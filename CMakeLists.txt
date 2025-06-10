@@ -31,7 +31,7 @@ if(USE_WINE_WINDOWS_API)
     )
     
     if(WINE_INCLUDE_DIR)
-        include_directories(${WINE_INCLUDE_DIR})
+        include_directories(SYSTEM ${WINE_INCLUDE_DIR})
         # Add our Wine stub headers for missing Windows headers
         include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/wine_stubs)
         message(STATUS "Found Wine headers: ${WINE_INCLUDE_DIR}")
@@ -115,12 +115,10 @@ endif()
 # Include directories
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/types
-    ${CMAKE_CURRENT_SOURCE_DIR}/utils
 )
 
 if(WIN32 OR USE_WINE_WINDOWS_API)
-    include_directories(${WINFSP_INCLUDE_DIR})
+    include_directories(SYSTEM ${WINFSP_INCLUDE_DIR})
 endif()
 
 # Source files
@@ -136,17 +134,6 @@ set(SOURCES
 if(USE_WINE_WINDOWS_API)
     list(APPEND SOURCES src/wine_stubs.cpp)
 endif()
-
-set(HEADERS
-    include/compiler_cache/hybrid_filesystem.hpp
-    include/compiler_cache/cache_manager.hpp
-    include/compiler_cache/network_client.hpp
-    include/compiler_cache/config_parser.hpp
-    include/compiler_cache/wine_compat.hpp
-    types/file_state.hpp
-    types/config.hpp
-    types/cache_entry.hpp
-)
 
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})

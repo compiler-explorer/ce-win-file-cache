@@ -4,8 +4,7 @@
             "name": "Linux Wine",
             "includePath": [
                 "${workspaceFolder}/include",
-                "${workspaceFolder}/types",
-                "${workspaceFolder}/utils",
+                "${workspaceFolder}/include/wine_stubs",
                 "${workspaceFolder}/external/winfsp/inc",
                 "/usr/include/wine/wine/windows"
             ],

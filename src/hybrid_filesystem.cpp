@@ -1,11 +1,7 @@
-#include "../include/compiler_cache/hybrid_filesystem.hpp"
-#ifdef WINE_CROSS_COMPILE
-#include "../include/compiler_cache/wine_compat.hpp"
-#else
-#include "../include/compiler_cache/alfaheader.h"
-#include <strsafe.h>
-#endif
+#include <ce-win-file-cache/alfaheader.h>
+#include <ce-win-file-cache/hybrid_filesystem.hpp>
 #include <iostream>
+#include <strsafe.h>
 
 namespace CeWinFileCache
 {

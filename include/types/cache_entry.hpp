@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../include/compiler_cache/windows_compat.hpp"
-#include "file_state.hpp"
+#include <ce-win-file-cache/windows_compat.hpp>
+#include <types/file_state.hpp>
 #include <chrono>
 #include <string>
 

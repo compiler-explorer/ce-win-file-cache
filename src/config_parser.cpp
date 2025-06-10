@@ -1,4 +1,4 @@
-#include "../include/compiler_cache/config_parser.hpp"
+#include <ce-win-file-cache/config_parser.hpp>
 #include <filesystem>
 #include <fstream>
 #include <regex>

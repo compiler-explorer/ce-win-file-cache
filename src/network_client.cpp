@@ -1,10 +1,5 @@
-#include "../include/compiler_cache/network_client.hpp"
-#ifdef WINE_CROSS_COMPILE
-#include "../include/compiler_cache/wine_compat.hpp"
-#else
-#include "../include/compiler_cache/alfaheader.h"
-#include <winnetwk.h>
-#endif
+#include <ce-win-file-cache/alfaheader.h>
+#include <ce-win-file-cache/network_client.hpp>
 #include <iostream>
 
 #ifndef WINE_CROSS_COMPILE

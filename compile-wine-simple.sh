@@ -20,6 +20,7 @@ cd build-wine
 # Configure
 echo "Configuring..."
 cmake .. \
+    -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DUSE_WINE_WINDOWS_API=ON \
     -DCMAKE_BUILD_TYPE=Debug \
     -DCMAKE_C_COMPILER=winegcc \

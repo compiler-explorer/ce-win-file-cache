@@ -1,5 +1,5 @@
-#include "../include/compiler_cache/config_parser.hpp"
-#include "../include/compiler_cache/hybrid_filesystem.hpp"
+#include <ce-win-file-cache/config_parser.hpp>
+#include <ce-win-file-cache/hybrid_filesystem.hpp>
 #include <iostream>
 #include <shellapi.h>
 #include <string>
@@ -122,6 +122,7 @@ class CompilerCacheService : public Fsp::Service
         // Configure host
         if (!volume_prefix.empty())
         {
+            // todo: find a nice way to convert from const wchar_t* to wchar_t*
             host_.SetPrefix(volume_prefix.c_str());
         }
 
