@@ -175,7 +175,7 @@ if(WIN32 OR USE_WINE_WINDOWS_API)
         
         # Wine-compatible compiler flags
         target_compile_options(${PROJECT_NAME} PRIVATE
-            -Wall -Wextra -Wno-unused-parameter
+            -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas -Wno-attributes
             $<$<CONFIG:Release>:-O3>
         )
         
