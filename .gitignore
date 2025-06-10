@@ -44,3 +44,46 @@
 *.suo
 *.log
 *.ilk
+
+# Build directories
+/build/
+/out/
+/bin/
+
+# Visual Studio
+/.vs/
+*.vcxproj.user
+*.sln.docstates
+*.sdf
+*.opensdf
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+_deps/
+
+# Cache directories
+CompilerCache/
+Cache/
+
+# IDE files
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

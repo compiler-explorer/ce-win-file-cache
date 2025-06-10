@@ -1,0 +1,3 @@
+[submodule "external/winfsp"]
+	path = external/winfsp
+	url = https://github.com/winfsp/winfsp.git

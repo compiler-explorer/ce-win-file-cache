@@ -4,15 +4,10 @@ project(CompilerCacheFS VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find WinFsp
+# Use WinFsp submodule
 if(WIN32)
-    set(WINFSP_ROOT "C:/Program Files (x86)/WinFsp" CACHE PATH "WinFsp installation directory")
-    
-    find_path(WINFSP_INCLUDE_DIR 
-        NAMES winfsp/winfsp.h
-        HINTS ${WINFSP_ROOT}/inc
-        DOC "WinFsp include directory"
-    )
+    set(WINFSP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/external/winfsp")
+    set(WINFSP_INCLUDE_DIR "${WINFSP_ROOT}/inc")
     
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
         set(WINFSP_ARCH "x64")
@@ -20,15 +15,30 @@ if(WIN32)
         set(WINFSP_ARCH "x86") 
     endif()
     
-    find_library(WINFSP_LIBRARY
-        NAMES winfsp-${WINFSP_ARCH}
-        HINTS ${WINFSP_ROOT}/lib
-        DOC "WinFsp library"
-    )
+    # Check if we have prebuilt libraries
+    set(WINFSP_LIBRARY "${WINFSP_ROOT}/opt/fsext/lib/winfsp-${WINFSP_ARCH}.lib")
     
-    if(NOT WINFSP_INCLUDE_DIR OR NOT WINFSP_LIBRARY)
-        message(FATAL_ERROR "WinFsp not found. Please install WinFsp and set WINFSP_ROOT")
+    if(NOT EXISTS ${WINFSP_INCLUDE_DIR}/winfsp/winfsp.h)
+        message(FATAL_ERROR "WinFsp submodule not found. Run: git submodule update --init --recursive")
     endif()
+    
+    if(NOT EXISTS ${WINFSP_LIBRARY})
+        message(WARNING "WinFsp prebuilt library not found at ${WINFSP_LIBRARY}")
+        message(STATUS "You may need to build WinFsp or install the WinFsp development package")
+        # Fall back to system installation
+        find_library(WINFSP_LIBRARY
+            NAMES winfsp-${WINFSP_ARCH}
+            HINTS "C:/Program Files (x86)/WinFsp/lib"
+            DOC "WinFsp library"
+        )
+        if(NOT WINFSP_LIBRARY)
+            message(FATAL_ERROR "WinFsp library not found. Please build WinFsp or install WinFsp development package")
+        endif()
+    endif()
+    
+    message(STATUS "Using WinFsp from submodule: ${WINFSP_ROOT}")
+    message(STATUS "WinFsp include dir: ${WINFSP_INCLUDE_DIR}")
+    message(STATUS "WinFsp library: ${WINFSP_LIBRARY}")
 endif()
 
 # Include directories

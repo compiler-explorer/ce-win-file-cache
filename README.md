@@ -20,8 +20,16 @@ A WinFsp-based hybrid cache filesystem for Compiler Explorer, designed to effici
 
 ## Building
 
-1. Install WinFsp from the official website
-2. Clone this repository
+1. Clone this repository with submodules:
+```cmd
+git clone --recursive https://github.com/your-org/ce-win-file-cache.git
+```
+Or if already cloned:
+```cmd
+git submodule update --init --recursive
+```
+
+2. Install WinFsp development package (optional - libraries included in submodule)
 3. Run the build script:
 
 ```cmd
