@@ -146,6 +146,7 @@ if(WIN32 OR USE_WINE_WINDOWS_API)
         UNICODE
         _UNICODE
         WIN32_LEAN_AND_MEAN
+        NO_WINFSP
     )
     
     if(USE_WINE_WINDOWS_API)

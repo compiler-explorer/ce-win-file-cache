@@ -3,11 +3,14 @@
 #include <iostream>
 #include <strsafe.h>
 
+#ifndef NO_WINFSP
+
 namespace CeWinFileCache
 {
 
 constexpr ULONG ALLOCATION_UNIT = 4096;
 constexpr ULONG FULLPATH_SIZE = MAX_PATH + FSP_FSCTL_TRANSACT_PATH_SIZEMAX / sizeof(WCHAR);
+
 
 HybridFileSystem::HybridFileSystem() : Fsp::FileSystemBase(), current_cache_size_(0), creation_time_(0)
 {
@@ -380,3 +383,5 @@ void HybridFileSystem::updateAccessTime(CacheEntry *entry)
 }
 
 } // namespace CeWinFileCache
+
+#endif

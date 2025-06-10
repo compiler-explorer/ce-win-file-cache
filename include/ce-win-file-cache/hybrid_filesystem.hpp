@@ -6,6 +6,8 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
+
+#ifndef NO_WINFSP
 #include <winfsp/winfsp.hpp>
 
 namespace CeWinFileCache
@@ -75,3 +77,5 @@ struct FileDescriptor
 };
 
 } // namespace CeWinFileCache
+
+#endif
