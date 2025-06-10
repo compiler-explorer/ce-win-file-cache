@@ -10,8 +10,8 @@ namespace CeWinFileCache
 class ConfigParser
 {
 public:
-    static std::optional<Config> parseYamlFile(const std::wstring& file_path);
-    static std::optional<Config> parseYamlString(const std::string& yaml_content);
+    static std::optional<Config> parseYamlFile(std::wstring_view file_path);
+    static std::optional<Config> parseYamlString(std::string yaml_content);
     
 private:
     static CompilerConfig parseCompilerConfig(const std::string& yaml_section);

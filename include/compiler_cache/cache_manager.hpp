@@ -1,5 +1,6 @@
 #pragma once
 
+#include "windows_compat.hpp"
 #include "../types/cache_entry.hpp"
 #include "../types/config.hpp"
 #include <memory>

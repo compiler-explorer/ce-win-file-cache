@@ -21,7 +21,7 @@ cmake .. \
 
 # Try to build
 echo "Building (this may fail due to WinFsp dependencies)..."
-make -j1 2>&1 | head -50
+make -j1
 
 echo ""
 echo "Note: Wine compilation is experimental."

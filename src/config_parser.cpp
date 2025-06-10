@@ -2,13 +2,16 @@
 #include <fstream>
 #include <sstream>
 #include <regex>
+#include <filesystem>
 
 namespace CeWinFileCache
 {
 
-std::optional<Config> ConfigParser::parseYamlFile(const std::wstring& file_path)
+std::optional<Config> ConfigParser::parseYamlFile(std::wstring_view file_path)
 {
-    std::ifstream file(file_path);
+    std::ifstream file;
+    auto filename = std::filesystem::path(file_path).string();
+    file.open(filename, std::ios::in);
     if (!file.is_open())
     {
         return std::nullopt;
@@ -20,11 +23,11 @@ std::optional<Config> ConfigParser::parseYamlFile(const std::wstring& file_path)
     return parseYamlString(content);
 }
 
-std::optional<Config> ConfigParser::parseYamlString(const std::string& yaml_content)
+std::optional<Config> ConfigParser::parseYamlString(std::string yaml_content)
 {
     Config config;
     
-    std::istringstream stream(yaml_content);
+    std::istringstream stream(yaml_content.data());
     std::string line;
     std::string current_section;
     std::string current_compiler;

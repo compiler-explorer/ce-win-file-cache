@@ -3,6 +3,7 @@
 #include <winfsp/winfsp.hpp>
 #include <iostream>
 #include <string>
+#include <shellapi.h>
 
 using namespace CeWinFileCache;
 
@@ -188,4 +189,19 @@ int wmain(int argc, wchar_t** argv)
     // Create and run service
     CompilerCacheService service;
     return service.Run();
-}
+};
+
+int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow)
+{
+    // call wmain with command line arguments
+    int argc;
+    wchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    if (!argv)
+    {
+        std::wcerr << L"Failed to parse command line arguments." << std::endl;
+        return 1;
+    }
+    int result = wmain(argc, argv);
+    LocalFree(argv); // Free the memory allocated by CommandLineToArgvW
+    return result;
+};

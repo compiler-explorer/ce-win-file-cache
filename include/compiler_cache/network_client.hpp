@@ -1,7 +1,8 @@
 #pragma once
 
+#include "windows_compat.hpp"
 #include <string>
-#include <windows.h>
+#include <vector>
 
 namespace CeWinFileCache
 {
