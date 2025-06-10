@@ -13,11 +13,10 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-#include <windows.h>
-#include <winbase.h>
-#include <winternl.h>
-#include <winnetwk.h>
-#include <strsafe.h>
+#include "alfaheader.h"
 #include <ntstatus.h>
 #include <shellapi.h>
+#include <strsafe.h>
+#include <winnetwk.h>
+#include <winternl.h>
 #endif

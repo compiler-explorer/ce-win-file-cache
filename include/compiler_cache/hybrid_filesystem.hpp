@@ -1,82 +1,50 @@
 #pragma once
 
-#include "windows_compat.hpp"
-#include "../types/config.hpp"
 #include "../types/cache_entry.hpp"
-#include <winfsp/winfsp.hpp>
+#include "../types/config.hpp"
+#include "windows_compat.hpp"
 #include <memory>
-#include <unordered_map>
 #include <mutex>
+#include <unordered_map>
+#include <winfsp/winfsp.hpp>
 
 namespace CeWinFileCache
 {
 
 class HybridFileSystem : public Fsp::FileSystemBase
 {
-public:
+    public:
     HybridFileSystem();
     ~HybridFileSystem();
-    
-    NTSTATUS Initialize(const Config& config);
-    NTSTATUS SetCompilerPaths(const std::unordered_map<std::wstring, std::wstring>& compiler_paths);
 
-protected:
+    NTSTATUS Initialize(const Config &config);
+    NTSTATUS SetCompilerPaths(const std::unordered_map<std::wstring, std::wstring> &compiler_paths);
+
+    protected:
     // WinFsp callbacks
     NTSTATUS Init(PVOID Host) override;
     NTSTATUS GetVolumeInfo(VolumeInfo *VolumeInfo) override;
-    NTSTATUS GetSecurityByName(
-        PWSTR FileName,
-        PUINT32 PFileAttributes,
-        PSECURITY_DESCRIPTOR SecurityDescriptor,
-        SIZE_T *PSecurityDescriptorSize) override;
-    NTSTATUS Open(
-        PWSTR FileName,
-        UINT32 CreateOptions,
-        UINT32 GrantedAccess,
-        PVOID *PFileNode,
-        PVOID *PFileDesc,
-        OpenFileInfo *OpenFileInfo) override;
+    NTSTATUS GetSecurityByName(PWSTR FileName, PUINT32 PFileAttributes, PSECURITY_DESCRIPTOR SecurityDescriptor, SIZE_T *PSecurityDescriptorSize) override;
+    NTSTATUS Open(PWSTR FileName, UINT32 CreateOptions, UINT32 GrantedAccess, PVOID *PFileNode, PVOID *PFileDesc, OpenFileInfo *OpenFileInfo) override;
     VOID Close(PVOID FileNode, PVOID FileDesc) override;
-    NTSTATUS Read(
-        PVOID FileNode,
-        PVOID FileDesc,
-        PVOID Buffer,
-        UINT64 Offset,
-        ULONG Length,
-        PULONG PBytesTransferred) override;
-    NTSTATUS GetFileInfo(
-        PVOID FileNode,
-        PVOID FileDesc,
-        FileInfo *FileInfo) override;
-    NTSTATUS ReadDirectory(
-        PVOID FileNode,
-        PVOID FileDesc,
-        PWSTR Pattern,
-        PWSTR Marker,
-        PVOID Buffer,
-        ULONG Length,
-        PULONG PBytesTransferred) override;
-    NTSTATUS ReadDirectoryEntry(
-        PVOID FileNode,
-        PVOID FileDesc,
-        PWSTR Pattern,
-        PWSTR Marker,
-        PVOID *PContext,
-        DirInfo *DirInfo) override;
+    NTSTATUS Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UINT64 Offset, ULONG Length, PULONG PBytesTransferred) override;
+    NTSTATUS GetFileInfo(PVOID FileNode, PVOID FileDesc, FileInfo *FileInfo) override;
+    NTSTATUS ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID Buffer, ULONG Length, PULONG PBytesTransferred) override;
+    NTSTATUS ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID *PContext, DirInfo *DirInfo) override;
 
-private:
+    private:
     // Internal methods
-    std::wstring resolveVirtualPath(const std::wstring& virtual_path);
-    CacheEntry* getCacheEntry(const std::wstring& virtual_path);
-    NTSTATUS ensureFileAvailable(CacheEntry* entry);
-    NTSTATUS fetchFromNetwork(CacheEntry* entry);
-    bool matchesPattern(const std::wstring& path, const std::wstring& pattern);
-    CachePolicy determineCachePolicy(const std::wstring& virtual_path);
-    
+    std::wstring resolveVirtualPath(const std::wstring &virtual_path);
+    CacheEntry *getCacheEntry(const std::wstring &virtual_path);
+    NTSTATUS ensureFileAvailable(CacheEntry *entry);
+    NTSTATUS fetchFromNetwork(CacheEntry *entry);
+    bool matchesPattern(const std::wstring &path, const std::wstring &pattern);
+    CachePolicy determineCachePolicy(const std::wstring &virtual_path);
+
     // Cache management
     NTSTATUS evictIfNeeded();
-    void updateAccessTime(CacheEntry* entry);
-    
+    void updateAccessTime(CacheEntry *entry);
+
     Config config_;
     std::unordered_map<std::wstring, std::unique_ptr<CacheEntry>> cache_entries_;
     std::mutex cache_mutex_;
@@ -87,10 +55,12 @@ private:
 struct FileDescriptor
 {
     HANDLE handle;
-    CacheEntry* entry;
+    CacheEntry *entry;
     PVOID dir_buffer;
-    
-    FileDescriptor() : handle(INVALID_HANDLE_VALUE), entry(nullptr), dir_buffer(nullptr) {}
+
+    FileDescriptor() : handle(INVALID_HANDLE_VALUE), entry(nullptr), dir_buffer(nullptr)
+    {
+    }
     ~FileDescriptor()
     {
         if (handle != INVALID_HANDLE_VALUE)

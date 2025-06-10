@@ -3,7 +3,7 @@
 // Wine compatibility header for cross-compilation
 #ifdef WINE_CROSS_COMPILE
 
-// Include Wine stub headers first  
+// Include Wine stub headers first
 #include "../wine_stubs/devioctl.h"
 
 // Prevent Windows min/max macro conflicts with C++ STL
@@ -30,19 +30,19 @@
 #endif
 #endif
 
-#include <windows.h>
-#include <winbase.h>
-#include <winnetwk.h>
-#include <strsafe.h>
-#include <winternl.h>
+#include "alfaheader.h"
 #include <ntstatus.h>
 #include <shellapi.h>
+#include <strsafe.h>
+#include <winnetwk.h>
+#include <winternl.h>
 
-// Wine may not have all shell functions - provide declarations  
+// Wine may not have all shell functions - provide declarations
 #ifdef WINE_CROSS_COMPILE
-extern "C" {
+extern "C"
+{
     HRESULT WINAPI SHCreateDirectoryExW(HWND hwnd, LPCWSTR pszPath, const SECURITY_ATTRIBUTES *psa);
-    WCHAR** WINAPI CommandLineToArgvW(LPCWSTR lpCmdLine, int* pNumArgs);
+    WCHAR **WINAPI CommandLineToArgvW(LPCWSTR lpCmdLine, int *pNumArgs);
 }
 #endif
 
@@ -55,7 +55,7 @@ extern "C" {
 #ifdef min
 #undef min
 #endif
-#ifdef max  
+#ifdef max
 #undef max
 #endif
 
@@ -122,13 +122,13 @@ typedef NTSTATUS *PNTSTATUS;
 
 #ifndef NTSTATUS_FROM_WIN32
 #define NTSTATUS_FROM_WIN32(x) \
-    ((NTSTATUS)(x) <= 0 ? ((NTSTATUS)(x)) : ((NTSTATUS) (((x) & 0x0000FFFF) | (FACILITY_WIN32 << 16) | ERROR_SEVERITY_ERROR)))
+    ((NTSTATUS)(x) <= 0 ? ((NTSTATUS)(x)) : ((NTSTATUS)(((x) & 0x0000FFFF) | (FACILITY_WIN32 << 16) | ERROR_SEVERITY_ERROR)))
 #endif
 
 // Wine-specific workarounds
-namespace CeWinFileCache 
+namespace CeWinFileCache
 {
-namespace WineCompat 
+namespace WineCompat
 {
 
 // Helper function to work around potential Wine limitations
@@ -136,27 +136,27 @@ inline NTSTATUS NtStatusFromWin32(DWORD error)
 {
     if (error == ERROR_SUCCESS)
         return STATUS_SUCCESS;
-    
+
     // Map common Win32 errors to NTSTATUS
     switch (error)
     {
-        case ERROR_FILE_NOT_FOUND:
-        case ERROR_PATH_NOT_FOUND:
-            return STATUS_OBJECT_NAME_NOT_FOUND;
-        case ERROR_INVALID_NAME:
-            return STATUS_OBJECT_NAME_INVALID;
-        case ERROR_ACCESS_DENIED:
-            return STATUS_ACCESS_DENIED;
-        case ERROR_INSUFFICIENT_BUFFER:
-            return STATUS_BUFFER_TOO_SMALL;
-        case ERROR_NO_MORE_FILES:
-            return STATUS_NO_MORE_FILES;
-        case ERROR_DISK_FULL:
-            return STATUS_DISK_FULL;
-        case ERROR_INVALID_HANDLE:
-            return STATUS_INVALID_HANDLE;
-        default:
-            return NTSTATUS_FROM_WIN32(error);
+    case ERROR_FILE_NOT_FOUND:
+    case ERROR_PATH_NOT_FOUND:
+        return STATUS_OBJECT_NAME_NOT_FOUND;
+    case ERROR_INVALID_NAME:
+        return STATUS_OBJECT_NAME_INVALID;
+    case ERROR_ACCESS_DENIED:
+        return STATUS_ACCESS_DENIED;
+    case ERROR_INSUFFICIENT_BUFFER:
+        return STATUS_BUFFER_TOO_SMALL;
+    case ERROR_NO_MORE_FILES:
+        return STATUS_NO_MORE_FILES;
+    case ERROR_DISK_FULL:
+        return STATUS_DISK_FULL;
+    case ERROR_INVALID_HANDLE:
+        return STATUS_INVALID_HANDLE;
+    default:
+        return NTSTATUS_FROM_WIN32(error);
     }
 }
 

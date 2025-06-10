@@ -2,7 +2,7 @@
 #ifdef WINE_CROSS_COMPILE
 #include "../include/compiler_cache/wine_compat.hpp"
 #else
-#include <windows.h>
+#include "../include/compiler_cache/alfaheader.h"
 #include <winnetwk.h>
 #endif
 #include <iostream>
@@ -14,8 +14,7 @@
 namespace CeWinFileCache
 {
 
-NetworkClient::NetworkClient()
-    : is_connected_(false)
+NetworkClient::NetworkClient() : is_connected_(false)
 {
     ZeroMemory(&net_resource_, sizeof(net_resource_));
 }
@@ -25,18 +24,18 @@ NetworkClient::~NetworkClient()
     disconnect();
 }
 
-NTSTATUS NetworkClient::connect(const std::wstring& share_path)
+NTSTATUS NetworkClient::connect(const std::wstring &share_path)
 {
     if (is_connected_ && current_share_ == share_path)
     {
         return STATUS_SUCCESS;
     }
-    
+
     if (is_connected_)
     {
         disconnect();
     }
-    
+
     return establishConnection(share_path);
 }
 
@@ -46,12 +45,12 @@ NTSTATUS NetworkClient::disconnect()
     {
         return STATUS_SUCCESS;
     }
-    
+
     cleanupConnection();
     return STATUS_SUCCESS;
 }
 
-NTSTATUS NetworkClient::copyFileToLocal(const std::wstring& network_path, const std::wstring& local_path)
+NTSTATUS NetworkClient::copyFileToLocal(const std::wstring &network_path, const std::wstring &local_path)
 {
     // Ensure the local directory exists
     size_t last_slash = local_path.find_last_of(L'\\');
@@ -60,77 +59,73 @@ NTSTATUS NetworkClient::copyFileToLocal(const std::wstring& network_path, const 
         std::wstring dir_path = local_path.substr(0, last_slash);
         SHCreateDirectoryExW(nullptr, dir_path.c_str(), nullptr);
     }
-    
+
     if (!CopyFileW(network_path.c_str(), local_path.c_str(), FALSE))
     {
         DWORD error = GetLastError();
-        std::wcerr << L"Failed to copy file from " << network_path 
-                   << L" to " << local_path 
-                   << L". Error: " << error << std::endl;
+        std::wcerr << L"Failed to copy file from " << network_path << L" to " << local_path << L". Error: " << error << std::endl;
         return CeWinFileCache::WineCompat::NtStatusFromWin32(error);
     }
-    
+
     return STATUS_SUCCESS;
 }
 
-NTSTATUS NetworkClient::getFileInfo(const std::wstring& network_path, WIN32_FILE_ATTRIBUTE_DATA* file_data)
+NTSTATUS NetworkClient::getFileInfo(const std::wstring &network_path, WIN32_FILE_ATTRIBUTE_DATA *file_data)
 {
     if (!GetFileAttributesExW(network_path.c_str(), GetFileExInfoStandard, file_data))
     {
         return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
     }
-    
+
     return STATUS_SUCCESS;
 }
 
-bool NetworkClient::fileExists(const std::wstring& network_path)
+bool NetworkClient::fileExists(const std::wstring &network_path)
 {
     DWORD attributes = GetFileAttributesW(network_path.c_str());
     return attributes != INVALID_FILE_ATTRIBUTES;
 }
 
-NTSTATUS NetworkClient::enumerateDirectory(const std::wstring& network_path, 
-                                          std::vector<WIN32_FIND_DATAW>& entries)
+NTSTATUS NetworkClient::enumerateDirectory(const std::wstring &network_path, std::vector<WIN32_FIND_DATAW> &entries)
 {
     entries.clear();
-    
+
     std::wstring search_pattern = network_path;
     if (search_pattern.back() != L'\\')
     {
         search_pattern += L'\\';
     }
     search_pattern += L"*";
-    
+
     WIN32_FIND_DATAW find_data;
     HANDLE find_handle = FindFirstFileW(search_pattern.c_str(), &find_data);
-    
+
     if (find_handle == INVALID_HANDLE_VALUE)
     {
         return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
     }
-    
+
     do
     {
         // Skip . and .. entries
-        if (wcscmp(find_data.cFileName, L".") != 0 && 
-            wcscmp(find_data.cFileName, L"..") != 0)
+        if (wcscmp(find_data.cFileName, L".") != 0 && wcscmp(find_data.cFileName, L"..") != 0)
         {
             entries.push_back(find_data);
         }
     } while (FindNextFileW(find_handle, &find_data));
-    
+
     DWORD error = GetLastError();
     FindClose(find_handle);
-    
+
     if (error != ERROR_NO_MORE_FILES)
     {
         return CeWinFileCache::WineCompat::NtStatusFromWin32(error);
     }
-    
+
     return STATUS_SUCCESS;
 }
 
-NTSTATUS NetworkClient::establishConnection(const std::wstring& share_path)
+NTSTATUS NetworkClient::establishConnection(const std::wstring &share_path)
 {
     // For UNC paths, we typically don't need explicit connection
     // but we can verify access
@@ -138,21 +133,20 @@ NTSTATUS NetworkClient::establishConnection(const std::wstring& share_path)
     if (attributes == INVALID_FILE_ATTRIBUTES)
     {
         DWORD error = GetLastError();
-        
+
         // Try to establish a connection if access failed
         net_resource_.dwType = RESOURCETYPE_DISK;
         net_resource_.lpLocalName = nullptr; // No drive mapping
         net_resource_.lpRemoteName = const_cast<LPWSTR>(share_path.c_str());
         net_resource_.lpProvider = nullptr;
-        
+
         DWORD result = WNetAddConnection2W(&net_resource_, nullptr, nullptr, 0);
         if (result != NO_ERROR && result != ERROR_ALREADY_ASSIGNED)
         {
-            std::wcerr << L"Failed to connect to " << share_path 
-                       << L". Error: " << result << std::endl;
+            std::wcerr << L"Failed to connect to " << share_path << L". Error: " << result << std::endl;
             return CeWinFileCache::WineCompat::NtStatusFromWin32(result);
         }
-        
+
         // Verify access again
         attributes = GetFileAttributesW(share_path.c_str());
         if (attributes == INVALID_FILE_ATTRIBUTES)
@@ -160,10 +154,10 @@ NTSTATUS NetworkClient::establishConnection(const std::wstring& share_path)
             return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
         }
     }
-    
+
     current_share_ = share_path;
     is_connected_ = true;
-    
+
     return STATUS_SUCCESS;
 }
 
@@ -178,7 +172,7 @@ void NetworkClient::cleanupConnection()
         }
         current_share_.clear();
     }
-    
+
     ZeroMemory(&net_resource_, sizeof(net_resource_));
     is_connected_ = false;
 }

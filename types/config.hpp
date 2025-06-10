@@ -1,8 +1,8 @@
 #pragma once
 
 #include <string>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 namespace CeWinFileCache
 {
@@ -15,7 +15,7 @@ struct CompilerConfig
     std::vector<std::wstring> prefetch_patterns;
 };
 
-struct GlobalConfig  
+struct GlobalConfig
 {
     size_t total_cache_size_mb;
     std::wstring eviction_policy;

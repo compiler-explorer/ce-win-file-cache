@@ -7,6 +7,12 @@ echo "Attempting Wine compilation (experimental)..."
 echo "Note: WinFsp requires Windows-specific headers that Wine may not provide"
 echo ""
 
+# Format all source files before compilation
+echo "Formatting source files with clang-format..."
+find src include/compiler_cache include/wine_stubs types utils -name "*.cpp" -o -name "*.hpp" | xargs clang-format -i
+echo "Formatting complete."
+echo ""
+
 # Create build directory  
 mkdir -p build-wine
 cd build-wine

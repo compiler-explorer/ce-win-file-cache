@@ -4,12 +4,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <cwchar>
-#include <vector>
-#include <string>
 #include <memory>
+#include <string>
+#include <vector>
 
 // C++ implementation of CommandLineToArgvW for Wine
-extern "C" WCHAR** WINAPI CommandLineToArgvW(LPCWSTR lpCmdLine, int* pNumArgs)
+extern "C" WCHAR **WINAPI CommandLineToArgvW(LPCWSTR lpCmdLine, int *pNumArgs)
 {
     if (!lpCmdLine || !pNumArgs)
     {
@@ -19,14 +19,14 @@ extern "C" WCHAR** WINAPI CommandLineToArgvW(LPCWSTR lpCmdLine, int* pNumArgs)
 
     std::wstring cmdLine(lpCmdLine);
     std::vector<std::wstring> args;
-    
+
     // Simple tokenization - split on spaces
     // This is a basic implementation for Wine compatibility
     if (!cmdLine.empty())
     {
         size_t start = 0;
         size_t end = 0;
-        
+
         while ((end = cmdLine.find(L' ', start)) != std::wstring::npos)
         {
             if (end != start)
@@ -35,40 +35,40 @@ extern "C" WCHAR** WINAPI CommandLineToArgvW(LPCWSTR lpCmdLine, int* pNumArgs)
             }
             start = end + 1;
         }
-        
+
         // Add the last token
         if (start < cmdLine.length())
         {
             args.push_back(cmdLine.substr(start));
         }
-        
+
         // If no spaces found, use the whole string
         if (args.empty())
         {
             args.push_back(cmdLine);
         }
     }
-    
+
     *pNumArgs = static_cast<int>(args.size());
-    
+
     if (args.empty())
     {
         return nullptr;
     }
-    
+
     // Allocate array of WCHAR* pointers
-    WCHAR** argv = static_cast<WCHAR**>(LocalAlloc(LMEM_FIXED, sizeof(WCHAR*) * args.size()));
+    WCHAR **argv = static_cast<WCHAR **>(LocalAlloc(LMEM_FIXED, sizeof(WCHAR *) * args.size()));
     if (!argv)
     {
         *pNumArgs = 0;
         return nullptr;
     }
-    
+
     // Allocate and copy each argument string
     for (size_t i = 0; i < args.size(); ++i)
     {
         size_t len = args[i].length() + 1;
-        argv[i] = static_cast<WCHAR*>(LocalAlloc(LMEM_FIXED, len * sizeof(WCHAR)));
+        argv[i] = static_cast<WCHAR *>(LocalAlloc(LMEM_FIXED, len * sizeof(WCHAR)));
         if (!argv[i])
         {
             // Clean up previously allocated strings
@@ -80,10 +80,10 @@ extern "C" WCHAR** WINAPI CommandLineToArgvW(LPCWSTR lpCmdLine, int* pNumArgs)
             *pNumArgs = 0;
             return nullptr;
         }
-        
+
         wcscpy(argv[i], args[i].c_str());
     }
-    
+
     return argv;
 }
 
@@ -91,7 +91,7 @@ extern "C" WCHAR** WINAPI CommandLineToArgvW(LPCWSTR lpCmdLine, int* pNumArgs)
 extern "C" HRESULT WINAPI SHCreateDirectoryExW(HWND hwnd, LPCWSTR pszPath, const SECURITY_ATTRIBUTES *psa)
 {
     // Simple implementation using CreateDirectoryW
-    if (CreateDirectoryW(pszPath, (SECURITY_ATTRIBUTES*)psa))
+    if (CreateDirectoryW(pszPath, (SECURITY_ATTRIBUTES *)psa))
     {
         return S_OK;
     }
@@ -107,15 +107,13 @@ extern "C" DWORD WINAPI WNetAddConnection2W(LPNETRESOURCEW lpNetResource, LPCWST
     {
         return ERROR_INVALID_PARAMETER;
     }
-    
+
     // Accept UNC paths
-    if (wcslen(lpNetResource->lpRemoteName) >= 2 && 
-        lpNetResource->lpRemoteName[0] == L'\\' && 
-        lpNetResource->lpRemoteName[1] == L'\\')
+    if (wcslen(lpNetResource->lpRemoteName) >= 2 && lpNetResource->lpRemoteName[0] == L'\\' && lpNetResource->lpRemoteName[1] == L'\\')
     {
         return NO_ERROR;
     }
-    
+
     return ERROR_BAD_NET_NAME;
 }
 
@@ -126,7 +124,7 @@ extern "C" DWORD WINAPI WNetCancelConnection2W(LPCWSTR lpName, DWORD dwFlags, BO
     {
         return ERROR_INVALID_PARAMETER;
     }
-    
+
     return NO_ERROR;
 }
 
