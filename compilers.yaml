@@ -1,0 +1,38 @@
+compilers:
+  msvc-14.29:
+    network_path: "\\\\fileserver\\compilers\\msvc-14.29"
+    cache_size_mb: 2048
+    cache_always:
+      - "bin/**/*.exe"
+      - "bin/**/*.dll"
+      - "include/vcruntime*.h"
+      - "include/stddef.h"
+      - "include/limits.h"
+    prefetch_patterns:
+      - "**/*.h"
+      - "**/*.hpp"
+      
+  msvc-14.32:
+    network_path: "\\\\fileserver\\compilers\\msvc-14.32"
+    cache_size_mb: 2048
+    cache_always:
+      - "bin/**/*.exe"
+      - "bin/**/*.dll"
+      - "include/vcruntime*.h"
+    prefetch_patterns:
+      - "**/*.h"
+      - "**/*.hpp"
+      
+  msvc-14.35:
+    network_path: "\\\\fileserver\\compilers\\msvc-14.35"
+    cache_size_mb: 2048
+    cache_always:
+      - "bin/**/*.exe"
+      - "bin/**/*.dll"
+    prefetch_patterns:
+      - "**/*.h"
+
+global:
+  total_cache_size_mb: 8192
+  eviction_policy: "lru"
+  cache_directory: "C:\\CompilerCache"
