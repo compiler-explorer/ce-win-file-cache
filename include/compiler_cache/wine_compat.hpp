@@ -14,6 +14,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
+
 // Define Windows architecture macros for WinFsp compatibility
 #ifdef __x86_64__
 #ifndef _AMD64_
@@ -30,8 +31,25 @@
 #endif
 
 #include <windows.h>
+#include <winbase.h>
 #include <winnetwk.h>
 #include <strsafe.h>
+#include <winternl.h>
+#include <ntstatus.h>
+#include <shellapi.h>
+
+// Wine may not have all shell functions - provide declarations  
+#ifdef WINE_CROSS_COMPILE
+extern "C" {
+    HRESULT WINAPI SHCreateDirectoryExW(HWND hwnd, LPCWSTR pszPath, const SECURITY_ATTRIBUTES *psa);
+    WCHAR** WINAPI CommandLineToArgvW(LPCWSTR lpCmdLine, int* pNumArgs);
+}
+#endif
+
+// Prevent WinFsp from redefining structures already defined by Wine
+#ifndef __MINGW32__
+#define __MINGW32__
+#endif
 
 // Undefine conflicting macros if they still exist
 #ifdef min
@@ -92,6 +110,11 @@
 #define STATUS_INVALID_DEVICE_REQUEST ((NTSTATUS)0xC0000010L)
 #endif
 
+// Define PNTSTATUS as pointer to NTSTATUS
+#ifndef PNTSTATUS
+typedef NTSTATUS *PNTSTATUS;
+#endif
+
 // Helper macros for Wine compatibility
 #ifndef NT_SUCCESS
 #define NT_SUCCESS(Status) (((NTSTATUS)(Status)) >= 0)
@@ -100,11 +123,6 @@
 #ifndef NTSTATUS_FROM_WIN32
 #define NTSTATUS_FROM_WIN32(x) \
     ((NTSTATUS)(x) <= 0 ? ((NTSTATUS)(x)) : ((NTSTATUS) (((x) & 0x0000FFFF) | (FACILITY_WIN32 << 16) | ERROR_SEVERITY_ERROR)))
-#endif
-
-// Wine may not have SHCreateDirectoryEx
-#ifndef SHCreateDirectoryExW
-HRESULT WINAPI SHCreateDirectoryExW(HWND hwnd, LPCWSTR pszPath, const SECURITY_ATTRIBUTES *psa);
 #endif
 
 // Wine-specific workarounds
@@ -140,6 +158,16 @@ inline NTSTATUS NtStatusFromWin32(DWORD error)
         default:
             return NTSTATUS_FROM_WIN32(error);
     }
+}
+
+// Cross-platform helper for converting GetLastError() to NTSTATUS
+inline NTSTATUS GetLastErrorAsNtStatus()
+{
+#ifdef WINE_CROSS_COMPILE
+    return NtStatusFromWin32(GetLastError());
+#else
+    return NTSTATUS_FROM_WIN32(GetLastError());
+#endif
 }
 
 } // namespace WineCompat

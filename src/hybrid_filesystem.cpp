@@ -34,11 +34,7 @@ NTSTATUS HybridFileSystem::Initialize(const Config& config)
         DWORD error = GetLastError();
         if (error != ERROR_ALREADY_EXISTS)
         {
-    #ifdef WINE_CROSS_COMPILE
-        return WineCompat::NtStatusFromWin32(error);
-#else
-        return NTSTATUS_FROM_WIN32(error);
-#endif
+            return CeWinFileCache::WineCompat::NtStatusFromWin32(error);
         }
     }
     
@@ -195,11 +191,7 @@ NTSTATUS HybridFileSystem::Open(
     if (file_desc->handle == INVALID_HANDLE_VALUE)
     {
         delete file_desc;
-#ifdef WINE_CROSS_COMPILE
-        return WineCompat::NtStatusFromWin32(GetLastError());
-#else
-        return NTSTATUS_FROM_WIN32(GetLastError());
-#endif
+        return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
     }
     
     file_desc->entry = entry;
@@ -210,11 +202,7 @@ NTSTATUS HybridFileSystem::Open(
     if (!GetFileInformationByHandle(file_desc->handle, &file_info))
     {
         delete file_desc;
-#ifdef WINE_CROSS_COMPILE
-        return WineCompat::NtStatusFromWin32(GetLastError());
-#else
-        return NTSTATUS_FROM_WIN32(GetLastError());
-#endif
+        return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
     }
     
     // Fill OpenFileInfo
@@ -265,11 +253,7 @@ NTSTATUS HybridFileSystem::Read(
     
     if (!ReadFile(file_desc->handle, Buffer, Length, PBytesTransferred, &overlapped))
     {
-#ifdef WINE_CROSS_COMPILE
-        return WineCompat::NtStatusFromWin32(GetLastError());
-#else
-        return NTSTATUS_FROM_WIN32(GetLastError());
-#endif
+        return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
     }
     
     // Update access statistics
@@ -291,11 +275,7 @@ NTSTATUS HybridFileSystem::GetFileInfo(
     BY_HANDLE_FILE_INFORMATION file_info;
     if (!GetFileInformationByHandle(file_desc->handle, &file_info))
     {
-#ifdef WINE_CROSS_COMPILE
-        return WineCompat::NtStatusFromWin32(GetLastError());
-#else
-        return NTSTATUS_FROM_WIN32(GetLastError());
-#endif
+        return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
     }
     
     FileInfo->FileAttributes = file_info.dwFileAttributes;

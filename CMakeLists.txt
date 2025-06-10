@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(CompilerCacheFS VERSION 1.0.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Option to use Wine's Windows API implementation for cross-compilation
@@ -70,7 +70,7 @@ if(USE_WINE_WINDOWS_API)
     
     # Wine typically provides these through winegcc, so we can add them as link flags
     if(NOT WINE_LIBRARIES)
-        set(WINE_LINK_FLAGS "-lkernel32 -luser32 -ladvapi32 -lnetapi32 -lmpr")
+        set(WINE_LINK_FLAGS "-lkernel32 -luser32 -ladvapi32 -lnetapi32 -lmpr -lshell32 -lshlwapi -lole32 -loleaut32")
         message(STATUS "Using Wine link flags: ${WINE_LINK_FLAGS}")
     endif()
 endif()
@@ -132,6 +132,11 @@ set(SOURCES
     src/main.cpp
 )
 
+# Add Wine-specific stubs when using Wine
+if(USE_WINE_WINDOWS_API)
+    list(APPEND SOURCES src/wine_stubs.cpp)
+endif()
+
 set(HEADERS
     include/compiler_cache/hybrid_filesystem.hpp
     include/compiler_cache/cache_manager.hpp
@@ -164,19 +169,22 @@ if(WIN32 OR USE_WINE_WINDOWS_API)
                 ${WINE_LIBRARIES}
             )
         else()
+            # Use target_link_libraries for proper ordering instead of LINK_FLAGS
             target_link_libraries(${PROJECT_NAME} 
                 ${WINFSP_LIBRARY}
-            )
-            # Add Wine libraries as link flags
-            set_target_properties(${PROJECT_NAME} PROPERTIES
-                LINK_FLAGS "${WINE_LINK_FLAGS}"
+                kernel32 user32 advapi32 netapi32 mpr shell32 shlwapi ole32 oleaut32
             )
         endif()
         
         # Wine-compatible compiler flags
         target_compile_options(${PROJECT_NAME} PRIVATE
-            -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas -Wno-attributes
+            -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas -Wno-attributes -fpermissive -mconsole
             $<$<CONFIG:Release>:-O3>
+        )
+        
+        # Additional Wine-specific link flags (only export-dynamic now)
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+            LINK_FLAGS "-Wl,--export-dynamic"
         )
         
         # Define architecture macros for WinFsp compatibility
@@ -194,6 +202,10 @@ if(WIN32 OR USE_WINE_WINDOWS_API)
             Userenv.lib
             netapi32.lib
             mpr.lib
+            shell32.lib
+            shlwapi.lib
+            ole32.lib
+            oleaut32.lib
         )
         
         # Enable strict warnings as per CLAUDE.md
