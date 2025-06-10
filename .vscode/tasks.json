@@ -1,0 +1,98 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build with Wine",
+            "type": "shell",
+            "command": "./build-wine.sh",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "detail": "Build using Wine Windows API implementation"
+        },
+        {
+            "label": "Build with Wine (Debug)",
+            "type": "shell",
+            "command": "./build-wine.sh",
+            "args": ["debug"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "detail": "Build debug version using Wine"
+        },
+        {
+            "label": "Configure CMake with Wine",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "..",
+                "-DUSE_WINE_WINDOWS_API=ON",
+                "-DCMAKE_BUILD_TYPE=Debug"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/build-wine"
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "detail": "Configure CMake for Wine compilation"
+        },
+        {
+            "label": "Clean Wine Build",
+            "type": "shell",
+            "command": "rm",
+            "args": ["-rf", "build-wine"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "detail": "Clean Wine build directory"
+        },
+        {
+            "label": "Run with Wine",
+            "type": "shell",
+            "command": "wine",
+            "args": [
+                "build-wine/bin/CompilerCacheFS.exe",
+                "--help"
+            ],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "dependsOn": "Build with Wine",
+            "detail": "Run the compiled executable with Wine"
+        }
+    ]
+}

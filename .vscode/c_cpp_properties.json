@@ -1,0 +1,78 @@
+{
+    "configurations": [
+        {
+            "name": "Linux Wine",
+            "includePath": [
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/types",
+                "${workspaceFolder}/utils",
+                "${workspaceFolder}/external/winfsp/inc",
+                "/usr/include/wine/wine/windows"
+            ],
+            "defines": [
+                "WINE_CROSS_COMPILE",
+                "_WIN32_WINNT=0x0A00",
+                "NTDDI_VERSION=0x0A000000",
+                "_CONSOLE",
+                "UNICODE",
+                "_UNICODE",
+                "WIN32_LEAN_AND_MEAN"
+            ],
+            "compilerPath": "/usr/bin/wineg++",
+            "cStandard": "c17",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "gcc-x64",
+            "configurationProvider": "ms-vscode.cmake-tools"
+        },
+        {
+            "name": "Windows Native",
+            "includePath": [
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/types",
+                "${workspaceFolder}/utils",
+                "${workspaceFolder}/external/winfsp/inc",
+                "C:/Program Files (x86)/WinFsp/inc",
+                "C:/Program Files (x86)/Windows Kits/10/Include/*/um",
+                "C:/Program Files (x86)/Windows Kits/10/Include/*/shared",
+                "C:/Program Files (x86)/Windows Kits/10/Include/*/winrt",
+                "C:/Program Files (x86)/Windows Kits/10/Include/*/cppwinrt",
+                "C:/Program Files (x86)/Microsoft Visual Studio/*/VC/Tools/MSVC/*/include",
+                "C:/Program Files/Microsoft Visual Studio/*/VC/Tools/MSVC/*/include"
+            ],
+            "defines": [
+                "_WIN32_WINNT=0x0A00",
+                "NTDDI_VERSION=0x0A000000",
+                "_CONSOLE",
+                "UNICODE",
+                "_UNICODE",
+                "WIN32_LEAN_AND_MEAN",
+                "_CRT_SECURE_NO_WARNINGS"
+            ],
+            "compilerPath": "cl.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "msvc-x64",
+            "configurationProvider": "ms-vscode.cmake-tools"
+        },
+        {
+            "name": "Linux GCC (Non-Windows)",
+            "includePath": [
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/types",
+                "${workspaceFolder}/utils",
+                "/usr/include",
+                "/usr/local/include",
+                "/usr/include/c++/*"
+            ],
+            "defines": [
+                "_GNU_SOURCE"
+            ],
+            "compilerPath": "/usr/bin/g++",
+            "cStandard": "c17",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "gcc-x64",
+            "configurationProvider": "ms-vscode.cmake-tools"
+        }
+    ],
+    "version": 4
+}

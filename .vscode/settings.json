@@ -1,0 +1,48 @@
+{
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "C_Cpp.default.intelliSenseMode": "gcc-x64",
+    "C_Cpp.default.compilerPath": "/usr/bin/wineg++",
+    "C_Cpp.default.cppStandard": "c++20",
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/types", 
+        "${workspaceFolder}/utils",
+        "${workspaceFolder}/external/winfsp/inc",
+        "/usr/include/wine/wine/windows"
+    ],
+    "C_Cpp.default.defines": [
+        "WINE_CROSS_COMPILE",
+        "_WIN32_WINNT=0x0A00",
+        "UNICODE",
+        "_UNICODE"
+    ],
+    "cmake.configureArgs": [
+        "-DUSE_WINE_WINDOWS_API=ON"
+    ],
+    "cmake.buildArgs": [
+        "-j8"
+    ],
+    "cmake.parallelJobs": 8,
+    "files.associations": {
+        "*.hpp": "cpp",
+        "*.h": "c",
+        "windows.h": "c",
+        "winnetwk.h": "c",
+        "strsafe.h": "c"
+    },
+    "files.exclude": {
+        "**/build*/": true,
+        "**/test-*/": true,
+        "**/.cache/": true
+    },
+    "search.exclude": {
+        "**/build*/": true,
+        "**/test-*/": true,
+        "**/external/winfsp/tst/": true,
+        "**/external/winfsp/tools/": true,
+        "**/external/winfsp/doc/": true
+    },
+    "C_Cpp.errorSquiggles": "enabled",
+    "C_Cpp.intelliSenseEngine": "default",
+    "C_Cpp.enhancedColorization": "enabled"
+}

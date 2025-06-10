@@ -2,7 +2,7 @@
 #ifdef WINE_CROSS_COMPILE
 #include "../include/compiler_cache/wine_compat.hpp"
 #else
-#include <Windows.h>
+#include <windows.h>
 #include <strsafe.h>
 #endif
 #include <iostream>

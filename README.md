@@ -72,6 +72,21 @@ This is useful for:
 - CI/CD pipelines on Linux
 - Testing Windows functionality without Windows
 
+### VSCode Integration
+
+The project includes VSCode configuration for Wine development:
+
+- **IntelliSense**: Configured to use Wine Windows headers for code completion
+- **Build Tasks**: `Ctrl+Shift+P` → "Tasks: Run Task" → "Build with Wine"
+- **Debugging**: Wine debugging support with GDB integration
+- **Multiple Configurations**: Switch between Wine, Windows Native, and Linux GCC
+
+To use Wine configuration in VSCode:
+1. Open the project in VSCode
+2. Install recommended extensions (C/C++, CMake Tools)
+3. Select "Linux Wine" configuration (bottom-right status bar)
+4. Use `Ctrl+Shift+B` to build with Wine
+
 ## Configuration
 
 Create a `compilers.yaml` file (see included example):

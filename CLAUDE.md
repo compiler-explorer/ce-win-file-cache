@@ -121,7 +121,7 @@ private:
 - **Headers**: Include Windows headers after project headers
 ```cpp
 #include "../include/config.hpp"
-#include <Windows.h>
+#include <windows.h>
 #include <aclapi.h>
 ```
 - **Pragma Comments**: Use for linking libraries

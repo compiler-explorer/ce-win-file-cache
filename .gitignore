@@ -74,8 +74,9 @@ Cache/
 # IDE files
 *.swp
 *.swo
-.vscode/
 .idea/
+# .vscode/ - uncommenting this line will ignore VSCode settings
+# Note: We include .vscode/ by default to provide Wine/Windows header support
 
 # Temporary files
 *.tmp

@@ -3,7 +3,7 @@
 #include "file_state.hpp"
 #include <string>
 #include <chrono>
-#include <Windows.h>
+#include <windows.h>
 
 namespace CeWinFileCache
 {

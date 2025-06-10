@@ -2,8 +2,8 @@
 #ifdef WINE_CROSS_COMPILE
 #include "../include/compiler_cache/wine_compat.hpp"
 #else
-#include <Windows.h>
-#include <Winnetwk.h>
+#include <windows.h>
+#include <winnetwk.h>
 #endif
 #include <iostream>
 
