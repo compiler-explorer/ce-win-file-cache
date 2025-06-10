@@ -10,7 +10,7 @@ using namespace CeWinFileCache;
 class CompilerCacheService : public Fsp::Service
 {
     public:
-    CompilerCacheService() : Fsp::Service(L"CompilerCacheFS"), filesystem_(), host_(filesystem_)
+    CompilerCacheService(wchar_t *ServiceName) : Fsp::Service(ServiceName), filesystem_(), host_(filesystem_)
     {
     }
 
@@ -180,7 +180,8 @@ int wmain(int argc, wchar_t **argv)
     }
 
     // Create and run service
-    CompilerCacheService service;
+    wchar_t service_name[] = L"CompilerCacheFS";
+    CompilerCacheService service{ service_name };
     return service.Run();
 };
 

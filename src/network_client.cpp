@@ -134,8 +134,6 @@ NTSTATUS NetworkClient::establishConnection(const std::wstring &share_path)
     DWORD attributes = GetFileAttributesW(share_path.c_str());
     if (attributes == INVALID_FILE_ATTRIBUTES)
     {
-        DWORD error = GetLastError();
-
         // Try to establish a connection if access failed
         // Create a non-const copy for the Windows API
         std::wstring share_path_copy = share_path;
