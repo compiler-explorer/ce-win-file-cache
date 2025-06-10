@@ -108,7 +108,9 @@ NTSTATUS NetworkClient::enumerateDirectory(const std::wstring &network_path, std
     do
     {
         // Skip . and .. entries
-        if (wcscmp(find_data.cFileName, L".") != 0 && wcscmp(find_data.cFileName, L"..") != 0)
+        const wchar_t *dot = L".";
+        const wchar_t *dotdot = L"..";
+        if (wcscmp(find_data.cFileName, dot) != 0 && wcscmp(find_data.cFileName, dotdot) != 0)
         {
             entries.push_back(find_data);
         }
@@ -135,9 +137,11 @@ NTSTATUS NetworkClient::establishConnection(const std::wstring &share_path)
         DWORD error = GetLastError();
 
         // Try to establish a connection if access failed
+        // Create a non-const copy for the Windows API
+        std::wstring share_path_copy = share_path;
         net_resource_.dwType = RESOURCETYPE_DISK;
         net_resource_.lpLocalName = nullptr; // No drive mapping
-        net_resource_.lpRemoteName = const_cast<LPWSTR>(share_path.c_str());
+        net_resource_.lpRemoteName = share_path_copy.data();
         net_resource_.lpProvider = nullptr;
 
         DWORD result = WNetAddConnection2W(&net_resource_, nullptr, nullptr, 0);

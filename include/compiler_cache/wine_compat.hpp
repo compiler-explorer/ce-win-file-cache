@@ -33,6 +33,7 @@
 #include "alfaheader.h"
 #include <ntstatus.h>
 #include <shellapi.h>
+#include <shlobj.h>
 #include <strsafe.h>
 #include <winnetwk.h>
 #include <winternl.h>
@@ -41,8 +42,6 @@
 #ifdef WINE_CROSS_COMPILE
 extern "C"
 {
-    HRESULT WINAPI SHCreateDirectoryExW(HWND hwnd, LPCWSTR pszPath, const SECURITY_ATTRIBUTES *psa);
-    WCHAR **WINAPI CommandLineToArgvW(LPCWSTR lpCmdLine, int *pNumArgs);
 }
 #endif
 
