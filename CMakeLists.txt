@@ -4,8 +4,76 @@ project(CompilerCacheFS VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Option to use Wine's Windows API implementation for cross-compilation
+option(USE_WINE_WINDOWS_API "Use Wine's Windows API implementation for cross-compilation" OFF)
+
+if(USE_WINE_WINDOWS_API)
+    message(STATUS "Using Wine Windows API implementation")
+    set(CMAKE_SYSTEM_NAME Windows)
+    set(CMAKE_C_COMPILER winegcc)
+    set(CMAKE_CXX_COMPILER wineg++)
+    
+    # Wine-specific settings
+    add_definitions(-DWINE_CROSS_COMPILE)
+    add_definitions(-D_WIN32_WINNT=0x0A00)  # Windows 10
+    add_definitions(-DNTDDI_VERSION=0x0A000000)
+    
+    # Wine headers path (common locations)
+    find_path(WINE_INCLUDE_DIR 
+        NAMES windows.h
+        PATHS
+            /usr/include/wine/wine/windows
+            /usr/include/wine/windows
+            /usr/local/include/wine/windows
+            /opt/wine-stable/include/wine/windows
+            /usr/include/wine-development/windows
+        DOC "Wine Windows headers directory"
+    )
+    
+    if(WINE_INCLUDE_DIR)
+        include_directories(${WINE_INCLUDE_DIR})
+        message(STATUS "Found Wine headers: ${WINE_INCLUDE_DIR}")
+    else()
+        message(FATAL_ERROR "Wine Windows headers not found. Please install wine-dev or wine-devel package")
+    endif()
+    
+    # Wine libraries (winegcc handles linking automatically for most libraries)
+    set(WINE_LIBRARIES "")
+    
+    # Common Wine library paths
+    set(WINE_LIB_PATHS 
+        /usr/lib/wine 
+        /usr/local/lib/wine 
+        /usr/lib/x86_64-linux-gnu/wine
+        /usr/lib64/wine
+    )
+    
+    # Try to find Wine libraries, but they're optional as winegcc often handles them
+    find_library(WINE_KERNEL32 NAMES kernel32 PATHS ${WINE_LIB_PATHS})
+    find_library(WINE_USER32 NAMES user32 PATHS ${WINE_LIB_PATHS})
+    find_library(WINE_ADVAPI32 NAMES advapi32 PATHS ${WINE_LIB_PATHS})
+    find_library(WINE_NETAPI32 NAMES netapi32 PATHS ${WINE_LIB_PATHS})
+    find_library(WINE_MPR NAMES mpr PATHS ${WINE_LIB_PATHS})
+    
+    # Add found libraries to the list
+    foreach(lib WINE_KERNEL32 WINE_USER32 WINE_ADVAPI32 WINE_NETAPI32 WINE_MPR)
+        if(${lib})
+            list(APPEND WINE_LIBRARIES ${${lib}})
+            message(STATUS "Found ${lib}: ${${lib}}")
+        else()
+            message(STATUS "${lib} not found - will rely on winegcc automatic linking")
+        endif()
+    endforeach()
+    
+    # Wine typically provides these through winegcc, so we can add them as link flags
+    if(NOT WINE_LIBRARIES)
+        set(WINE_LINK_FLAGS "-lkernel32 -luser32 -ladvapi32 -lnetapi32 -lmpr")
+        message(STATUS "Using Wine link flags: ${WINE_LINK_FLAGS}")
+    endif()
+endif()
+
 # Use WinFsp submodule
-if(WIN32)
+if(WIN32 OR USE_WINE_WINDOWS_API)
     set(WINFSP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/external/winfsp")
     set(WINFSP_INCLUDE_DIR "${WINFSP_ROOT}/inc")
     
@@ -48,7 +116,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/utils
 )
 
-if(WIN32)
+if(WIN32 OR USE_WINE_WINDOWS_API)
     include_directories(${WINFSP_INCLUDE_DIR})
 endif()
 
@@ -66,6 +134,7 @@ set(HEADERS
     include/compiler_cache/cache_manager.hpp
     include/compiler_cache/network_client.hpp
     include/compiler_cache/config_parser.hpp
+    include/compiler_cache/wine_compat.hpp
     types/file_state.hpp
     types/config.hpp
     types/cache_entry.hpp
@@ -74,16 +143,9 @@ set(HEADERS
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
-# Windows-specific settings
-if(WIN32)
-    target_link_libraries(${PROJECT_NAME} 
-        ${WINFSP_LIBRARY}
-        Userenv.lib
-        netapi32.lib
-        mpr.lib
-    )
-    
-    # Set compiler flags
+# Windows-specific settings (native Windows or Wine)
+if(WIN32 OR USE_WINE_WINDOWS_API)
+    # Set compiler definitions
     target_compile_definitions(${PROJECT_NAME} PRIVATE
         _CONSOLE
         UNICODE
@@ -91,15 +153,49 @@ if(WIN32)
         WIN32_LEAN_AND_MEAN
     )
     
-    # Enable strict warnings as per CLAUDE.md
-    target_compile_options(${PROJECT_NAME} PRIVATE
-        /W4 /WX /Wall
-        $<$<CONFIG:Release>:/O2 /GL>
-    )
-    
-    # Enable LTO for release builds
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        set_property(TARGET ${PROJECT_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+    if(USE_WINE_WINDOWS_API)
+        # Wine-specific settings
+        if(WINE_LIBRARIES)
+            target_link_libraries(${PROJECT_NAME} 
+                ${WINFSP_LIBRARY}
+                ${WINE_LIBRARIES}
+            )
+        else()
+            target_link_libraries(${PROJECT_NAME} 
+                ${WINFSP_LIBRARY}
+            )
+            # Add Wine libraries as link flags
+            set_target_properties(${PROJECT_NAME} PROPERTIES
+                LINK_FLAGS "${WINE_LINK_FLAGS}"
+            )
+        endif()
+        
+        # Wine-compatible compiler flags
+        target_compile_options(${PROJECT_NAME} PRIVATE
+            -Wall -Wextra -Wno-unused-parameter
+            $<$<CONFIG:Release>:-O3>
+        )
+        
+        message(STATUS "Configured for Wine compilation")
+    else()
+        # Native Windows settings
+        target_link_libraries(${PROJECT_NAME} 
+            ${WINFSP_LIBRARY}
+            Userenv.lib
+            netapi32.lib
+            mpr.lib
+        )
+        
+        # Enable strict warnings as per CLAUDE.md
+        target_compile_options(${PROJECT_NAME} PRIVATE
+            /W4 /WX /Wall
+            $<$<CONFIG:Release>:/O2 /GL>
+        )
+        
+        # Enable LTO for release builds
+        if(CMAKE_BUILD_TYPE STREQUAL "Release")
+            set_property(TARGET ${PROJECT_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+        endif()
     endif()
 endif()
 

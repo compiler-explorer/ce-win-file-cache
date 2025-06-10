@@ -1,9 +1,15 @@
 #include "../include/compiler_cache/network_client.hpp"
+#ifdef WINE_CROSS_COMPILE
+#include "../include/compiler_cache/wine_compat.hpp"
+#else
 #include <Windows.h>
 #include <Winnetwk.h>
+#endif
 #include <iostream>
 
+#ifndef WINE_CROSS_COMPILE
 #pragma comment(lib, "mpr.lib")
+#endif
 
 namespace CeWinFileCache
 {
@@ -61,7 +67,11 @@ NTSTATUS NetworkClient::copyFileToLocal(const std::wstring& network_path, const 
         std::wcerr << L"Failed to copy file from " << network_path 
                    << L" to " << local_path 
                    << L". Error: " << error << std::endl;
+#ifdef WINE_CROSS_COMPILE
+        return WineCompat::NtStatusFromWin32(error);
+#else
         return NTSTATUS_FROM_WIN32(error);
+#endif
     }
     
     return STATUS_SUCCESS;
@@ -71,7 +81,11 @@ NTSTATUS NetworkClient::getFileInfo(const std::wstring& network_path, WIN32_FILE
 {
     if (!GetFileAttributesExW(network_path.c_str(), GetFileExInfoStandard, file_data))
     {
+#ifdef WINE_CROSS_COMPILE
+        return WineCompat::NtStatusFromWin32(GetLastError());
+#else
         return NTSTATUS_FROM_WIN32(GetLastError());
+#endif
     }
     
     return STATUS_SUCCESS;
@@ -100,7 +114,11 @@ NTSTATUS NetworkClient::enumerateDirectory(const std::wstring& network_path,
     
     if (find_handle == INVALID_HANDLE_VALUE)
     {
+#ifdef WINE_CROSS_COMPILE
+        return WineCompat::NtStatusFromWin32(GetLastError());
+#else
         return NTSTATUS_FROM_WIN32(GetLastError());
+#endif
     }
     
     do
@@ -118,7 +136,11 @@ NTSTATUS NetworkClient::enumerateDirectory(const std::wstring& network_path,
     
     if (error != ERROR_NO_MORE_FILES)
     {
+#ifdef WINE_CROSS_COMPILE
+        return WineCompat::NtStatusFromWin32(error);
+#else
         return NTSTATUS_FROM_WIN32(error);
+#endif
     }
     
     return STATUS_SUCCESS;
@@ -144,14 +166,22 @@ NTSTATUS NetworkClient::establishConnection(const std::wstring& share_path)
         {
             std::wcerr << L"Failed to connect to " << share_path 
                        << L". Error: " << result << std::endl;
+#ifdef WINE_CROSS_COMPILE
+            return WineCompat::NtStatusFromWin32(result);
+#else
             return NTSTATUS_FROM_WIN32(result);
+#endif
         }
         
         // Verify access again
         attributes = GetFileAttributesW(share_path.c_str());
         if (attributes == INVALID_FILE_ATTRIBUTES)
         {
-            return NTSTATUS_FROM_WIN32(GetLastError());
+    #ifdef WINE_CROSS_COMPILE
+        return WineCompat::NtStatusFromWin32(GetLastError());
+#else
+        return NTSTATUS_FROM_WIN32(GetLastError());
+#endif
         }
     }
     

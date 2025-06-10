@@ -1,6 +1,10 @@
 #include "../include/compiler_cache/hybrid_filesystem.hpp"
+#ifdef WINE_CROSS_COMPILE
+#include "../include/compiler_cache/wine_compat.hpp"
+#else
 #include <Windows.h>
 #include <strsafe.h>
+#endif
 #include <iostream>
 
 namespace CeWinFileCache
@@ -30,7 +34,11 @@ NTSTATUS HybridFileSystem::Initialize(const Config& config)
         DWORD error = GetLastError();
         if (error != ERROR_ALREADY_EXISTS)
         {
-            return NTSTATUS_FROM_WIN32(error);
+    #ifdef WINE_CROSS_COMPILE
+        return WineCompat::NtStatusFromWin32(error);
+#else
+        return NTSTATUS_FROM_WIN32(error);
+#endif
         }
     }
     
@@ -187,7 +195,11 @@ NTSTATUS HybridFileSystem::Open(
     if (file_desc->handle == INVALID_HANDLE_VALUE)
     {
         delete file_desc;
+#ifdef WINE_CROSS_COMPILE
+        return WineCompat::NtStatusFromWin32(GetLastError());
+#else
         return NTSTATUS_FROM_WIN32(GetLastError());
+#endif
     }
     
     file_desc->entry = entry;
@@ -198,7 +210,11 @@ NTSTATUS HybridFileSystem::Open(
     if (!GetFileInformationByHandle(file_desc->handle, &file_info))
     {
         delete file_desc;
+#ifdef WINE_CROSS_COMPILE
+        return WineCompat::NtStatusFromWin32(GetLastError());
+#else
         return NTSTATUS_FROM_WIN32(GetLastError());
+#endif
     }
     
     // Fill OpenFileInfo
@@ -249,7 +265,11 @@ NTSTATUS HybridFileSystem::Read(
     
     if (!ReadFile(file_desc->handle, Buffer, Length, PBytesTransferred, &overlapped))
     {
+#ifdef WINE_CROSS_COMPILE
+        return WineCompat::NtStatusFromWin32(GetLastError());
+#else
         return NTSTATUS_FROM_WIN32(GetLastError());
+#endif
     }
     
     // Update access statistics
@@ -271,7 +291,11 @@ NTSTATUS HybridFileSystem::GetFileInfo(
     BY_HANDLE_FILE_INFORMATION file_info;
     if (!GetFileInformationByHandle(file_desc->handle, &file_info))
     {
+#ifdef WINE_CROSS_COMPILE
+        return WineCompat::NtStatusFromWin32(GetLastError());
+#else
         return NTSTATUS_FROM_WIN32(GetLastError());
+#endif
     }
     
     FileInfo->FileAttributes = file_info.dwFileAttributes;

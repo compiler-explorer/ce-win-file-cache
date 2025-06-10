@@ -41,6 +41,37 @@ For debug builds:
 build.bat debug
 ```
 
+### Cross-compilation with Wine (Linux)
+
+You can also build and test the project on Linux using Wine's Windows API implementation:
+
+1. Install Wine development packages:
+```bash
+# Ubuntu/Debian
+sudo apt-get install wine-dev
+
+# Fedora/RHEL
+sudo dnf install wine-devel
+
+# Arch Linux
+sudo pacman -S wine
+```
+
+2. Build with Wine:
+```bash
+./build-wine.sh
+```
+
+3. Run with Wine:
+```bash
+wine build-wine/bin/CompilerCacheFS.exe --help
+```
+
+This is useful for:
+- Cross-platform development
+- CI/CD pipelines on Linux
+- Testing Windows functionality without Windows
+
 ## Configuration
 
 Create a `compilers.yaml` file (see included example):
