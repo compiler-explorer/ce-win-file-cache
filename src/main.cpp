@@ -144,14 +144,14 @@ class CompilerCacheService : public Fsp::Service
     NTSTATUS OnStop() override
     {
         host_.Unmount();
-        std::wcout << L"CompilerCacheFS unmounted" << std::endl;
+        std::wcout << L"CeWinFileCacheFS unmounted" << std::endl;
         return STATUS_SUCCESS;
     }
 
     private:
     void printUsage()
     {
-        std::wcout << L"Usage: CompilerCacheFS [OPTIONS]\n"
+        std::wcout << L"Usage: CeWinFileCacheFS [OPTIONS]\n"
                    << L"\n"
                    << L"Options:\n"
                    << L"  -c, --config FILE      Configuration file (default: compilers.yaml)\n"
@@ -161,8 +161,8 @@ class CompilerCacheService : public Fsp::Service
                    << L"  -h, --help             Show this help message\n"
                    << L"\n"
                    << L"Examples:\n"
-                   << L"  CompilerCacheFS --config compilers.yaml --mount M:\n"
-                   << L"  CompilerCacheFS --mount C:\\compilers --debug\n"
+                   << L"  CeWinFileCacheFS --config compilers.yaml --mount M:\n"
+                   << L"  CeWinFileCacheFS --mount C:\\compilers --debug\n"
                    << std::endl;
     }
 
@@ -181,7 +181,7 @@ int wmain(int argc, wchar_t **argv)
     }
 
     // Create and run service
-    wchar_t service_name[] = L"CompilerCacheFS";
+    wchar_t service_name[] = L"CeWinFileCacheFS";
     CompilerCacheService service{ service_name };
     return service.Run();
 };
