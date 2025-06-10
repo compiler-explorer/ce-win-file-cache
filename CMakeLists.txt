@@ -32,7 +32,10 @@ if(USE_WINE_WINDOWS_API)
     
     if(WINE_INCLUDE_DIR)
         include_directories(${WINE_INCLUDE_DIR})
+        # Add our Wine stub headers for missing Windows headers
+        include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/wine_stubs)
         message(STATUS "Found Wine headers: ${WINE_INCLUDE_DIR}")
+        message(STATUS "Using Wine stub headers: ${CMAKE_CURRENT_SOURCE_DIR}/include/wine_stubs")
     else()
         message(FATAL_ERROR "Wine Windows headers not found. Please install wine-dev or wine-devel package")
     endif()
@@ -175,6 +178,13 @@ if(WIN32 OR USE_WINE_WINDOWS_API)
             -Wall -Wextra -Wno-unused-parameter
             $<$<CONFIG:Release>:-O3>
         )
+        
+        # Define architecture macros for WinFsp compatibility
+        if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+            target_compile_definitions(${PROJECT_NAME} PRIVATE _AMD64_)
+        else()
+            target_compile_definitions(${PROJECT_NAME} PRIVATE _X86_)
+        endif()
         
         message(STATUS "Configured for Wine compilation")
     else()

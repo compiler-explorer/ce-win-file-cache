@@ -3,9 +3,43 @@
 // Wine compatibility header for cross-compilation
 #ifdef WINE_CROSS_COMPILE
 
+// Include Wine stub headers first  
+#include "../wine_stubs/devioctl.h"
+
+// Prevent Windows min/max macro conflicts with C++ STL
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+
+// Define Windows architecture macros for WinFsp compatibility
+#ifdef __x86_64__
+#ifndef _AMD64_
+#define _AMD64_
+#endif
+#elif defined(__i386__)
+#ifndef _X86_
+#define _X86_
+#endif
+#elif defined(__aarch64__)
+#ifndef _ARM64_
+#define _ARM64_
+#endif
+#endif
+
 #include <windows.h>
 #include <winnetwk.h>
 #include <strsafe.h>
+
+// Undefine conflicting macros if they still exist
+#ifdef min
+#undef min
+#endif
+#ifdef max  
+#undef max
+#endif
 
 // Wine doesn't always have all the latest Windows API definitions
 // Add any missing definitions here
