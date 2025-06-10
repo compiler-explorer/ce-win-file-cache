@@ -1,0 +1,46 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# More msvc stuff we don't need
+*.tlog
+*.iobj
+*.ipdb
+*.pdb
+*.db
+*.opendb
+*.ipch
+*.recipe
+*.FileListAbsolute.txt
+*.suo
+*.log
+*.ilk
