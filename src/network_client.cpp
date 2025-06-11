@@ -1,4 +1,4 @@
-#include <ce-win-file-cache/alfaheader.h>
+#include <ce-win-file-cache/windows_compat.hpp>
 #include <ce-win-file-cache/network_client.hpp>
 #include <iostream>
 

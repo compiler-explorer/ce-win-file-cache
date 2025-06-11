@@ -206,7 +206,8 @@ class CompilerCacheService : public Fsp::Service
         }
 
         // Mount filesystem
-        result = host_.Mount(options_.mount_point.c_str(), nullptr, FALSE, options_.debug_flags);
+        std::wstring mount_point_copy = options_.mount_point;
+        result = host_.Mount(mount_point_copy.data(), nullptr, FALSE, options_.debug_flags);
         if (!NT_SUCCESS(result))
         {
             std::wcerr << L"Failed to mount filesystem at " << options_.mount_point << L". Status: 0x" << std::hex

@@ -1,7 +1,6 @@
-#include <ce-win-file-cache/alfaheader.h>
+#include <ce-win-file-cache/windows_compat.hpp>
 #include <ce-win-file-cache/hybrid_filesystem.hpp>
 #include <iostream>
-#include <strsafe.h>
 
 #ifndef NO_WINFSP
 
