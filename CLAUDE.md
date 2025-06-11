@@ -204,3 +204,28 @@ public:
 
 } // namespace MyProject
 ```
+
+## Building with MSVC from WSL
+
+To compile this project with MSVC from WSL:
+
+1. **IMPORTANT**: Copy the source code to a Windows drive (e.g., `/mnt/c/` or `/mnt/d/`) first. Building from WSL filesystem paths won't work with MSVC.
+2. Ensure MSVC compiler is available at: `/mnt/d/efs/compilers/msvc/14.40.33807-14.40.33811.0/bin/Hostx64/x64/cl.exe`
+3. Ensure Windows SDK is available at: `/mnt/d/efs/compilers/windows-kits-10`
+4. From the Windows drive location, run: `./build-msvc.sh`
+
+The build uses the `msvc-toolchain.cmake` file to configure CMake with the correct paths and flags.
+
+### Quick Build Commands from Windows Drive
+
+```bash
+# After copying source to Windows drive
+cd /mnt/d/your-path/ce-win-file-cache
+mkdir -p build-msvc && cd build-msvc
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../msvc-toolchain.cmake -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles"
+cmake --build . --config Release -j$(nproc)
+```
+
+### Prompt for Claude after copying to Windows drive
+
+"I've copied the ce-win-file-cache source to a Windows drive. Can you help me build it with MSVC? The source is now at [INSERT PATH], MSVC is at /mnt/d/efs/compilers/msvc/14.40.33807-14.40.33811.0/bin/Hostx64/x64/cl.exe, and Windows SDK is at /mnt/d/efs/compilers/windows-kits-10"
