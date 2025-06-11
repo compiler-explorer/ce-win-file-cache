@@ -20,72 +20,70 @@ A WinFsp-based hybrid cache filesystem for Compiler Explorer, designed to effici
 
 ## Building
 
+### Native Windows Build (Recommended)
+
 1. Clone this repository with submodules:
 ```cmd
 git clone --recursive https://github.com/your-org/ce-win-file-cache.git
-```
-Or if already cloned:
-```cmd
+cd ce-win-file-cache
 git submodule update --init --recursive
 ```
 
-2. Install WinFsp development package (optional - libraries included in submodule)
-3. Run the build script:
+2. Install [WinFsp](https://github.com/winfsp/winfsp/releases) if not already installed
 
+3. Run the native Windows build:
 ```cmd
-build.bat
+build-msvc.bat
 ```
 
-For debug builds:
-```cmd
-build.bat debug
-```
+This will:
+- Set up the MSVC environment automatically
+- Build with optimizations enabled
+- Copy required DLLs and config files to the output directory
 
-### Cross-compilation with Wine (Linux)
+### Building from WSL with MSVC
 
-You can also build and test the project on Linux using Wine's Windows API implementation:
+If developing from WSL, you can cross-compile using MSVC:
 
-1. Install Wine development packages:
+1. **Important**: Source must be on a Windows drive (e.g., `/mnt/d/` or `/mnt/c/`)
+2. Run the WSL build script:
 ```bash
-# Ubuntu/Debian
-sudo apt-get install wine-dev
-
-# Fedora/RHEL
-sudo dnf install wine-devel
-
-# Arch Linux
-sudo pacman -S wine
+./build-msvc.sh
 ```
 
-2. Build with Wine:
+### Alternative Build Methods
+
+#### Manual CMake Build
+```cmd
+# Set up MSVC environment first (run from Developer Command Prompt)
+mkdir build && cd build
+cmake .. -G "Visual Studio 17 2022" -A x64
+cmake --build . --config Release
+```
+
+#### Wine Build (Experimental)
+For cross-platform development or CI on Linux:
 ```bash
 ./build-wine.sh
+wine build-wine/bin/CeWinFileCacheFS.exe --help
 ```
 
-3. Run with Wine:
-```bash
-wine build-wine/bin/CompilerCacheFS.exe --help
+### Testing the Build
+
+After building, test the installation:
+```cmd
+# Test config parsing
+.\build-msvc\bin\CeWinFileCacheFS.exe --test-config
+
+# Test path resolution
+.\build-msvc\bin\CeWinFileCacheFS.exe --test-paths
+
+# Test network mapping
+.\build-msvc\bin\CeWinFileCacheFS.exe --test-network
+
+# Run all tests
+.\build-msvc\bin\CeWinFileCacheFS.exe --test
 ```
-
-This is useful for:
-- Cross-platform development
-- CI/CD pipelines on Linux
-- Testing Windows functionality without Windows
-
-### VSCode Integration
-
-The project includes VSCode configuration for Wine development:
-
-- **IntelliSense**: Configured to use Wine Windows headers for code completion
-- **Build Tasks**: `Ctrl+Shift+P` → "Tasks: Run Task" → "Build with Wine"
-- **Debugging**: Wine debugging support with GDB integration
-- **Multiple Configurations**: Switch between Wine, Windows Native, and Linux GCC
-
-To use Wine configuration in VSCode:
-1. Open the project in VSCode
-2. Install recommended extensions (C/C++, CMake Tools)
-3. Select "Linux Wine" configuration (bottom-right status bar)
-4. Use `Ctrl+Shift+B` to build with Wine
 
 ## Configuration
 
@@ -93,19 +91,39 @@ Create a `compilers.yaml` file (see included example):
 
 ```yaml
 compilers:
-  msvc-14.29:
-    network_path: "\\\\fileserver\\compilers\\msvc-14.29"
+  msvc-14.40:
+    network_path: "\\\\127.0.0.1\\efs\\compilers\\msvc\\14.40.33807-14.40.33811.0"
     cache_size_mb: 2048
     cache_always:
-      - "bin/**/*.exe"
-      - "bin/**/*.dll"
+      - "bin/Hostx64/x64/*.exe"
+      - "bin/Hostx64/x64/*.dll"
+      - "include/**/*.h"
+      - "lib/x64/*.lib"
     prefetch_patterns:
-      - "**/*.h"
+      - "include/**/*.h"
+      - "include/**/*.hpp"
+      
+  windows-kits-10:
+    network_path: "\\\\127.0.0.1\\efs\\compilers\\windows-kits-10"
+    cache_size_mb: 1024
+    cache_always:
+      - "Include/**/*.h"
+      - "Lib/**/*.lib"
+      - "bin/**/*.exe"
+    prefetch_patterns:
+      - "Include/**/*.h"
+      
+  ninja:
+    network_path: "\\\\127.0.0.1\\efs\\compilers\\ninja"
+    cache_size_mb: 64
+    cache_always:
+      - "*.exe"
+    prefetch_patterns: []
 
 global:
   total_cache_size_mb: 8192
   eviction_policy: "lru"
-  cache_directory: "C:\\CompilerCache"
+  cache_directory: "D:\\CompilerCache"
 ```
 
 ## Usage
@@ -119,23 +137,36 @@ CompilerCacheFS.exe --config compilers.yaml --mount M:
 
 ### Command Line Options
 
+#### Runtime Options
 - `-c, --config FILE`: Configuration file (default: compilers.yaml)
 - `-m, --mount POINT`: Mount point (default: M:)
 - `-u, --volume-prefix`: Volume prefix for UNC paths
 - `-d, --debug [LEVEL]`: Enable debug logging
 - `-h, --help`: Show help message
 
+#### Testing Options (No WinFsp required)
+- `-t, --test`: Run all test modes without mounting
+- `--test-config`: Test configuration file parsing only
+- `--test-paths`: Test virtual path to network path resolution
+- `--test-network`: Test network path mapping validation
+
 ### Example Usage
 
 ```cmd
+# Test configuration before mounting
+CeWinFileCacheFS.exe --test
+
 # Mount to drive M: with default config
-CompilerCacheFS.exe
+CeWinFileCacheFS.exe
 
 # Mount to specific directory with custom config
-CompilerCacheFS.exe --config my-compilers.yaml --mount C:\\compilers
+CeWinFileCacheFS.exe --config my-compilers.yaml --mount C:\\compilers
 
 # Enable debug logging
-CompilerCacheFS.exe --debug --mount M:
+CeWinFileCacheFS.exe --debug --mount M:
+
+# Test specific functionality
+CeWinFileCacheFS.exe --test-paths --config compilers.yaml
 ```
 
 ## Architecture
@@ -158,12 +189,16 @@ CompilerCacheFS.exe --debug --mount M:
 
 ```
 /
-├── msvc-14.29/
-│   ├── bin/           # Executables (always cached)
-│   ├── include/       # Headers (on-demand caching)
-│   └── lib/          # Libraries (on-demand caching)
-├── msvc-14.32/
-└── msvc-14.35/
+├── msvc-14.40/
+│   ├── bin/Hostx64/x64/    # Executables (always cached)
+│   ├── include/            # Headers (on-demand caching)
+│   └── lib/x64/           # Libraries (on-demand caching)
+├── windows-kits-10/
+│   ├── Include/           # Windows SDK headers
+│   ├── Lib/              # Windows SDK libraries
+│   └── bin/              # SDK tools
+└── ninja/
+    └── ninja.exe         # Build system executable
 ```
 
 ## Performance Considerations
