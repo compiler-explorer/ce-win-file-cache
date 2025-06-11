@@ -3,6 +3,11 @@ REM Set up MSVC environment and build with CMake
 
 echo Setting up MSVC environment...
 
+REM Set temp directory to H:\tmp to avoid disk space issues
+set "TMP=H:\tmp"
+set "TEMP=H:\tmp"
+if not exist H:\tmp mkdir H:\tmp
+
 REM MSVC and Windows SDK paths
 set "MSVC_ROOT=D:\efs\compilers\msvc\14.40.33807-14.40.33811.0"
 set "WINDOWS_SDK_ROOT=D:\efs\compilers\windows-kits-10"
@@ -43,3 +48,11 @@ if %errorlevel% neq 0 (
 )
 
 echo Build completed successfully!
+
+echo Copying WinFsp DLL to executable directory...
+copy "C:\PROGRA~2\WinFsp\bin\winfsp-x64.dll" "build-msvc\bin\"
+
+echo Copying config file to executable directory...
+copy "compilers.yaml" "build-msvc\bin\"
+
+echo Setup complete!

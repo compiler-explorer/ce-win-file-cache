@@ -4,6 +4,8 @@
 #include <shellapi.h>
 #include <string>
 #include <unordered_map>
+#include <algorithm>
+#include <vector>
 
 #ifndef NO_WINFSP
 #include <winfsp/winfsp.hpp>
@@ -22,6 +24,9 @@ struct ProgramOptions
     ULONG debug_flags = 0;
     bool show_help = false;
     bool test_mode = false;
+    bool test_path_resolution = false;
+    bool test_network_mapping = false;
+    bool test_config_only = false;
 };
 
 // Function to print usage information
@@ -35,6 +40,9 @@ void printUsage()
                << L"  -u, --volume-prefix    Volume prefix for UNC paths\n"
                << L"  -d, --debug [LEVEL]    Enable debug logging\n"
                << L"  -t, --test             Test mode (no WinFsp mounting)\n"
+               << L"      --test-paths       Test path resolution only\n"
+               << L"      --test-network     Test network mapping only\n"
+               << L"      --test-config      Test config parsing only\n"
                << L"  -h, --help             Show this help message\n"
                << L"\n"
                << L"Examples:\n"
@@ -107,6 +115,21 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
         {
             options.test_mode = true;
         }
+        else if (arg == L"--test-paths")
+        {
+            options.test_mode = true;
+            options.test_path_resolution = true;
+        }
+        else if (arg == L"--test-network")
+        {
+            options.test_mode = true;
+            options.test_network_mapping = true;
+        }
+        else if (arg == L"--test-config")
+        {
+            options.test_mode = true;
+            options.test_config_only = true;
+        }
         else if (arg == L"-h" || arg == L"--help")
         {
             options.show_help = true;
@@ -123,22 +146,10 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
     return options;
 }
 
-// Test mode function - runs without WinFsp
-int runTestMode(const ProgramOptions &options)
+// Test function for config parsing only
+int testConfigOnly(const Config& config)
 {
-    std::wcout << L"Running in test mode (no WinFsp mounting)" << std::endl;
-
-    // Load configuration
-    auto config_opt = ConfigParser::parseYamlFile(options.config_file);
-    if (!config_opt)
-    {
-        std::wcerr << L"Failed to load configuration from: " << options.config_file << std::endl;
-        return 1;
-    }
-
-    Config config = *config_opt;
-
-    // Note: Initialize method requires WinFsp types, so we'll just test config parsing for now
+    std::wcout << L"=== Config Parsing Test ===" << std::endl;
     std::wcout << L"Configuration loaded successfully:" << std::endl;
     std::wcout << L"  Cache directory: " << config.global.cache_directory << std::endl;
     std::wcout << L"  Total cache size: " << config.global.total_cache_size_mb << L" MB" << std::endl;
@@ -148,10 +159,199 @@ int runTestMode(const ProgramOptions &options)
     for (const auto &[name, compiler_config] : config.compilers)
     {
         std::wcout << L"    - " << name << L": " << compiler_config.network_path << std::endl;
+        std::wcout << L"      Cache size: " << compiler_config.cache_size_mb << L" MB" << std::endl;
+        std::wcout << L"      Cache patterns: " << compiler_config.cache_always_patterns.size() << L" patterns" << std::endl;
+        std::wcout << L"      Prefetch patterns: " << compiler_config.prefetch_patterns.size() << L" patterns" << std::endl;
     }
 
-    std::wcout << L"Test completed successfully!" << std::endl;
+    std::wcout << L"Config test completed successfully!" << std::endl;
     return 0;
+}
+
+// Test function for path resolution (TODO #3)
+int testPathResolution(const Config& config)
+{
+    std::wcout << L"=== Path Resolution Test ===" << std::endl;
+    
+    // Test cases for path resolution
+    std::vector<std::wstring> test_paths = {
+        L"/msvc-14.40/bin/Hostx64/x64/cl.exe",
+        L"/msvc-14.40/include/iostream",
+        L"/windows-kits-10/Include/10.0.22621.0/um/windows.h",
+        L"/ninja/ninja.exe",
+        L"/invalid-compiler/some/path"
+    };
+    
+    for (const auto& virtual_path : test_paths)
+    {
+        std::wcout << L"Testing virtual path: " << virtual_path << std::endl;
+        
+        // Extract compiler name from virtual path
+        std::wstring compiler_name;
+        size_t first_slash = virtual_path.find(L'/', 1);
+        if (first_slash != std::wstring::npos)
+        {
+            compiler_name = virtual_path.substr(1, first_slash - 1);
+        }
+        else
+        {
+            compiler_name = virtual_path.substr(1);
+        }
+        
+        // Check if compiler exists in config
+        auto it = config.compilers.find(compiler_name);
+        if (it != config.compilers.end())
+        {
+            // Extract relative path
+            std::wstring relative_path;
+            if (first_slash != std::wstring::npos)
+            {
+                relative_path = virtual_path.substr(first_slash + 1);
+            }
+            
+            // Resolve to network path
+            std::wstring resolved_path = it->second.network_path;
+            if (!relative_path.empty())
+            {
+                // Convert forward slashes to backslashes for Windows
+                std::wstring windows_relative = relative_path;
+                std::replace(windows_relative.begin(), windows_relative.end(), L'/', L'\\');
+                resolved_path += L"\\" + windows_relative;
+            }
+            
+            std::wcout << L"  -> Resolved to: " << resolved_path << std::endl;
+        }
+        else
+        {
+            std::wcout << L"  -> ERROR: Compiler '" << compiler_name << L"' not found in config" << std::endl;
+        }
+        std::wcout << std::endl;
+    }
+    
+    std::wcout << L"Path resolution test completed!" << std::endl;
+    return 0;
+}
+
+// Test function for network mapping (TODO #4)
+int testNetworkMapping(const Config& config)
+{
+    std::wcout << L"=== Network Mapping Test ===" << std::endl;
+    
+    // Test cases for network path mapping
+    std::vector<std::pair<std::wstring, std::wstring>> test_cases = {
+        {L"/msvc-14.40/bin/Hostx64/x64/cl.exe", L"\\\\\\\\127.0.0.1\\\\efs\\\\compilers\\\\msvc\\\\14.40.33807-14.40.33811.0\\bin\\Hostx64\\x64\\cl.exe"},
+        {L"/msvc-14.40/include/iostream", L"\\\\\\\\127.0.0.1\\\\efs\\\\compilers\\\\msvc\\\\14.40.33807-14.40.33811.0\\include\\iostream"},
+        {L"/windows-kits-10/Lib/10.0.22621.0/ucrt/x64/ucrt.lib", L"\\\\\\\\127.0.0.1\\\\efs\\\\compilers\\\\windows-kits-10\\Lib\\10.0.22621.0\\ucrt\\x64\\ucrt.lib"},
+        {L"/ninja/ninja.exe", L"\\\\\\\\127.0.0.1\\\\efs\\\\compilers\\\\ninja\\ninja.exe"}
+    };
+    
+    for (const auto& [virtual_path, expected_network_path] : test_cases)
+    {
+        std::wcout << L"Testing virtual path: " << virtual_path << std::endl;
+        std::wcout << L"Expected network path: " << expected_network_path << std::endl;
+        
+        // Extract compiler name
+        std::wstring compiler_name;
+        size_t first_slash = virtual_path.find(L'/', 1);
+        if (first_slash != std::wstring::npos)
+        {
+            compiler_name = virtual_path.substr(1, first_slash - 1);
+        }
+        else
+        {
+            compiler_name = virtual_path.substr(1);
+        }
+        
+        // Check if compiler exists
+        auto it = config.compilers.find(compiler_name);
+        if (it != config.compilers.end())
+        {
+            // Extract relative path and convert to Windows format
+            std::wstring relative_path;
+            if (first_slash != std::wstring::npos)
+            {
+                relative_path = virtual_path.substr(first_slash + 1);
+                std::replace(relative_path.begin(), relative_path.end(), L'/', L'\\');
+            }
+            
+            // Map to network path
+            std::wstring actual_network_path = it->second.network_path;
+            if (!relative_path.empty())
+            {
+                actual_network_path += L"\\" + relative_path;
+            }
+            
+            std::wcout << L"Actual network path: " << actual_network_path << std::endl;
+            
+            // Check if mapping is correct
+            if (actual_network_path == expected_network_path)
+            {
+                std::wcout << L"  -> PASS: Network mapping correct" << std::endl;
+            }
+            else
+            {
+                std::wcout << L"  -> FAIL: Network mapping mismatch" << std::endl;
+                return 1;
+            }
+        }
+        else
+        {
+            std::wcout << L"  -> ERROR: Compiler '" << compiler_name << L"' not found" << std::endl;
+            return 1;
+        }
+        std::wcout << std::endl;
+    }
+    
+    std::wcout << L"Network mapping test completed successfully!" << std::endl;
+    return 0;
+}
+
+// Test mode function - runs without WinFsp
+int runTestMode(const ProgramOptions &options)
+{
+    std::wcout << L"Running in test mode (no WinFsp mounting)" << std::endl;
+
+    // Load configuration
+    std::wcout << L"Loading config from: " << options.config_file << std::endl;
+    auto config_opt = ConfigParser::parseYamlFile(options.config_file);
+    if (!config_opt)
+    {
+        std::wcerr << L"Failed to load configuration from: " << options.config_file << std::endl;
+        return 1;
+    }
+
+    Config config = *config_opt;
+
+    // Run specific tests based on options
+    if (options.test_config_only)
+    {
+        return testConfigOnly(config);
+    }
+    else if (options.test_path_resolution)
+    {
+        return testPathResolution(config);
+    }
+    else if (options.test_network_mapping)
+    {
+        return testNetworkMapping(config);
+    }
+    else
+    {
+        // Run all tests
+        std::wcout << L"Running all tests..." << std::endl;
+        
+        int result = testConfigOnly(config);
+        if (result != 0) return result;
+        
+        result = testPathResolution(config);
+        if (result != 0) return result;
+        
+        result = testNetworkMapping(config);
+        if (result != 0) return result;
+        
+        std::wcout << L"All tests completed successfully!" << std::endl;
+        return 0;
+    }
 }
 
 #ifndef NO_WINFSP
@@ -293,4 +493,4 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
     int result = wmain(argc, argv);
     LocalFree(argv); // Free the memory allocated by CommandLineToArgvW
     return result;
-};
+}

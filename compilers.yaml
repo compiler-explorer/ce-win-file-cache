@@ -1,38 +1,34 @@
 compilers:
-  msvc-14.29:
-    network_path: "\\\\fileserver\\compilers\\msvc-14.29"
+  msvc-14.40:
+    network_path: "\\\\127.0.0.1\\efs\\compilers\\msvc\\14.40.33807-14.40.33811.0"
     cache_size_mb: 2048
     cache_always:
-      - "bin/**/*.exe"
-      - "bin/**/*.dll"
-      - "include/vcruntime*.h"
-      - "include/stddef.h"
-      - "include/limits.h"
+      - "bin/Hostx64/x64/*.exe"
+      - "bin/Hostx64/x64/*.dll"
+      - "include/**/*.h"
+      - "lib/x64/*.lib"
     prefetch_patterns:
-      - "**/*.h"
-      - "**/*.hpp"
+      - "include/**/*.h"
+      - "include/**/*.hpp"
       
-  msvc-14.32:
-    network_path: "\\\\fileserver\\compilers\\msvc-14.32"
-    cache_size_mb: 2048
+  windows-kits-10:
+    network_path: "\\\\127.0.0.1\\efs\\compilers\\windows-kits-10"
+    cache_size_mb: 1024
     cache_always:
+      - "Include/**/*.h"
+      - "Lib/**/*.lib"
       - "bin/**/*.exe"
-      - "bin/**/*.dll"
-      - "include/vcruntime*.h"
     prefetch_patterns:
-      - "**/*.h"
-      - "**/*.hpp"
+      - "Include/**/*.h"
       
-  msvc-14.35:
-    network_path: "\\\\fileserver\\compilers\\msvc-14.35"
-    cache_size_mb: 2048
+  ninja:
+    network_path: "\\\\127.0.0.1\\efs\\compilers\\ninja"
+    cache_size_mb: 64
     cache_always:
-      - "bin/**/*.exe"
-      - "bin/**/*.dll"
-    prefetch_patterns:
-      - "**/*.h"
+      - "*.exe"
+    prefetch_patterns: []
 
 global:
   total_cache_size_mb: 8192
   eviction_policy: "lru"
-  cache_directory: "C:\\CompilerCache"
+  cache_directory: "D:\\\\CompilerCache"

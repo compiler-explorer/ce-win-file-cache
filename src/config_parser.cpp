@@ -1,6 +1,7 @@
 #include <ce-win-file-cache/config_parser.hpp>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <regex>
 #include <sstream>
 
@@ -14,9 +15,10 @@ std::optional<Config> ConfigParser::parseYamlFile(std::wstring_view file_path)
     file.open(filename, std::ios::in);
     if (!file.is_open())
     {
+        std::wcerr << L"Failed to open config file: " << file_path << std::endl;
         return std::nullopt;
     }
-
+    
     std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
     return parseYamlString(content);
@@ -28,12 +30,19 @@ std::optional<Config> ConfigParser::parseYamlString(std::string yaml_content)
 
     std::istringstream stream(yaml_content.data());
     std::string line;
+    
+    int line_count = 0;
     std::string current_section;
     std::string current_compiler;
 
     while (std::getline(stream, line))
     {
-        // Remove leading/trailing whitespace
+        line_count++;
+        
+        // Keep original line for pattern matching
+        std::string original_line = line;
+        
+        // Remove leading/trailing whitespace for empty line check
         line.erase(0, line.find_first_not_of(" \t"));
         line.erase(line.find_last_not_of(" \t") + 1);
 
@@ -57,14 +66,21 @@ std::optional<Config> ConfigParser::parseYamlString(std::string yaml_content)
 
         if (current_section == "compilers")
         {
-            // Parse compiler entries
-            std::regex compiler_regex(R"(^\s+([^:]+):\s*$)");
+            // Parse compiler entries  
+            std::regex compiler_regex(R"(^  ([^:]+):\s*$)");
             std::smatch match;
 
-            if (std::regex_match(line, match, compiler_regex))
+            if (std::regex_match(original_line, match, compiler_regex))
             {
-                current_compiler = match[1].str();
-                config.compilers[std::wstring(current_compiler.begin(), current_compiler.end())] = CompilerConfig{};
+                std::string potential_compiler = match[1].str();
+                // Skip config sections like cache_always, prefetch_patterns, etc.
+                if (potential_compiler.find(' ') == std::string::npos &&
+                    potential_compiler != "cache_always" && 
+                    potential_compiler != "prefetch_patterns")
+                {
+                    current_compiler = potential_compiler;
+                    config.compilers[std::wstring(current_compiler.begin(), current_compiler.end())] = CompilerConfig{};
+                }
                 continue;
             }
 
@@ -74,8 +90,8 @@ std::optional<Config> ConfigParser::parseYamlString(std::string yaml_content)
                 auto &compiler_config = config.compilers[compiler_name];
 
                 // Parse compiler config properties
-                std::regex property_regex(R"(^\s+([^:]+):\s*(.+)$)");
-                if (std::regex_match(line, match, property_regex))
+                std::regex property_regex(R"(^    ([^:]+):\s*(.+)$)");
+                if (std::regex_match(original_line, match, property_regex))
                 {
                     std::string key = match[1].str();
                     std::string value = match[2].str();
