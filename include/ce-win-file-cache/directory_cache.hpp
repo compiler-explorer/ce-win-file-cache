@@ -38,7 +38,7 @@ public:
     void clearTree();
 
 private:
-    DirectoryTree directory_tree_;
+    DirectoryTree directory_tree;
     
     // Platform-specific network enumeration
     NTSTATUS enumerateNetworkDirectoryWindows(const std::wstring& network_path, const std::wstring& virtual_path);

@@ -9,12 +9,12 @@ namespace CeWinFileCache
 AsyncDownloadManager::AsyncDownloadManager(MemoryCacheManager& memory_cache, 
                                           const Config& config, 
                                           size_t thread_count)
-    : memory_cache_(memory_cache), config_(config), shutdown_requested_(false),
-      pending_count_(0), active_count_(0)
+    : memory_cache(memory_cache), config(config), shutdown_requested(false),
+      pending_count(0), active_count(0)
 {
     for (size_t i = 0; i < thread_count; ++i)
     {
-        worker_threads_.emplace_back(&AsyncDownloadManager::workerThread, this);
+        worker_threads.emplace_back(&AsyncDownloadManager::workerThread, this);
     }
 }
 
@@ -29,9 +29,9 @@ NTSTATUS AsyncDownloadManager::queueDownload(const std::wstring& virtual_path,
                                             CachePolicy policy,
                                             std::function<void(NTSTATUS, const std::wstring&)> callback)
 {
-    std::lock_guard<std::mutex> lock(queue_mutex_);
+    std::lock_guard<std::mutex> lock(queue_mutex);
     
-    if (shutdown_requested_)
+    if (shutdown_requested)
     {
         if (callback)
         {
@@ -40,7 +40,7 @@ NTSTATUS AsyncDownloadManager::queueDownload(const std::wstring& virtual_path,
         return STATUS_UNSUCCESSFUL;
     }
     
-    if (active_downloads_.find(virtual_path) != active_downloads_.end())
+    if (active_downloads.find(virtual_path) != active_downloads.end())
     {
         if (callback)
         {
@@ -52,42 +52,42 @@ NTSTATUS AsyncDownloadManager::queueDownload(const std::wstring& virtual_path,
     auto task = std::make_shared<DownloadTask>(virtual_path, network_path, 
                                               cache_entry, policy, callback);
     
-    download_queue_.push(task);
-    active_downloads_[virtual_path] = task;
-    pending_count_++;
+    download_queue.push(task);
+    active_downloads[virtual_path] = task;
+    pending_count++;
     
-    queue_condition_.notify_one();
+    queue_condition.notify_one();
     
     return STATUS_PENDING;
 }
 
 bool AsyncDownloadManager::isDownloadInProgress(const std::wstring& virtual_path)
 {
-    std::lock_guard<std::mutex> lock(queue_mutex_);
-    return active_downloads_.find(virtual_path) != active_downloads_.end();
+    std::lock_guard<std::mutex> lock(queue_mutex);
+    return active_downloads.find(virtual_path) != active_downloads.end();
 }
 
 void AsyncDownloadManager::cancelDownload(const std::wstring& virtual_path)
 {
-    std::lock_guard<std::mutex> lock(queue_mutex_);
+    std::lock_guard<std::mutex> lock(queue_mutex);
     
-    auto it = active_downloads_.find(virtual_path);
-    if (it != active_downloads_.end())
+    auto it = active_downloads.find(virtual_path);
+    if (it != active_downloads.end())
     {
-        active_downloads_.erase(it);
+        active_downloads.erase(it);
     }
 }
 
 void AsyncDownloadManager::shutdown()
 {
     {
-        std::lock_guard<std::mutex> lock(queue_mutex_);
-        shutdown_requested_ = true;
+        std::lock_guard<std::mutex> lock(queue_mutex);
+        shutdown_requested = true;
     }
     
-    queue_condition_.notify_all();
+    queue_condition.notify_all();
     
-    for (auto& thread : worker_threads_)
+    for (auto& thread : worker_threads)
     {
         if (thread.joinable())
         {
@@ -95,53 +95,53 @@ void AsyncDownloadManager::shutdown()
         }
     }
     
-    worker_threads_.clear();
+    worker_threads.clear();
 }
 
 size_t AsyncDownloadManager::getPendingCount() const
 {
-    return pending_count_.load();
+    return pending_count.load();
 }
 
 size_t AsyncDownloadManager::getActiveCount() const
 {
-    return active_count_.load();
+    return active_count.load();
 }
 
 void AsyncDownloadManager::workerThread()
 {
-    while (!shutdown_requested_)
+    while (!shutdown_requested)
     {
         std::shared_ptr<DownloadTask> task;
         
         {
-            std::unique_lock<std::mutex> lock(queue_mutex_);
-            queue_condition_.wait(lock, [this] { 
-                return !download_queue_.empty() || shutdown_requested_; 
+            std::unique_lock<std::mutex> lock(queue_mutex);
+            queue_condition.wait(lock, [this] { 
+                return !download_queue.empty() || shutdown_requested; 
             });
             
-            if (shutdown_requested_)
+            if (shutdown_requested)
             {
                 break;
             }
             
-            if (!download_queue_.empty())
+            if (!download_queue.empty())
             {
-                task = download_queue_.front();
-                download_queue_.pop();
-                pending_count_--;
-                active_count_++;
+                task = download_queue.front();
+                download_queue.pop();
+                pending_count--;
+                active_count++;
             }
         }
         
         if (task)
         {
             processDownload(task);
-            active_count_--;
+            active_count--;
             
             {
-                std::lock_guard<std::mutex> lock(queue_mutex_);
-                active_downloads_.erase(task->virtual_path);
+                std::lock_guard<std::mutex> lock(queue_mutex);
+                active_downloads.erase(task->virtual_path);
             }
         }
     }
@@ -161,7 +161,7 @@ void AsyncDownloadManager::processDownload(std::shared_ptr<DownloadTask> task)
             
             if (success && task->cache_entry)
             {
-                auto content = memory_cache_.getFileContent(task->virtual_path, config_);
+                auto content = memory_cache.getFileContent(task->virtual_path, config);
                 if (!content.empty())
                 {
                     task->cache_entry->file_size = content.size();
@@ -227,7 +227,7 @@ bool AsyncDownloadManager::downloadFile(const std::wstring& network_path,
         }
         
         std::vector<uint8_t> uint8_buffer(buffer.begin(), buffer.end());
-        memory_cache_.addFileToMemoryCache(virtual_path, uint8_buffer);
+        memory_cache.addFileToMemoryCache(virtual_path, uint8_buffer);
         return true;
     }
     catch (...)

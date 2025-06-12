@@ -53,20 +53,20 @@ class HybridFileSystem : public Fsp::FileSystemBase
     NTSTATUS evictIfNeeded();
     void updateAccessTime(CacheEntry *entry);
 
-    Config config_;
-    std::unordered_map<std::wstring, std::unique_ptr<CacheEntry>> cache_entries_;
-    std::mutex cache_mutex_;
-    size_t current_cache_size_;
-    UINT64 creation_time_;
+    Config config;
+    std::unordered_map<std::wstring, std::unique_ptr<CacheEntry>> cache_entries;
+    std::mutex cache_mutex;
+    size_t current_cache_size;
+    UINT64 creation_time;
     
     // In-memory cache for fast file access
-    MemoryCacheManager memory_cache_;
+    MemoryCacheManager memory_cache;
     
     // Always-resident directory tree (never evicted)
-    DirectoryCache directory_cache_;
+    DirectoryCache directory_cache;
     
     // Async download manager for non-blocking file fetching
-    std::unique_ptr<AsyncDownloadManager> download_manager_;
+    std::unique_ptr<AsyncDownloadManager> download_manager;
 };
 
 struct FileDescriptor

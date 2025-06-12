@@ -9,9 +9,9 @@
 namespace CeWinFileCache
 {
 
-NetworkClient::NetworkClient() : is_connected_(false)
+NetworkClient::NetworkClient() : is_connected(false)
 {
-    ZeroMemory(&net_resource_, sizeof(net_resource_));
+    ZeroMemory(&net_resource, sizeof(net_resource));
 }
 
 NetworkClient::~NetworkClient()
@@ -21,12 +21,12 @@ NetworkClient::~NetworkClient()
 
 NTSTATUS NetworkClient::connect(const std::wstring &share_path)
 {
-    if (is_connected_ && current_share_ == share_path)
+    if (is_connected && current_share == share_path)
     {
         return STATUS_SUCCESS;
     }
 
-    if (is_connected_)
+    if (is_connected)
     {
         disconnect();
     }
@@ -36,7 +36,7 @@ NTSTATUS NetworkClient::connect(const std::wstring &share_path)
 
 NTSTATUS NetworkClient::disconnect()
 {
-    if (!is_connected_)
+    if (!is_connected)
     {
         return STATUS_SUCCESS;
     }
@@ -132,12 +132,12 @@ NTSTATUS NetworkClient::establishConnection(const std::wstring &share_path)
         // Try to establish a connection if access failed
         // Create a non-const copy for the Windows API
         std::wstring share_path_copy = share_path;
-        net_resource_.dwType = RESOURCETYPE_DISK;
-        net_resource_.lpLocalName = nullptr; // No drive mapping
-        net_resource_.lpRemoteName = share_path_copy.data();
-        net_resource_.lpProvider = nullptr;
+        net_resource.dwType = RESOURCETYPE_DISK;
+        net_resource.lpLocalName = nullptr; // No drive mapping
+        net_resource.lpRemoteName = share_path_copy.data();
+        net_resource.lpProvider = nullptr;
 
-        DWORD result = WNetAddConnection2W(&net_resource_, nullptr, nullptr, 0);
+        DWORD result = WNetAddConnection2W(&net_resource, nullptr, nullptr, 0);
         if (result != NO_ERROR && result != ERROR_ALREADY_ASSIGNED)
         {
             std::wcerr << L"Failed to connect to " << share_path << L". Error: " << result << std::endl;
@@ -152,26 +152,26 @@ NTSTATUS NetworkClient::establishConnection(const std::wstring &share_path)
         }
     }
 
-    current_share_ = share_path;
-    is_connected_ = true;
+    current_share = share_path;
+    is_connected = true;
 
     return STATUS_SUCCESS;
 }
 
 void NetworkClient::cleanupConnection()
 {
-    if (!current_share_.empty())
+    if (!current_share.empty())
     {
         // Only disconnect if we explicitly connected
-        if (net_resource_.lpRemoteName != nullptr)
+        if (net_resource.lpRemoteName != nullptr)
         {
-            WNetCancelConnection2W(current_share_.c_str(), 0, FALSE);
+            WNetCancelConnection2W(current_share.c_str(), 0, FALSE);
         }
-        current_share_.clear();
+        current_share.clear();
     }
 
-    ZeroMemory(&net_resource_, sizeof(net_resource_));
-    is_connected_ = false;
+    ZeroMemory(&net_resource, sizeof(net_resource));
+    is_connected = false;
 }
 
 } // namespace CeWinFileCache

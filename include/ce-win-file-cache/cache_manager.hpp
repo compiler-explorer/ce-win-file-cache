@@ -36,19 +36,19 @@ class CacheManager
     NTSTATUS performLRUEviction(size_t bytes_needed);
     size_t calculateFileSize(const std::wstring &file_path);
 
-    GlobalConfig config_;
-    mutable std::mutex cache_mutex_;
-    std::unordered_map<std::wstring, std::unique_ptr<CacheEntry>> cached_files_;
+    GlobalConfig config;
+    mutable std::mutex cache_mutex;
+    std::unordered_map<std::wstring, std::unique_ptr<CacheEntry>> cached_files;
 
     // Statistics
-    mutable std::atomic<size_t> current_cache_size_;
-    mutable std::atomic<size_t> cache_hits_;
-    mutable std::atomic<size_t> cache_misses_;
+    mutable std::atomic<size_t> current_cache_size;
+    mutable std::atomic<size_t> cache_hits;
+    mutable std::atomic<size_t> cache_misses;
 
     // Background thread
-    std::thread eviction_thread_;
-    std::condition_variable eviction_cv_;
-    std::atomic<bool> shutdown_requested_;
+    std::thread eviction_thread;
+    std::condition_variable eviction_cv;
+    std::atomic<bool> shutdown_requested;
 };
 
 } // namespace CeWinFileCache

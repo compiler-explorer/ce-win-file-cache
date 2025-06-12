@@ -28,9 +28,9 @@ class NetworkClient
     NTSTATUS establishConnection(const std::wstring &share_path);
     void cleanupConnection();
 
-    std::wstring current_share_;
-    bool is_connected_;
-    NETRESOURCEW net_resource_;
+    std::wstring current_share;
+    bool is_connected;
+    NETRESOURCEW net_resource;
 };
 
 } // namespace CeWinFileCache

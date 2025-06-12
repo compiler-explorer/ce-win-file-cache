@@ -459,7 +459,7 @@ class CompilerCacheService : public Fsp::Service
 {
     public:
     CompilerCacheService(wchar_t *ServiceName, const ProgramOptions &options)
-    : Fsp::Service(ServiceName), filesystem_(), host_(filesystem_), options_(options)
+    : Fsp::Service(ServiceName), filesystem(), host(filesystem), options_(options)
     {
     }
 
@@ -477,7 +477,7 @@ class CompilerCacheService : public Fsp::Service
         Config config = *config_opt;
 
         // Initialize filesystem
-        NTSTATUS result = filesystem_.Initialize(config);
+        NTSTATUS result = filesystem.Initialize(config);
         if (!NT_SUCCESS(result))
         {
             std::wcerr << L"Failed to initialize filesystem. Status: 0x" << std::hex << result << std::endl;
@@ -491,7 +491,7 @@ class CompilerCacheService : public Fsp::Service
             compiler_paths[name] = compiler_config.network_path;
         }
 
-        result = filesystem_.SetCompilerPaths(compiler_paths);
+        result = filesystem.SetCompilerPaths(compiler_paths);
         if (!NT_SUCCESS(result))
         {
             std::wcerr << L"Failed to set compiler paths. Status: 0x" << std::hex << result << std::endl;
@@ -502,12 +502,12 @@ class CompilerCacheService : public Fsp::Service
         if (!options_.volume_prefix.empty())
         {
             std::wstring volume_prefix_copy = options_.volume_prefix;
-            host_.SetPrefix(volume_prefix_copy.data());
+            host.SetPrefix(volume_prefix_copy.data());
         }
 
         // Mount filesystem
         std::wstring mount_point_copy = options_.mount_point;
-        result = host_.Mount(mount_point_copy.data(), nullptr, FALSE, options_.debug_flags);
+        result = host.Mount(mount_point_copy.data(), nullptr, FALSE, options_.debug_flags);
         if (!NT_SUCCESS(result))
         {
             std::wcerr << L"Failed to mount filesystem at " << options_.mount_point << L". Status: 0x" << std::hex
@@ -515,7 +515,7 @@ class CompilerCacheService : public Fsp::Service
             return result;
         }
 
-        std::wcout << L"CompilerCacheFS mounted at " << host_.MountPoint() << std::endl;
+        std::wcout << L"CompilerCacheFS mounted at " << host.MountPoint() << std::endl;
         std::wcout << L"Cache directory: " << config.global.cache_directory << std::endl;
         std::wcout << L"Total cache size: " << config.global.total_cache_size_mb << L" MB" << std::endl;
 
@@ -524,14 +524,14 @@ class CompilerCacheService : public Fsp::Service
 
     NTSTATUS OnStop() override
     {
-        host_.Unmount();
+        host.Unmount();
         std::wcout << L"CeWinFileCacheFS unmounted" << std::endl;
         return STATUS_SUCCESS;
     }
 
     private:
-    HybridFileSystem filesystem_;
-    Fsp::FileSystemHost host_;
+    HybridFileSystem filesystem;
+    Fsp::FileSystemHost host;
     ProgramOptions options_;
 };
 #endif // NO_WINFSP

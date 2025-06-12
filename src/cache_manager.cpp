@@ -7,7 +7,7 @@ namespace CeWinFileCache
 {
 
 CacheManager::CacheManager(const GlobalConfig &config)
-: config_(config), current_cache_size_(0), cache_hits_(0), cache_misses_(0), shutdown_requested_(false)
+: config(config), current_cache_size(0), cache_hits(0), cache_misses(0), shutdown_requested(false)
 {
 }
 
@@ -20,21 +20,21 @@ NTSTATUS CacheManager::initialize()
 {
     // Create cache directory if it doesn't exist
     std::error_code ec;
-    std::filesystem::create_directories(config_.cache_directory, ec);
+    std::filesystem::create_directories(config.cache_directory, ec);
     if (ec)
     {
-        std::wcerr << L"Failed to create cache directory: " << config_.cache_directory << std::endl;
+        std::wcerr << L"Failed to create cache directory: " << config.cache_directory << std::endl;
         return STATUS_UNSUCCESSFUL;
     }
 
     // Calculate current cache size by scanning existing files
     try
     {
-        for (const auto &entry : std::filesystem::recursive_directory_iterator(config_.cache_directory))
+        for (const auto &entry : std::filesystem::recursive_directory_iterator(config.cache_directory))
         {
             if (entry.is_regular_file())
             {
-                current_cache_size_ += entry.file_size();
+                current_cache_size += entry.file_size();
             }
         }
     }
@@ -45,34 +45,34 @@ NTSTATUS CacheManager::initialize()
     }
 
     // Start background eviction thread
-    eviction_thread_ = std::thread(&CacheManager::backgroundEvictionThread, this);
+    eviction_thread = std::thread(&CacheManager::backgroundEvictionThread, this);
 
     return STATUS_SUCCESS;
 }
 
 void CacheManager::shutdown()
 {
-    shutdown_requested_ = true;
-    eviction_cv_.notify_all();
+    shutdown_requested = true;
+    eviction_cv.notify_all();
 
-    if (eviction_thread_.joinable())
+    if (eviction_thread.joinable())
     {
-        eviction_thread_.join();
+        eviction_thread.join();
     }
 }
 
 NTSTATUS CacheManager::cacheFile(const std::wstring &network_path, const std::wstring &local_path)
 {
-    std::lock_guard<std::mutex> lock(cache_mutex_);
+    std::lock_guard<std::mutex> lock(cache_mutex);
 
     // Check if file is already cached
-    if (cached_files_.find(local_path) != cached_files_.end())
+    if (cached_files.find(local_path) != cached_files.end())
     {
-        cache_hits_++;
+        cache_hits++;
         return STATUS_SUCCESS;
     }
 
-    cache_misses_++;
+    cache_misses++;
 
     // Calculate file size
     size_t file_size = calculateFileSize(network_path);
@@ -82,8 +82,8 @@ NTSTATUS CacheManager::cacheFile(const std::wstring &network_path, const std::ws
     }
 
     // Check if we need to evict files to make space
-    size_t max_cache_size = config_.total_cache_size_mb * 1024 * 1024;
-    if (current_cache_size_ + file_size > max_cache_size)
+    size_t max_cache_size = config.total_cache_size_mb * 1024 * 1024;
+    if (current_cache_size + file_size > max_cache_size)
     {
         NTSTATUS result = performLRUEviction(file_size);
         if (!NT_SUCCESS(result))
@@ -101,18 +101,18 @@ NTSTATUS CacheManager::cacheFile(const std::wstring &network_path, const std::ws
     entry->last_used = std::chrono::steady_clock::now();
 
     // Add to cache
-    cached_files_[local_path] = std::move(entry);
-    current_cache_size_ += file_size;
+    cached_files[local_path] = std::move(entry);
+    current_cache_size += file_size;
 
     return STATUS_SUCCESS;
 }
 
 NTSTATUS CacheManager::evictFile(const std::wstring &local_path)
 {
-    std::lock_guard<std::mutex> lock(cache_mutex_);
+    std::lock_guard<std::mutex> lock(cache_mutex);
 
-    auto it = cached_files_.find(local_path);
-    if (it == cached_files_.end())
+    auto it = cached_files.find(local_path);
+    if (it == cached_files.end())
     {
         return STATUS_OBJECT_NAME_NOT_FOUND;
     }
@@ -126,56 +126,56 @@ NTSTATUS CacheManager::evictFile(const std::wstring &local_path)
         // Continue anyway to remove from cache tracking
     }
 
-    current_cache_size_ -= it->second->file_size;
-    cached_files_.erase(it);
+    current_cache_size -= it->second->file_size;
+    cached_files.erase(it);
 
     return STATUS_SUCCESS;
 }
 
 bool CacheManager::isFileCached(const std::wstring &local_path)
 {
-    std::lock_guard<std::mutex> lock(cache_mutex_);
-    return cached_files_.find(local_path) != cached_files_.end();
+    std::lock_guard<std::mutex> lock(cache_mutex);
+    return cached_files.find(local_path) != cached_files.end();
 }
 
 size_t CacheManager::getCurrentCacheSize() const
 {
-    return current_cache_size_;
+    return current_cache_size;
 }
 
 size_t CacheManager::getCacheHitCount() const
 {
-    return cache_hits_;
+    return cache_hits;
 }
 
 size_t CacheManager::getCacheMissCount() const
 {
-    return cache_misses_;
+    return cache_misses;
 }
 
 void CacheManager::backgroundEvictionThread()
 {
-    while (!shutdown_requested_)
+    while (!shutdown_requested)
     {
-        std::unique_lock<std::mutex> lock(cache_mutex_);
+        std::unique_lock<std::mutex> lock(cache_mutex);
 
         // Wait for eviction signal or timeout
-        eviction_cv_.wait_for(lock, std::chrono::minutes(5),
+        eviction_cv.wait_for(lock, std::chrono::minutes(5),
                               [this]
                               {
-                                  return shutdown_requested_.load();
+                                  return shutdown_requested.load();
                               });
 
-        if (shutdown_requested_)
+        if (shutdown_requested)
         {
             break;
         }
 
         // Check if we need to evict based on cache size
-        size_t max_cache_size = config_.total_cache_size_mb * 1024 * 1024;
-        if (current_cache_size_ > max_cache_size * 0.9) // Start evicting at 90% capacity
+        size_t max_cache_size = config.total_cache_size_mb * 1024 * 1024;
+        if (current_cache_size > max_cache_size * 0.9) // Start evicting at 90% capacity
         {
-            size_t bytes_to_evict = current_cache_size_ - (max_cache_size * 0.8); // Evict down to 80%
+            size_t bytes_to_evict = current_cache_size - (max_cache_size * 0.8); // Evict down to 80%
             performLRUEviction(bytes_to_evict);
         }
     }
@@ -186,7 +186,7 @@ NTSTATUS CacheManager::performLRUEviction(size_t bytes_needed)
     // Collect candidates for eviction (sorted by last access time)
     std::vector<std::pair<std::chrono::steady_clock::time_point, std::wstring>> candidates;
 
-    for (const auto &[path, entry] : cached_files_)
+    for (const auto &[path, entry] : cached_files)
     {
         candidates.emplace_back(entry->last_used, path);
     }
@@ -202,8 +202,8 @@ NTSTATUS CacheManager::performLRUEviction(size_t bytes_needed)
             break;
         }
 
-        auto it = cached_files_.find(path);
-        if (it != cached_files_.end())
+        auto it = cached_files.find(path);
+        if (it != cached_files.end())
         {
             bytes_evicted += it->second->file_size;
 
@@ -212,11 +212,11 @@ NTSTATUS CacheManager::performLRUEviction(size_t bytes_needed)
             std::filesystem::remove(path, ec);
 
             // Remove from cache
-            cached_files_.erase(it);
+            cached_files.erase(it);
         }
     }
 
-    current_cache_size_ -= bytes_evicted;
+    current_cache_size -= bytes_evicted;
 
     return bytes_evicted >= bytes_needed ? STATUS_SUCCESS : STATUS_DISK_FULL;
 }

@@ -98,13 +98,13 @@ public:
     void reset();
     
     // Thread safety
-    void lock() { tree_mutex_.lock(); }
-    void unlock() { tree_mutex_.unlock(); }
-    std::lock_guard<std::mutex> getLock() { return std::lock_guard<std::mutex>(tree_mutex_); }
+    void lock() { tree_mutex.lock(); }
+    void unlock() { tree_mutex.unlock(); }
+    std::lock_guard<std::mutex> getLock() { return std::lock_guard<std::mutex>(tree_mutex); }
 
 private:
-    std::unique_ptr<DirectoryNode> root_;
-    mutable std::mutex tree_mutex_;
+    std::unique_ptr<DirectoryNode> root;
+    mutable std::mutex tree_mutex;
     
     // Helper methods
     std::vector<std::wstring> splitPath(const std::wstring& path);

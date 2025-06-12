@@ -11,7 +11,7 @@ constexpr ULONG ALLOCATION_UNIT = 4096;
 constexpr ULONG FULLPATH_SIZE = MAX_PATH + FSP_FSCTL_TRANSACT_PATH_SIZEMAX / sizeof(WCHAR);
 
 
-HybridFileSystem::HybridFileSystem() : Fsp::FileSystemBase(), current_cache_size_(0), creation_time_(0)
+HybridFileSystem::HybridFileSystem() : Fsp::FileSystemBase(), current_cache_size(0), creation_time(0)
 {
 }
 
@@ -21,10 +21,10 @@ HybridFileSystem::~HybridFileSystem()
 
 NTSTATUS HybridFileSystem::Initialize(const Config &config)
 {
-    config_ = config;
+    config = config;
 
     // Create cache directory if it doesn't exist
-    if (!CreateDirectoryW(config_.global.cache_directory.c_str(), nullptr))
+    if (!CreateDirectoryW(config.global.cache_directory.c_str(), nullptr))
     {
         DWORD error = GetLastError();
         if (error != ERROR_ALREADY_EXISTS)
@@ -36,30 +36,30 @@ NTSTATUS HybridFileSystem::Initialize(const Config &config)
     // Get creation time for volume
     FILETIME ft;
     GetSystemTimeAsFileTime(&ft);
-    creation_time_ = ((PLARGE_INTEGER)&ft)->QuadPart;
+    creation_time = ((PLARGE_INTEGER)&ft)->QuadPart;
 
     // Initialize directory cache with configured compiler paths
-    NTSTATUS result = directory_cache_.initialize(config_);
+    NTSTATUS result = directory_cache.initialize(config);
     if (!NT_SUCCESS(result))
     {
         return result;
     }
 
     // Initialize async download manager with 4 worker threads
-    download_manager_ = std::make_unique<AsyncDownloadManager>(memory_cache_, config_, 4);
+    download_manager = std::make_unique<AsyncDownloadManager>(memory_cache, config, 4);
 
     return STATUS_SUCCESS;
 }
 
 NTSTATUS HybridFileSystem::SetCompilerPaths(const std::unordered_map<std::wstring, std::wstring> &compiler_paths)
 {
-    std::lock_guard<std::mutex> lock(cache_mutex_);
+    std::lock_guard<std::mutex> lock(cache_mutex);
 
     // Initialize cache entries for each compiler
     for (const auto &[compiler_name, base_path] : compiler_paths)
     {
-        auto it = config_.compilers.find(compiler_name);
-        if (it == config_.compilers.end())
+        auto it = config.compilers.find(compiler_name);
+        if (it == config.compilers.end())
         {
             continue;
         }
@@ -74,7 +74,7 @@ NTSTATUS HybridFileSystem::SetCompilerPaths(const std::unordered_map<std::wstrin
         entry->policy = CachePolicy::ON_DEMAND;
         entry->file_attributes = FILE_ATTRIBUTE_DIRECTORY;
 
-        cache_entries_[entry->virtual_path] = std::move(entry);
+        cache_entries[entry->virtual_path] = std::move(entry);
     }
 
     return STATUS_SUCCESS;
@@ -93,7 +93,7 @@ NTSTATUS HybridFileSystem::Init(PVOID Host)
     host->SetPersistentAcls(TRUE);
     host->SetPostCleanupWhenModifiedOnly(TRUE);
     host->SetPassQueryDirectoryPattern(TRUE);
-    host->SetVolumeCreationTime(creation_time_);
+    host->SetVolumeCreationTime(creation_time);
     host->SetVolumeSerialNumber(0x12345678);
     host->SetFlushAndPurgeOnCleanup(TRUE);
 
@@ -102,8 +102,8 @@ NTSTATUS HybridFileSystem::Init(PVOID Host)
 
 NTSTATUS HybridFileSystem::GetVolumeInfo(VolumeInfo *VolumeInfo)
 {
-    VolumeInfo->TotalSize = config_.global.total_cache_size_mb * 1024ULL * 1024ULL;
-    VolumeInfo->FreeSize = VolumeInfo->TotalSize - (current_cache_size_ * 1024ULL * 1024ULL);
+    VolumeInfo->TotalSize = config.global.total_cache_size_mb * 1024ULL * 1024ULL;
+    VolumeInfo->FreeSize = VolumeInfo->TotalSize - (current_cache_size * 1024ULL * 1024ULL);
 
     return STATUS_SUCCESS;
 }
@@ -177,7 +177,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     if (entry->state == FileState::CACHED && entry->local_path.empty())
     {
         // File is in memory cache - check if we have it
-        if (memory_cache_.isFileInMemoryCache(entry->virtual_path))
+        if (memory_cache.isFileInMemoryCache(entry->virtual_path))
         {
             // File is in memory - create a temporary file if we need a handle for compatibility
             std::wstring temp_path = createTemporaryFileForMemoryCached(entry);
@@ -216,7 +216,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     // For memory-cached files, we allow INVALID_HANDLE_VALUE since Read() can serve from memory
     if (file_desc->handle == INVALID_HANDLE_VALUE && 
         !(entry->state == FileState::CACHED && entry->local_path.empty() && 
-          memory_cache_.isFileInMemoryCache(entry->virtual_path)))
+          memory_cache.isFileInMemoryCache(entry->virtual_path)))
     {
         delete file_desc;
         return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
@@ -271,7 +271,7 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
     if (file_desc->entry && file_desc->entry->state == FileState::CACHED && file_desc->entry->local_path.empty())
     {
         // File is cached in memory - serve directly from memory cache
-        auto cached = memory_cache_.getMemoryCachedFile(file_desc->entry->virtual_path);
+        auto cached = memory_cache.getMemoryCachedFile(file_desc->entry->virtual_path);
         
         if (cached.has_value())
         {
@@ -363,7 +363,7 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
     if (*PContext == nullptr)
     {
         // Start enumeration - get all directory contents
-        contents = directory_cache_.getDirectoryContents(file_desc->entry->virtual_path);
+        contents = directory_cache.getDirectoryContents(file_desc->entry->virtual_path);
         
         if (contents.empty())
         {
@@ -430,10 +430,10 @@ std::wstring HybridFileSystem::resolveVirtualPath(const std::wstring &virtual_pa
 
 CacheEntry *HybridFileSystem::getCacheEntry(const std::wstring &virtual_path)
 {
-    std::lock_guard<std::mutex> lock(cache_mutex_);
+    std::lock_guard<std::mutex> lock(cache_mutex);
 
-    auto it = cache_entries_.find(virtual_path);
-    if (it != cache_entries_.end())
+    auto it = cache_entries.find(virtual_path);
+    if (it != cache_entries.end())
     {
         return it->second.get();
     }
@@ -448,7 +448,7 @@ CacheEntry *HybridFileSystem::getCacheEntry(const std::wstring &virtual_path)
     // todo: determine network path based on virtual path and compiler config
 
     CacheEntry *result = entry.get();
-    cache_entries_[virtual_path] = std::move(entry);
+    cache_entries[virtual_path] = std::move(entry);
     return result;
 }
 
@@ -467,7 +467,7 @@ NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
     }
 
     // Check if file is already being downloaded
-    if (download_manager_ && download_manager_->isDownloadInProgress(entry->virtual_path))
+    if (download_manager && download_manager->isDownloadInProgress(entry->virtual_path))
     {
         entry->state = FileState::FETCHING;
         return STATUS_PENDING;
@@ -482,11 +482,11 @@ NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
     }
 
     // Queue async download for ALWAYS_CACHE and ON_DEMAND policies
-    if (download_manager_ && !entry->network_path.empty())
+    if (download_manager && !entry->network_path.empty())
     {
         entry->state = FileState::FETCHING;
         
-        NTSTATUS status = download_manager_->queueDownload(
+        NTSTATUS status = download_manager->queueDownload(
             entry->virtual_path,
             entry->network_path,
             entry,
@@ -533,7 +533,7 @@ NTSTATUS HybridFileSystem::fetchFromNetwork(CacheEntry *entry)
     if (entry->policy == CachePolicy::ALWAYS_CACHE || entry->policy == CachePolicy::ON_DEMAND)
     {
         // Load file content into memory cache
-        auto content = memory_cache_.getFileContent(entry->virtual_path, config_);
+        auto content = memory_cache.getFileContent(entry->virtual_path, config);
         
         if (!content.empty())
         {
@@ -589,8 +589,8 @@ CachePolicy HybridFileSystem::determineCachePolicy(const std::wstring &virtual_p
     std::wstring relative_path = virtual_path.substr(second_slash + 1);
     
     // Find compiler config
-    auto compiler_it = config_.compilers.find(compiler_name);
-    if (compiler_it == config_.compilers.end())
+    auto compiler_it = config.compilers.find(compiler_name);
+    if (compiler_it == config.compilers.end())
     {
         return CachePolicy::NEVER_CACHE;
     }
@@ -614,7 +614,7 @@ CachePolicy HybridFileSystem::determineCachePolicy(const std::wstring &virtual_p
 std::wstring HybridFileSystem::createTemporaryFileForMemoryCached(CacheEntry *entry)
 {
     // Get cached content from memory
-    auto cached = memory_cache_.getMemoryCachedFile(entry->virtual_path);
+    auto cached = memory_cache.getMemoryCachedFile(entry->virtual_path);
     if (!cached.has_value())
     {
         return L""; // No content in cache
