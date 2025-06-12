@@ -102,8 +102,6 @@
         "*.inc": "cpp"
     },
     "files.exclude": {
-        "**/build*/": true,
-        "**/test-*/": true,
         "**/.cache/": true
     },
     "search.exclude": {
