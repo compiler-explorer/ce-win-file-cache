@@ -4,6 +4,7 @@
 #include "../types/config.hpp"
 #include "windows_compat.hpp"
 #include "memory_cache_manager.hpp"
+#include "directory_cache.hpp"
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -44,6 +45,9 @@ class HybridFileSystem : public Fsp::FileSystemBase
     bool matchesPattern(const std::wstring &path, const std::wstring &pattern);
     CachePolicy determineCachePolicy(const std::wstring &virtual_path);
     std::wstring createTemporaryFileForMemoryCached(CacheEntry *entry);
+    
+    // Directory tree management
+    void fillDirInfo(DirInfo* dir_info, DirectoryNode* node);
 
     // Cache management
     NTSTATUS evictIfNeeded();
@@ -57,6 +61,9 @@ class HybridFileSystem : public Fsp::FileSystemBase
     
     // In-memory cache for fast file access
     MemoryCacheManager memory_cache_;
+    
+    // Always-resident directory tree (never evicted)
+    DirectoryCache directory_cache_;
 };
 
 struct FileDescriptor

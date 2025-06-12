@@ -18,7 +18,14 @@ typedef int32_t NTSTATUS;
 typedef wchar_t* PWSTR;
 typedef const wchar_t* PCWSTR;
 typedef uint64_t ULONGLONG;
+typedef uint64_t UINT64;
 typedef void* PVOID;
+
+// File time structure
+struct FILETIME {
+    DWORD dwLowDateTime;
+    DWORD dwHighDateTime;
+};
 
 // Windows constants
 #define INVALID_HANDLE_VALUE ((HANDLE)(intptr_t)-1)
@@ -52,5 +59,10 @@ struct SECURITY_CAPABILITIES {
 // Function stubs
 inline void CloseHandle(HANDLE) {}
 inline DWORD GetLastError() { return 0; }
+inline void GetSystemTimeAsFileTime(FILETIME* lpSystemTimeAsFileTime) {
+    // Mock implementation - set to zero
+    lpSystemTimeAsFileTime->dwLowDateTime = 0;
+    lpSystemTimeAsFileTime->dwHighDateTime = 0;
+}
 
 #endif // !_WIN32

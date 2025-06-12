@@ -38,6 +38,13 @@ NTSTATUS HybridFileSystem::Initialize(const Config &config)
     GetSystemTimeAsFileTime(&ft);
     creation_time_ = ((PLARGE_INTEGER)&ft)->QuadPart;
 
+    // Initialize directory cache with configured compiler paths
+    NTSTATUS result = directory_cache_.initialize(config_);
+    if (!NT_SUCCESS(result))
+    {
+        return result;
+    }
+
     return STATUS_SUCCESS;
 }
 
@@ -339,17 +346,73 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
 NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID *PContext, DirInfo *DirInfo)
 {
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
-
-    // For now, implement basic directory reading from network
-    // In a full implementation, this would enumerate both cache and network entries
-
+    
+    if (!file_desc->entry)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+    
+    // Get directory contents from in-memory tree
+    std::vector<DirectoryNode*> contents;
+    
     if (*PContext == nullptr)
     {
-        // Start enumeration - this is a simplified implementation
-        return STATUS_NO_MORE_FILES;
+        // Start enumeration - get all directory contents
+        contents = directory_cache_.getDirectoryContents(file_desc->entry->virtual_path);
+        
+        if (contents.empty())
+        {
+            return STATUS_NO_MORE_FILES;
+        }
+        
+        // Store the contents vector as context (simplified - in production should be more robust)
+        auto* context_data = new std::vector<DirectoryNode*>(std::move(contents));
+        *PContext = context_data;
+        
+        // Return first entry
+        auto* first_entry = (*context_data)[0];
+        fillDirInfo(DirInfo, first_entry);
+        
+        return STATUS_SUCCESS;
     }
-
-    return STATUS_NO_MORE_FILES;
+    else
+    {
+        // Continue enumeration
+        auto* context_data = static_cast<std::vector<DirectoryNode*>*>(*PContext);
+        
+        // Find current position
+        size_t current_index = 0;
+        if (Marker && wcslen(Marker) > 0)
+        {
+            // Find marker in the list
+            for (size_t i = 0; i < context_data->size(); i++)
+            {
+                if ((*context_data)[i]->name == Marker)
+                {
+                    current_index = i + 1;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            current_index = 1; // Next after first
+        }
+        
+        if (current_index >= context_data->size())
+        {
+            // End of enumeration
+            delete context_data;
+            *PContext = nullptr;
+            return STATUS_NO_MORE_FILES;
+        }
+        
+        // Return next entry
+        auto* next_entry = (*context_data)[current_index];
+        fillDirInfo(DirInfo, next_entry);
+        
+        return STATUS_SUCCESS;
+    }
 }
 
 // Private methods
@@ -541,6 +604,35 @@ std::wstring HybridFileSystem::createTemporaryFileForMemoryCached(CacheEntry *en
     }
     
     return std::wstring(temp_path);
+}
+
+
+void HybridFileSystem::fillDirInfo(DirInfo* dir_info, DirectoryNode* node)
+{
+    if (!dir_info || !node)
+    {
+        return;
+    }
+    
+    // Copy filename (WinFsp expects wide char)
+    wcscpy_s(dir_info->FileName, sizeof(dir_info->FileName) / sizeof(WCHAR), node->name.c_str());
+    
+    // Set file attributes
+    dir_info->FileAttributes = node->file_attributes;
+    
+    // Set file size
+    dir_info->FileSize = node->file_size;
+    dir_info->AllocationSize = (dir_info->FileSize + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
+    
+    // Set timestamps
+    dir_info->CreationTime = ((PLARGE_INTEGER)&node->creation_time)->QuadPart;
+    dir_info->LastAccessTime = ((PLARGE_INTEGER)&node->last_access_time)->QuadPart;
+    dir_info->LastWriteTime = ((PLARGE_INTEGER)&node->last_write_time)->QuadPart;
+    dir_info->ChangeTime = dir_info->LastWriteTime;
+    
+    // Set additional info
+    dir_info->IndexNumber = 0;
+    dir_info->ReparseTag = 0;
 }
 
 NTSTATUS HybridFileSystem::evictIfNeeded()

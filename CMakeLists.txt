@@ -149,6 +149,8 @@ set(SOURCES
     src/hybrid_filesystem.cpp
     src/cache_manager.cpp
     src/memory_cache_manager.cpp
+    src/directory_tree.cpp
+    src/directory_cache.cpp
     src/network_client.cpp
     src/config_parser.cpp
     src/main.cpp
@@ -305,5 +307,18 @@ if(BUILD_CACHE_TEST OR APPLE)
     )
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         target_compile_options(cache_demo PRIVATE -Wall -Wextra)
+    endif()
+    
+    # Directory cache test
+    add_executable(directory_test src/test_directory_cache.cpp src/directory_cache.cpp src/directory_tree.cpp src/config_parser.cpp)
+    target_compile_definitions(directory_test PRIVATE NO_WINFSP)
+    target_include_directories(directory_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    set_target_properties(directory_test PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    )
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(directory_test PRIVATE -Wall -Wextra)
     endif()
 endif()
