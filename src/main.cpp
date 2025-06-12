@@ -1,13 +1,13 @@
+#include <algorithm>
 #include <ce-win-file-cache/config_parser.hpp>
 #include <ce-win-file-cache/hybrid_filesystem.hpp>
 #include <ce-win-file-cache/memory_cache_manager.hpp>
+#include <chrono>
 #include <iostream>
 #include <shellapi.h>
 #include <string>
 #include <unordered_map>
-#include <algorithm>
 #include <vector>
-#include <chrono>
 
 #ifndef NO_WINFSP
 #include <winfsp/winfsp.hpp>
@@ -156,7 +156,7 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
 }
 
 // Test function for config parsing only
-int testConfigOnly(const Config& config)
+int testConfigOnly(const Config &config)
 {
     std::wcout << L"=== Config Parsing Test ===" << std::endl;
     std::wcout << L"Configuration loaded successfully:" << std::endl;
@@ -178,23 +178,19 @@ int testConfigOnly(const Config& config)
 }
 
 // Test function for path resolution (TODO #3)
-int testPathResolution(const Config& config)
+int testPathResolution(const Config &config)
 {
     std::wcout << L"=== Path Resolution Test ===" << std::endl;
-    
+
     // Test cases for path resolution
-    std::vector<std::wstring> test_paths = {
-        L"/msvc-14.40/bin/Hostx64/x64/cl.exe",
-        L"/msvc-14.40/include/iostream",
-        L"/windows-kits-10/Include/10.0.22621.0/um/windows.h",
-        L"/ninja/ninja.exe",
-        L"/invalid-compiler/some/path"
-    };
-    
-    for (const auto& virtual_path : test_paths)
+    std::vector<std::wstring> test_paths = { L"/msvc-14.40/bin/Hostx64/x64/cl.exe", L"/msvc-14.40/include/iostream",
+                                             L"/windows-kits-10/Include/10.0.22621.0/um/windows.h", L"/ninja/ninja.exe",
+                                             L"/invalid-compiler/some/path" };
+
+    for (const auto &virtual_path : test_paths)
     {
         std::wcout << L"Testing virtual path: " << virtual_path << std::endl;
-        
+
         // Extract compiler name from virtual path
         std::wstring compiler_name;
         size_t first_slash = virtual_path.find(L'/', 1);
@@ -206,7 +202,7 @@ int testPathResolution(const Config& config)
         {
             compiler_name = virtual_path.substr(1);
         }
-        
+
         // Check if compiler exists in config
         auto it = config.compilers.find(compiler_name);
         if (it != config.compilers.end())
@@ -217,7 +213,7 @@ int testPathResolution(const Config& config)
             {
                 relative_path = virtual_path.substr(first_slash + 1);
             }
-            
+
             // Resolve to network path
             std::wstring resolved_path = it->second.network_path;
             if (!relative_path.empty())
@@ -227,7 +223,7 @@ int testPathResolution(const Config& config)
                 std::replace(windows_relative.begin(), windows_relative.end(), L'/', L'\\');
                 resolved_path += L"\\" + windows_relative;
             }
-            
+
             std::wcout << L"  -> Resolved to: " << resolved_path << std::endl;
         }
         else
@@ -236,29 +232,32 @@ int testPathResolution(const Config& config)
         }
         std::wcout << std::endl;
     }
-    
+
     std::wcout << L"Path resolution test completed!" << std::endl;
     return 0;
 }
 
 // Test function for network mapping (TODO #4)
-int testNetworkMapping(const Config& config)
+int testNetworkMapping(const Config &config)
 {
     std::wcout << L"=== Network Mapping Test ===" << std::endl;
-    
+
     // Test cases for network path mapping
     std::vector<std::pair<std::wstring, std::wstring>> test_cases = {
-        {L"/msvc-14.40/bin/Hostx64/x64/cl.exe", L"\\\\\\\\127.0.0.1\\\\efs\\\\compilers\\\\msvc\\\\14.40.33807-14.40.33811.0\\bin\\Hostx64\\x64\\cl.exe"},
-        {L"/msvc-14.40/include/iostream", L"\\\\\\\\127.0.0.1\\\\efs\\\\compilers\\\\msvc\\\\14.40.33807-14.40.33811.0\\include\\iostream"},
-        {L"/windows-kits-10/Lib/10.0.22621.0/ucrt/x64/ucrt.lib", L"\\\\\\\\127.0.0.1\\\\efs\\\\compilers\\\\windows-kits-10\\Lib\\10.0.22621.0\\ucrt\\x64\\ucrt.lib"},
-        {L"/ninja/ninja.exe", L"\\\\\\\\127.0.0.1\\\\efs\\\\compilers\\\\ninja\\ninja.exe"}
+        { L"/msvc-14.40/bin/Hostx64/x64/cl.exe",
+          L"\\\\\\\\127.0.0.1\\\\efs\\\\compilers\\\\msvc\\\\14.40.33807-14.40.33811.0\\bin\\Hostx64\\x64\\cl.exe" },
+        { L"/msvc-14.40/include/iostream",
+          L"\\\\\\\\127.0.0.1\\\\efs\\\\compilers\\\\msvc\\\\14.40.33807-14.40.33811.0\\include\\iostream" },
+        { L"/windows-kits-10/Lib/10.0.22621.0/ucrt/x64/ucrt.lib",
+          L"\\\\\\\\127.0.0.1\\\\efs\\\\compilers\\\\windows-kits-10\\Lib\\10.0.22621.0\\ucrt\\x64\\ucrt.lib" },
+        { L"/ninja/ninja.exe", L"\\\\\\\\127.0.0.1\\\\efs\\\\compilers\\\\ninja\\ninja.exe" }
     };
-    
-    for (const auto& [virtual_path, expected_network_path] : test_cases)
+
+    for (const auto &[virtual_path, expected_network_path] : test_cases)
     {
         std::wcout << L"Testing virtual path: " << virtual_path << std::endl;
         std::wcout << L"Expected network path: " << expected_network_path << std::endl;
-        
+
         // Extract compiler name
         std::wstring compiler_name;
         size_t first_slash = virtual_path.find(L'/', 1);
@@ -270,7 +269,7 @@ int testNetworkMapping(const Config& config)
         {
             compiler_name = virtual_path.substr(1);
         }
-        
+
         // Check if compiler exists
         auto it = config.compilers.find(compiler_name);
         if (it != config.compilers.end())
@@ -282,16 +281,16 @@ int testNetworkMapping(const Config& config)
                 relative_path = virtual_path.substr(first_slash + 1);
                 std::replace(relative_path.begin(), relative_path.end(), L'/', L'\\');
             }
-            
+
             // Map to network path
             std::wstring actual_network_path = it->second.network_path;
             if (!relative_path.empty())
             {
                 actual_network_path += L"\\" + relative_path;
             }
-            
+
             std::wcout << L"Actual network path: " << actual_network_path << std::endl;
-            
+
             // Check if mapping is correct
             if (actual_network_path == expected_network_path)
             {
@@ -310,45 +309,41 @@ int testNetworkMapping(const Config& config)
         }
         std::wcout << std::endl;
     }
-    
+
     std::wcout << L"Network mapping test completed successfully!" << std::endl;
     return 0;
 }
 
 // Test function for cache operations
-int testCacheOperations(const Config& config)
+int testCacheOperations(const Config &config)
 {
     std::wcout << L"=== Cache Operations Test ===" << std::endl;
-    
+
     // Create cache manager
     MemoryCacheManager cache_manager;
-    
+
     // Test files (use real compiler paths)
-    std::vector<std::wstring> test_files = {
-        L"/msvc-14.40/bin/Hostx64/x64/cl.exe",
-        L"/msvc-14.40/include/iostream",
-        L"/ninja/ninja.exe"
-    };
-    
+    std::vector<std::wstring> test_files = { L"/msvc-14.40/bin/Hostx64/x64/cl.exe", L"/msvc-14.40/include/iostream", L"/ninja/ninja.exe" };
+
     std::wcout << L"\n1. Testing cache miss and network loading..." << std::endl;
-    for (const auto& virtual_path : test_files)
+    for (const auto &virtual_path : test_files)
     {
         std::wcout << L"  Loading: " << virtual_path << std::endl;
-        
+
         // Check cache (should miss)
         if (cache_manager.isFileInMemoryCache(virtual_path))
         {
             std::wcout << L"    ERROR: File unexpectedly in cache" << std::endl;
             return 1;
         }
-        
+
         // Load from network
         auto start = std::chrono::high_resolution_clock::now();
         auto content = cache_manager.getFileContent(virtual_path, config);
         auto end = std::chrono::high_resolution_clock::now();
-        
+
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-        
+
         if (content.empty())
         {
             std::wcout << L"    WARNING: Failed to load file (may not exist)" << std::endl;
@@ -358,9 +353,9 @@ int testCacheOperations(const Config& config)
             std::wcout << L"    Loaded " << content.size() << L" bytes in " << duration << L"ms" << std::endl;
         }
     }
-    
+
     std::wcout << L"\n2. Testing cache hits..." << std::endl;
-    for (const auto& virtual_path : test_files)
+    for (const auto &virtual_path : test_files)
     {
         // Skip if file wasn't loaded
         if (!cache_manager.isFileInMemoryCache(virtual_path))
@@ -368,33 +363,33 @@ int testCacheOperations(const Config& config)
             std::wcout << L"  Skipping: " << virtual_path << L" (not in cache)" << std::endl;
             continue;
         }
-        
+
         std::wcout << L"  Reading from cache: " << virtual_path << std::endl;
-        
+
         auto start = std::chrono::high_resolution_clock::now();
         auto cached = cache_manager.getMemoryCachedFile(virtual_path);
         auto end = std::chrono::high_resolution_clock::now();
-        
+
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-        
+
         if (!cached.has_value())
         {
             std::wcout << L"    ERROR: Failed to retrieve cached file" << std::endl;
             return 1;
         }
-        
+
         std::wcout << L"    Retrieved " << cached->size() << L" bytes in " << duration << L"μs" << std::endl;
     }
-    
+
     std::wcout << L"\n3. Cache statistics..." << std::endl;
     std::wcout << L"  Total cached files: " << cache_manager.getCachedFileCount() << std::endl;
     std::wcout << L"  Total cache size: " << cache_manager.getCacheSize() << L" bytes" << std::endl;
     std::wcout << L"  Average cache hit time: <1ms" << std::endl;
-    
+
     std::wcout << L"\n4. Testing cache clear..." << std::endl;
     cache_manager.clearCache();
     std::wcout << L"  Cache cleared. Files in cache: " << cache_manager.getCachedFileCount() << std::endl;
-    
+
     std::wcout << L"\nCache operations test completed!" << std::endl;
     return 0;
 }
@@ -436,19 +431,23 @@ int runTestMode(const ProgramOptions &options)
     {
         // Run all tests
         std::wcout << L"Running all tests..." << std::endl;
-        
+
         int result = testConfigOnly(config);
-        if (result != 0) return result;
-        
+        if (result != 0)
+            return result;
+
         result = testPathResolution(config);
-        if (result != 0) return result;
-        
+        if (result != 0)
+            return result;
+
         result = testNetworkMapping(config);
-        if (result != 0) return result;
-        
+        if (result != 0)
+            return result;
+
         result = testCacheOperations(config);
-        if (result != 0) return result;
-        
+        if (result != 0)
+            return result;
+
         std::wcout << L"All tests completed successfully!" << std::endl;
         return 0;
     }

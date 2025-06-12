@@ -161,10 +161,10 @@ void CacheManager::backgroundEvictionThread()
 
         // Wait for eviction signal or timeout
         eviction_cv.wait_for(lock, std::chrono::minutes(5),
-                              [this]
-                              {
-                                  return shutdown_requested.load();
-                              });
+                             [this]
+                             {
+                                 return shutdown_requested.load();
+                             });
 
         if (shutdown_requested)
         {

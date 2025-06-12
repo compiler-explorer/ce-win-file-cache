@@ -18,7 +18,7 @@ std::optional<Config> ConfigParser::parseYamlFile(std::wstring_view file_path)
         std::wcerr << L"Failed to open config file: " << file_path << std::endl;
         return std::nullopt;
     }
-    
+
     std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
     return parseYamlString(content);
@@ -30,7 +30,7 @@ std::optional<Config> ConfigParser::parseYamlString(std::string yaml_content)
 
     std::istringstream stream(yaml_content.data());
     std::string line;
-    
+
     int line_count = 0;
     std::string current_section;
     std::string current_compiler;
@@ -38,10 +38,10 @@ std::optional<Config> ConfigParser::parseYamlString(std::string yaml_content)
     while (std::getline(stream, line))
     {
         line_count++;
-        
+
         // Keep original line for pattern matching
         std::string original_line = line;
-        
+
         // Remove leading/trailing whitespace for empty line check
         line.erase(0, line.find_first_not_of(" \t"));
         line.erase(line.find_last_not_of(" \t") + 1);
@@ -66,7 +66,7 @@ std::optional<Config> ConfigParser::parseYamlString(std::string yaml_content)
 
         if (current_section == "compilers")
         {
-            // Parse compiler entries  
+            // Parse compiler entries
             std::regex compiler_regex(R"(^  ([^:]+):\s*$)");
             std::smatch match;
 
@@ -74,8 +74,7 @@ std::optional<Config> ConfigParser::parseYamlString(std::string yaml_content)
             {
                 std::string potential_compiler = match[1].str();
                 // Skip config sections like cache_always, prefetch_patterns, etc.
-                if (potential_compiler.find(' ') == std::string::npos &&
-                    potential_compiler != "cache_always" && 
+                if (potential_compiler.find(' ') == std::string::npos && potential_compiler != "cache_always" &&
                     potential_compiler != "prefetch_patterns")
                 {
                     current_compiler = potential_compiler;

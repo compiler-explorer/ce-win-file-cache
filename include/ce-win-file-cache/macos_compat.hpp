@@ -11,18 +11,19 @@
 // Basic Windows types
 typedef uint32_t DWORD;
 typedef int32_t BOOL;
-typedef void* HANDLE;
+typedef void *HANDLE;
 typedef int32_t LONG;
 typedef uint32_t ULONG;
 typedef int32_t NTSTATUS;
-typedef wchar_t* PWSTR;
-typedef const wchar_t* PCWSTR;
+typedef wchar_t *PWSTR;
+typedef const wchar_t *PCWSTR;
 typedef uint64_t ULONGLONG;
 typedef uint64_t UINT64;
-typedef void* PVOID;
+typedef void *PVOID;
 
 // File time structure
-struct FILETIME {
+struct FILETIME
+{
     DWORD dwLowDateTime;
     DWORD dwHighDateTime;
 };
@@ -48,27 +49,35 @@ struct FILETIME {
 #define NT_SUCCESS(Status) ((NTSTATUS)(Status) >= 0)
 
 // Fake security structures
-struct SECURITY_ATTRIBUTES {
+struct SECURITY_ATTRIBUTES
+{
     DWORD nLength;
-    void* lpSecurityDescriptor;
+    void *lpSecurityDescriptor;
     BOOL bInheritHandle;
 };
 
-struct SECURITY_CAPABILITIES {
-    void* AppContainerSid;
-    void* Capabilities;
+struct SECURITY_CAPABILITIES
+{
+    void *AppContainerSid;
+    void *Capabilities;
     DWORD CapabilityCount;
     DWORD Reserved;
 };
 
 // Fake file attributes
 #define FILE_ATTRIBUTE_DIRECTORY 0x00000010
-#define FILE_ATTRIBUTE_NORMAL    0x00000080
+#define FILE_ATTRIBUTE_NORMAL 0x00000080
 
 // Function stubs
-inline void CloseHandle(HANDLE) {}
-inline DWORD GetLastError() { return 0; }
-inline void GetSystemTimeAsFileTime(FILETIME* lpSystemTimeAsFileTime) {
+inline void CloseHandle(HANDLE)
+{
+}
+inline DWORD GetLastError()
+{
+    return 0;
+}
+inline void GetSystemTimeAsFileTime(FILETIME *lpSystemTimeAsFileTime)
+{
     // Mock implementation - set to zero
     lpSystemTimeAsFileTime->dwLowDateTime = 0;
     lpSystemTimeAsFileTime->dwHighDateTime = 0;

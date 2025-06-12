@@ -1,5 +1,5 @@
-#include <ce-win-file-cache/windows_compat.hpp>
 #include <ce-win-file-cache/hybrid_filesystem.hpp>
+#include <ce-win-file-cache/windows_compat.hpp>
 #include <iostream>
 
 #ifndef NO_WINFSP
@@ -181,12 +181,12 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         {
             // File is in memory - create a temporary file if we need a handle for compatibility
             std::wstring temp_path = createTemporaryFileForMemoryCached(entry);
-            
+
             if (!temp_path.empty())
             {
-                file_desc->handle = CreateFileW(temp_path.c_str(), GrantedAccess, 
-                                              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                              nullptr, OPEN_EXISTING, create_flags | FILE_FLAG_DELETE_ON_CLOSE, nullptr);
+                file_desc->handle =
+                CreateFileW(temp_path.c_str(), GrantedAccess, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                            nullptr, OPEN_EXISTING, create_flags | FILE_FLAG_DELETE_ON_CLOSE, nullptr);
                 entry->local_path = temp_path; // Track temp file for cleanup
             }
             else
@@ -199,24 +199,22 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         else
         {
             // Memory cache miss - fallback to network
-            file_desc->handle = CreateFileW(entry->network_path.c_str(), GrantedAccess, 
-                                          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                          nullptr, OPEN_EXISTING, create_flags, nullptr);
+            file_desc->handle = CreateFileW(entry->network_path.c_str(), GrantedAccess,
+                                            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                                            OPEN_EXISTING, create_flags, nullptr);
         }
     }
     else
     {
         // File not in memory cache - use local_path or network_path
         std::wstring full_path = entry->local_path.empty() ? entry->network_path : entry->local_path;
-        file_desc->handle = CreateFileW(full_path.c_str(), GrantedAccess, 
-                                      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                      nullptr, OPEN_EXISTING, create_flags, nullptr);
+        file_desc->handle = CreateFileW(full_path.c_str(), GrantedAccess, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                        nullptr, OPEN_EXISTING, create_flags, nullptr);
     }
 
     // For memory-cached files, we allow INVALID_HANDLE_VALUE since Read() can serve from memory
-    if (file_desc->handle == INVALID_HANDLE_VALUE && 
-        !(entry->state == FileState::CACHED && entry->local_path.empty() && 
-          memory_cache.isFileInMemoryCache(entry->virtual_path)))
+    if (file_desc->handle == INVALID_HANDLE_VALUE && !(entry->state == FileState::CACHED && entry->local_path.empty() &&
+                                                       memory_cache.isFileInMemoryCache(entry->virtual_path)))
     {
         delete file_desc;
         return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
@@ -272,29 +270,29 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
     {
         // File is cached in memory - serve directly from memory cache
         auto cached = memory_cache.getMemoryCachedFile(file_desc->entry->virtual_path);
-        
+
         if (cached.has_value())
         {
-            const auto& content = cached.value();
-            
+            const auto &content = cached.value();
+
             // Validate read parameters
             if (Offset >= content.size())
             {
                 *PBytesTransferred = 0;
                 return STATUS_END_OF_FILE;
             }
-            
+
             // Calculate actual bytes to transfer
             ULONG bytes_available = static_cast<ULONG>(content.size() - Offset);
             ULONG bytes_to_read = min(Length, bytes_available);
-            
+
             // Copy data directly from memory
             memcpy(Buffer, content.data() + Offset, bytes_to_read);
             *PBytesTransferred = bytes_to_read;
-            
+
             // Update access statistics
             updateAccessTime(file_desc->entry);
-            
+
             return STATUS_SUCCESS;
         }
     }
@@ -351,40 +349,40 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
 NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID *PContext, DirInfo *DirInfo)
 {
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
-    
+
     if (!file_desc->entry)
     {
         return STATUS_INVALID_PARAMETER;
     }
-    
+
     // Get directory contents from in-memory tree
-    std::vector<DirectoryNode*> contents;
-    
+    std::vector<DirectoryNode *> contents;
+
     if (*PContext == nullptr)
     {
         // Start enumeration - get all directory contents
         contents = directory_cache.getDirectoryContents(file_desc->entry->virtual_path);
-        
+
         if (contents.empty())
         {
             return STATUS_NO_MORE_FILES;
         }
-        
+
         // Store the contents vector as context (simplified - in production should be more robust)
-        auto* context_data = new std::vector<DirectoryNode*>(std::move(contents));
+        auto *context_data = new std::vector<DirectoryNode *>(std::move(contents));
         *PContext = context_data;
-        
+
         // Return first entry
-        auto* first_entry = (*context_data)[0];
+        auto *first_entry = (*context_data)[0];
         fillDirInfo(DirInfo, first_entry);
-        
+
         return STATUS_SUCCESS;
     }
     else
     {
         // Continue enumeration
-        auto* context_data = static_cast<std::vector<DirectoryNode*>*>(*PContext);
-        
+        auto *context_data = static_cast<std::vector<DirectoryNode *> *>(*PContext);
+
         // Find current position
         size_t current_index = 0;
         if (Marker && wcslen(Marker) > 0)
@@ -403,7 +401,7 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
         {
             current_index = 1; // Next after first
         }
-        
+
         if (current_index >= context_data->size())
         {
             // End of enumeration
@@ -411,11 +409,11 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
             *PContext = nullptr;
             return STATUS_NO_MORE_FILES;
         }
-        
+
         // Return next entry
-        auto* next_entry = (*context_data)[current_index];
+        auto *next_entry = (*context_data)[current_index];
         fillDirInfo(DirInfo, next_entry);
-        
+
         return STATUS_SUCCESS;
     }
 }
@@ -485,34 +483,32 @@ NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
     if (download_manager && !entry->network_path.empty())
     {
         entry->state = FileState::FETCHING;
-        
-        NTSTATUS status = download_manager->queueDownload(
-            entry->virtual_path,
-            entry->network_path,
-            entry,
-            entry->policy,
-            [this, entry](NTSTATUS download_status, const std::wstring& error) {
-                if (download_status == STATUS_SUCCESS)
-                {
-                    // Download completed successfully
-                    // The AsyncDownloadManager already updated the cache entry
-                    std::wcout << L"Download completed: " << entry->virtual_path << std::endl;
-                }
-                else if (download_status == STATUS_PENDING)
-                {
-                    // Already downloading
-                    std::wcout << L"Already downloading: " << entry->virtual_path << std::endl;
-                }
-                else
-                {
-                    // Download failed
-                    entry->state = FileState::NETWORK_ONLY;
-                    entry->local_path = entry->network_path;
-                    std::wcerr << L"Download failed for " << entry->virtual_path << L": " << error << std::endl;
-                }
-            }
-        );
-        
+
+        NTSTATUS status =
+        download_manager->queueDownload(entry->virtual_path, entry->network_path, entry, entry->policy,
+                                        [this, entry](NTSTATUS download_status, const std::wstring &error)
+                                        {
+                                            if (download_status == STATUS_SUCCESS)
+                                            {
+                                                // Download completed successfully
+                                                // The AsyncDownloadManager already updated the cache entry
+                                                std::wcout << L"Download completed: " << entry->virtual_path << std::endl;
+                                            }
+                                            else if (download_status == STATUS_PENDING)
+                                            {
+                                                // Already downloading
+                                                std::wcout << L"Already downloading: " << entry->virtual_path << std::endl;
+                                            }
+                                            else
+                                            {
+                                                // Download failed
+                                                entry->state = FileState::NETWORK_ONLY;
+                                                entry->local_path = entry->network_path;
+                                                std::wcerr << L"Download failed for " << entry->virtual_path << L": "
+                                                           << error << std::endl;
+                                            }
+                                        });
+
         return status;
     }
 
@@ -534,17 +530,17 @@ NTSTATUS HybridFileSystem::fetchFromNetwork(CacheEntry *entry)
     {
         // Load file content into memory cache
         auto content = memory_cache.getFileContent(entry->virtual_path, config);
-        
+
         if (!content.empty())
         {
             // File successfully loaded into memory cache
             entry->file_size = content.size();
             entry->state = FileState::CACHED;
-            
+
             // Update file metadata
             entry->last_used = std::chrono::steady_clock::now();
             entry->access_count++;
-            
+
             // No local_path needed - file is served directly from memory
             entry->local_path.clear();
         }
@@ -578,34 +574,34 @@ CachePolicy HybridFileSystem::determineCachePolicy(const std::wstring &virtual_p
     {
         return CachePolicy::NEVER_CACHE;
     }
-    
+
     size_t second_slash = virtual_path.find(L'/', 1);
     if (second_slash == std::wstring::npos)
     {
         return CachePolicy::NEVER_CACHE;
     }
-    
+
     std::wstring compiler_name = virtual_path.substr(1, second_slash - 1);
     std::wstring relative_path = virtual_path.substr(second_slash + 1);
-    
+
     // Find compiler config
     auto compiler_it = config.compilers.find(compiler_name);
     if (compiler_it == config.compilers.end())
     {
         return CachePolicy::NEVER_CACHE;
     }
-    
-    const auto& compiler_config = compiler_it->second;
-    
+
+    const auto &compiler_config = compiler_it->second;
+
     // Check cache_always_patterns for immediate caching
-    for (const auto& pattern : compiler_config.cache_always_patterns)
+    for (const auto &pattern : compiler_config.cache_always_patterns)
     {
         if (matchesPattern(relative_path, pattern))
         {
             return CachePolicy::ALWAYS_CACHE;
         }
     }
-    
+
     // Default policy for compiler files is on-demand caching
     // This provides good performance while managing memory usage
     return CachePolicy::ON_DEMAND;
@@ -619,71 +615,69 @@ std::wstring HybridFileSystem::createTemporaryFileForMemoryCached(CacheEntry *en
     {
         return L""; // No content in cache
     }
-    
-    const auto& content = cached.value();
-    
+
+    const auto &content = cached.value();
+
     // Create temporary file path
     wchar_t temp_path[MAX_PATH];
     wchar_t temp_dir[MAX_PATH];
-    
+
     if (!GetTempPathW(MAX_PATH, temp_dir))
     {
         return L"";
     }
-    
+
     if (!GetTempFileNameW(temp_dir, L"CWF", 0, temp_path))
     {
         return L"";
     }
-    
+
     // Write memory content to temporary file
-    HANDLE temp_file = CreateFileW(temp_path, GENERIC_WRITE, 0, nullptr, 
-                                   CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
-    
+    HANDLE temp_file = CreateFileW(temp_path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
+
     if (temp_file == INVALID_HANDLE_VALUE)
     {
         return L"";
     }
-    
+
     DWORD bytes_written;
-    BOOL write_result = WriteFile(temp_file, content.data(), static_cast<DWORD>(content.size()), 
-                                  &bytes_written, nullptr);
-    
+    BOOL write_result = WriteFile(temp_file, content.data(), static_cast<DWORD>(content.size()), &bytes_written, nullptr);
+
     CloseHandle(temp_file);
-    
+
     if (!write_result || bytes_written != content.size())
     {
         DeleteFileW(temp_path); // Clean up on failure
         return L"";
     }
-    
+
     return std::wstring(temp_path);
 }
 
 
-void HybridFileSystem::fillDirInfo(DirInfo* dir_info, DirectoryNode* node)
+void HybridFileSystem::fillDirInfo(DirInfo *dir_info, DirectoryNode *node)
 {
     if (!dir_info || !node)
     {
         return;
     }
-    
+
     // Copy filename (WinFsp expects wide char)
     wcscpy_s(dir_info->FileName, sizeof(dir_info->FileName) / sizeof(WCHAR), node->name.c_str());
-    
+
     // Set file attributes
     dir_info->FileAttributes = node->file_attributes;
-    
+
     // Set file size
     dir_info->FileSize = node->file_size;
     dir_info->AllocationSize = (dir_info->FileSize + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
-    
+
     // Set timestamps
     dir_info->CreationTime = ((PLARGE_INTEGER)&node->creation_time)->QuadPart;
     dir_info->LastAccessTime = ((PLARGE_INTEGER)&node->last_access_time)->QuadPart;
     dir_info->LastWriteTime = ((PLARGE_INTEGER)&node->last_write_time)->QuadPart;
     dir_info->ChangeTime = dir_info->LastWriteTime;
-    
+
     // Set additional info
     dir_info->IndexNumber = 0;
     dir_info->ReparseTag = 0;

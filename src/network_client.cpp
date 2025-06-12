@@ -1,5 +1,5 @@
-#include <ce-win-file-cache/windows_compat.hpp>
 #include <ce-win-file-cache/network_client.hpp>
+#include <ce-win-file-cache/windows_compat.hpp>
 #include <iostream>
 
 #ifndef WINE_CROSS_COMPILE

@@ -1,9 +1,9 @@
 #pragma once
 
 #include <ce-win-file-cache/windows_compat.hpp>
-#include <types/file_state.hpp>
 #include <chrono>
 #include <string>
+#include <types/file_state.hpp>
 
 namespace CeWinFileCache
 {
