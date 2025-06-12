@@ -339,4 +339,22 @@ if(BUILD_CACHE_TEST OR APPLE)
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         target_compile_options(async_test PRIVATE -Wall -Wextra)
     endif()
+    
+    # Filesystem async integration test
+    add_executable(filesystem_async_test
+        src/test_filesystem_async.cpp
+        src/async_download_manager.cpp
+        src/memory_cache_manager.cpp
+        src/config_parser.cpp
+    )
+    target_compile_definitions(filesystem_async_test PRIVATE NO_WINFSP)
+    target_include_directories(filesystem_async_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    set_target_properties(filesystem_async_test PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    )
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(filesystem_async_test PRIVATE -Wall -Wextra)
+    endif()
 endif()

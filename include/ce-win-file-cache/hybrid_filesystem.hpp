@@ -64,6 +64,9 @@ class HybridFileSystem : public Fsp::FileSystemBase
     
     // Always-resident directory tree (never evicted)
     DirectoryCache directory_cache_;
+    
+    // Async download manager for non-blocking file fetching
+    std::unique_ptr<AsyncDownloadManager> download_manager_;
 };
 
 struct FileDescriptor

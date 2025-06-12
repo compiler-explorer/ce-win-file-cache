@@ -45,6 +45,9 @@ NTSTATUS HybridFileSystem::Initialize(const Config &config)
         return result;
     }
 
+    // Initialize async download manager with 4 worker threads
+    download_manager_ = std::make_unique<AsyncDownloadManager>(memory_cache_, config_, 4);
+
     return STATUS_SUCCESS;
 }
 
@@ -156,6 +159,8 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     NTSTATUS result = ensureFileAvailable(entry);
     if (!NT_SUCCESS(result))
     {
+        // For async downloads, STATUS_PENDING is returned
+        // WinFsp will retry the operation when the download completes
         return result;
     }
 
@@ -449,20 +454,69 @@ CacheEntry *HybridFileSystem::getCacheEntry(const std::wstring &virtual_path)
 
 NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
 {
-    if (entry->state == FileState::CACHED && !entry->local_path.empty())
+    if (entry->state == FileState::CACHED)
     {
-        // File is already cached
+        // File is already cached in memory
         return STATUS_SUCCESS;
     }
 
     if (entry->state == FileState::FETCHING)
     {
-        // File is currently being fetched - for now, wait
-        // todo: implement proper async handling
+        // File is currently being fetched by async download manager
         return STATUS_PENDING;
     }
 
-    // Fetch from network
+    // Check if file is already being downloaded
+    if (download_manager_ && download_manager_->isDownloadInProgress(entry->virtual_path))
+    {
+        entry->state = FileState::FETCHING;
+        return STATUS_PENDING;
+    }
+
+    // For NEVER_CACHE policy, don't use async download
+    if (entry->policy == CachePolicy::NEVER_CACHE)
+    {
+        entry->local_path = entry->network_path;
+        entry->state = FileState::NETWORK_ONLY;
+        return STATUS_SUCCESS;
+    }
+
+    // Queue async download for ALWAYS_CACHE and ON_DEMAND policies
+    if (download_manager_ && !entry->network_path.empty())
+    {
+        entry->state = FileState::FETCHING;
+        
+        NTSTATUS status = download_manager_->queueDownload(
+            entry->virtual_path,
+            entry->network_path,
+            entry,
+            entry->policy,
+            [this, entry](NTSTATUS download_status, const std::wstring& error) {
+                if (download_status == STATUS_SUCCESS)
+                {
+                    // Download completed successfully
+                    // The AsyncDownloadManager already updated the cache entry
+                    std::wcout << L"Download completed: " << entry->virtual_path << std::endl;
+                }
+                else if (download_status == STATUS_PENDING)
+                {
+                    // Already downloading
+                    std::wcout << L"Already downloading: " << entry->virtual_path << std::endl;
+                }
+                else
+                {
+                    // Download failed
+                    entry->state = FileState::NETWORK_ONLY;
+                    entry->local_path = entry->network_path;
+                    std::wcerr << L"Download failed for " << entry->virtual_path << L": " << error << std::endl;
+                }
+            }
+        );
+        
+        return status;
+    }
+
+    // Fallback to synchronous fetch if async download manager not available
     return fetchFromNetwork(entry);
 }
 
