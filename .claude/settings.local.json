@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(./compile-wine-simple.sh:*)",
+      "Bash(make:*)",
+      "Bash(rg:*)",
+      "Bash(true)",
+      "Bash(grep:*)",
+      "Bash(/mnt/d/efs/cmake-3.31.7/bin/cmake.exe --build \"D:/opt/ce-win-file-cache/build-msvc\" --config Release)",
+      "Bash(ls:*)",
+      "Bash(rm:*)",
+      "Bash(/mnt/d/efs/cmake-3.31.7/bin/cmake.exe .. -DCMAKE_TOOLCHAIN_FILE=D:/opt/ce-win-file-cache/msvc-toolchain.cmake -DCMAKE_BUILD_TYPE=Release -G \"Ninja\" -DCMAKE_MAKE_PROGRAM=D:/efs/compilers/ninja/ninja.exe)",
+      "Bash(../build-msvc-env.sh)",
+      "Bash(cmd.exe /c build-msvc.bat)",
+      "Bash(./build-msvc/bin/CeWinFileCacheFS.exe --test-config)",
+      "Bash(./build-msvc/bin/CeWinFileCacheFS.exe --test-paths)",
+      "Bash(./build-msvc/bin/CeWinFileCacheFS.exe --test-network)",
+      "Bash(./build-msvc/bin/CeWinFileCacheFS.exe --test)"
+    ],
+    "deny": []
+  }
+}

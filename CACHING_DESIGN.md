@@ -1,4 +1,4 @@
-# Caching Logic Design and Implementation Strategy
+# In-Memory Caching Logic Design and Implementation Strategy
 
 This document outlines the design approach for implementing TODO #1: Actual Caching Logic in CompilerCacheFS.
 
@@ -12,56 +12,55 @@ This document outlines the design approach for implementing TODO #1: Actual Cach
 - **Build System**: Working MSVC compilation
 
 ### 🎯 What We Need
-Core file caching operations that copy files from network locations to local cache storage with proper management.
+Core in-memory file caching operations that load files from network locations into RAM and serve them from memory with proper management.
 
 ---
 
 ## Design Options
 
-### Option A: Simple File Copy Approach (Recommended for MVP)
+### Option A: Simple In-Memory Approach (Recommended for MVP)
 
-**Philosophy**: Start with basic synchronous file operations, get core functionality working, then optimize.
+**Philosophy**: Start with basic in-memory caching, load files into RAM, serve from memory with network fallback.
 
 **Implementation Strategy**:
 ```cpp
-// Core operations to implement
-bool copyFileToCache(const std::wstring& networkPath, const std::wstring& localPath);
-bool isFileInCache(const std::wstring& virtualPath);
-std::wstring getCacheFilePath(const std::wstring& virtualPath);
-bool ensureCacheDirectory(const std::wstring& cachePath);
+// Core in-memory operations to implement
+std::vector<uint8_t> loadFileToMemory(const std::wstring& networkPath);
+bool isFileInMemoryCache(const std::wstring& virtualPath);
+std::vector<uint8_t> getFileFromCache(const std::wstring& virtualPath);
+void addFileToMemoryCache(const std::wstring& virtualPath, std::vector<uint8_t> content);
 ```
 
 **Advantages**:
+- Fast access once cached (RAM speed)
+- No disk I/O for cached files
 - Simple to implement and test
-- Predictable behavior
-- Easy to debug
-- Fast development iteration
+- Clean memory management
 
 **Disadvantages**:
-- Blocking I/O operations
-- No progress indication for large files
-- Potential timeouts on slow networks
+- Limited by available RAM
+- Large files consume significant memory
+- Memory pressure considerations
 
-### Option B: Async with Progress Tracking
+### Option B: Async In-Memory with Progress Tracking
 
-**Philosophy**: Implement non-blocking operations from the start for better user experience.
+**Philosophy**: Implement non-blocking memory operations from the start for better user experience.
 
 **Implementation Strategy**:
 ```cpp
-// Async operations with callbacks
-class CacheOperation {
+// Async in-memory operations with callbacks
+class MemoryCacheOperation {
 public:
     enum Status { Pending, InProgress, Completed, Failed };
     
-    std::future<bool> copyFileAsync(const std::wstring& networkPath, 
-                                   const std::wstring& localPath,
-                                   std::function<void(float)> progressCallback);
+    std::future<std::vector<uint8_t>> loadFileAsync(const std::wstring& networkPath,
+                                                    std::function<void(float)> progressCallback);
 };
 ```
 
 **Advantages**:
 - Non-blocking operations
-- Progress tracking
+- Progress tracking for large files
 - Better scalability
 - Modern C++ patterns
 
@@ -69,15 +68,16 @@ public:
 - More complex to implement
 - Harder to test initially
 - Thread safety considerations
+- Memory management complexity
 
-### Option C: Hybrid Approach (Recommended)
+### Option C: Hybrid In-Memory Approach (Recommended)
 
-**Philosophy**: Start with simple synchronous operations for testing, then add async layer.
+**Philosophy**: Start with simple synchronous in-memory operations for testing, then add async layer.
 
 **Implementation Strategy**:
-1. **Phase 1**: Implement synchronous core operations with comprehensive testing
-2. **Phase 2**: Add async wrapper around working synchronous operations
-3. **Phase 3**: Optimize and add advanced features
+1. **Phase 1**: Implement synchronous in-memory operations with comprehensive testing
+2. **Phase 2**: Add async wrapper around working synchronous memory operations
+3. **Phase 3**: Optimize and add advanced memory management features
 
 ---
 
@@ -287,24 +287,22 @@ private:
 
 ## ✅ Technical Decisions Made
 
-### 1. Cache Directory Structure: **Hierarchical** ✅
-```
-D:\CompilerCache\
-├── msvc-14.40\
-│   ├── bin\Hostx64\x64\cl.exe
-│   └── include\iostream
-└── windows-kits-10\
-    └── Include\windows.h
+### 1. Cache Storage Structure: **In-Memory Map** ✅
+```cpp
+// In-memory cache structure
+std::unordered_map<std::wstring, std::vector<uint8_t>> memoryCache;
+// Key: virtual path (e.g., "/msvc-14.40/bin/Hostx64/x64/cl.exe")
+// Value: file content in memory
 ```
 
-**Rationale**: Mirrors original structure, easier to navigate, supports compiler-specific organization.
+**Rationale**: Fast RAM-based access, no disk I/O for cached files, simple key-value structure.
 
 ### 2. File Validation Strategy: **Read-Only Assumption** ✅
 ```cpp
 // No validation needed - files are immutable
-// If files change, restart server to invalidate cache
-bool isFileInCache(const std::wstring& virtualPath) {
-    return std::filesystem::exists(getCacheFilePath(virtualPath));
+// If files change, restart server to invalidate memory cache
+bool isFileInMemoryCache(const std::wstring& virtualPath) {
+    return memoryCache.find(virtualPath) != memoryCache.end();
 }
 ```
 
