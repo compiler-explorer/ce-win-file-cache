@@ -217,6 +217,39 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
 {
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
 
+    // Try to serve from memory cache first for maximum performance
+    if (file_desc->entry && file_desc->entry->state == FileState::CACHED && file_desc->entry->local_path.empty())
+    {
+        // File is cached in memory - serve directly from memory cache
+        auto cached = memory_cache_.getMemoryCachedFile(file_desc->entry->virtual_path);
+        
+        if (cached.has_value())
+        {
+            const auto& content = cached.value();
+            
+            // Validate read parameters
+            if (Offset >= content.size())
+            {
+                *PBytesTransferred = 0;
+                return STATUS_END_OF_FILE;
+            }
+            
+            // Calculate actual bytes to transfer
+            ULONG bytes_available = static_cast<ULONG>(content.size() - Offset);
+            ULONG bytes_to_read = min(Length, bytes_available);
+            
+            // Copy data directly from memory
+            memcpy(Buffer, content.data() + Offset, bytes_to_read);
+            *PBytesTransferred = bytes_to_read;
+            
+            // Update access statistics
+            updateAccessTime(file_desc->entry);
+            
+            return STATUS_SUCCESS;
+        }
+    }
+
+    // Fallback to file handle read (for network-only files or cache miss)
     OVERLAPPED overlapped = {};
     overlapped.Offset = static_cast<DWORD>(Offset);
     overlapped.OffsetHigh = static_cast<DWORD>(Offset >> 32);
@@ -341,16 +374,36 @@ NTSTATUS HybridFileSystem::fetchFromNetwork(CacheEntry *entry)
 
     entry->state = FileState::FETCHING;
 
-    // For now, just use the network path directly
-    // In a full implementation, this would copy to local cache
+    // Load file into memory cache for fast access
     if (entry->policy == CachePolicy::ALWAYS_CACHE || entry->policy == CachePolicy::ON_DEMAND)
     {
-        // todo: implement actual caching logic
-        entry->local_path = entry->network_path;
-        entry->state = FileState::CACHED;
+        // Load file content into memory cache
+        auto content = memory_cache_.getFileContent(entry->virtual_path, config_);
+        
+        if (!content.empty())
+        {
+            // File successfully loaded into memory cache
+            entry->file_size = content.size();
+            entry->state = FileState::CACHED;
+            
+            // Update file metadata
+            entry->last_used = std::chrono::steady_clock::now();
+            entry->access_count++;
+            
+            // No local_path needed - file is served directly from memory
+            entry->local_path.clear();
+        }
+        else
+        {
+            // Fallback to network-only access if memory caching fails
+            entry->local_path = entry->network_path;
+            entry->state = FileState::NETWORK_ONLY;
+        }
     }
     else
     {
+        // NEVER_CACHE policy - always access from network
+        entry->local_path = entry->network_path;
         entry->state = FileState::NETWORK_ONLY;
     }
 
@@ -365,7 +418,41 @@ bool HybridFileSystem::matchesPattern(const std::wstring &path, const std::wstri
 
 CachePolicy HybridFileSystem::determineCachePolicy(const std::wstring &virtual_path)
 {
-    // todo: implement based on config patterns
+    // Extract compiler name from virtual path (e.g., "/msvc-14.40/bin/cl.exe" -> "msvc-14.40")
+    if (virtual_path.empty() || virtual_path[0] != L'/')
+    {
+        return CachePolicy::NEVER_CACHE;
+    }
+    
+    size_t second_slash = virtual_path.find(L'/', 1);
+    if (second_slash == std::wstring::npos)
+    {
+        return CachePolicy::NEVER_CACHE;
+    }
+    
+    std::wstring compiler_name = virtual_path.substr(1, second_slash - 1);
+    std::wstring relative_path = virtual_path.substr(second_slash + 1);
+    
+    // Find compiler config
+    auto compiler_it = config_.compilers.find(compiler_name);
+    if (compiler_it == config_.compilers.end())
+    {
+        return CachePolicy::NEVER_CACHE;
+    }
+    
+    const auto& compiler_config = compiler_it->second;
+    
+    // Check cache_always_patterns for immediate caching
+    for (const auto& pattern : compiler_config.cache_always_patterns)
+    {
+        if (matchesPattern(relative_path, pattern))
+        {
+            return CachePolicy::ALWAYS_CACHE;
+        }
+    }
+    
+    // Default policy for compiler files is on-demand caching
+    // This provides good performance while managing memory usage
     return CachePolicy::ON_DEMAND;
 }
 

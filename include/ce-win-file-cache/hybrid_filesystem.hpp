@@ -3,6 +3,7 @@
 #include "../types/cache_entry.hpp"
 #include "../types/config.hpp"
 #include "windows_compat.hpp"
+#include "memory_cache_manager.hpp"
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -52,6 +53,9 @@ class HybridFileSystem : public Fsp::FileSystemBase
     std::mutex cache_mutex_;
     size_t current_cache_size_;
     UINT64 creation_time_;
+    
+    // In-memory cache for fast file access
+    MemoryCacheManager memory_cache_;
 };
 
 struct FileDescriptor
