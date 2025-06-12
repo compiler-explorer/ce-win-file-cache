@@ -43,6 +43,7 @@ class HybridFileSystem : public Fsp::FileSystemBase
     NTSTATUS fetchFromNetwork(CacheEntry *entry);
     bool matchesPattern(const std::wstring &path, const std::wstring &pattern);
     CachePolicy determineCachePolicy(const std::wstring &virtual_path);
+    std::wstring createTemporaryFileForMemoryCached(CacheEntry *entry);
 
     // Cache management
     NTSTATUS evictIfNeeded();

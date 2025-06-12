@@ -161,12 +161,50 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         create_flags |= FILE_FLAG_DELETE_ON_CLOSE;
     }
 
-    std::wstring full_path = entry->local_path.empty() ? entry->network_path : entry->local_path;
+    // Check if file is in memory cache first
+    if (entry->state == FileState::CACHED && entry->local_path.empty())
+    {
+        // File is in memory cache - check if we have it
+        if (memory_cache_.isFileInMemoryCache(entry->virtual_path))
+        {
+            // File is in memory - create a temporary file if we need a handle for compatibility
+            std::wstring temp_path = createTemporaryFileForMemoryCached(entry);
+            
+            if (!temp_path.empty())
+            {
+                file_desc->handle = CreateFileW(temp_path.c_str(), GrantedAccess, 
+                                              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                              nullptr, OPEN_EXISTING, create_flags | FILE_FLAG_DELETE_ON_CLOSE, nullptr);
+                entry->local_path = temp_path; // Track temp file for cleanup
+            }
+            else
+            {
+                // If temp file creation fails, use INVALID_HANDLE_VALUE
+                // Read method will still work with memory cache
+                file_desc->handle = INVALID_HANDLE_VALUE;
+            }
+        }
+        else
+        {
+            // Memory cache miss - fallback to network
+            file_desc->handle = CreateFileW(entry->network_path.c_str(), GrantedAccess, 
+                                          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                          nullptr, OPEN_EXISTING, create_flags, nullptr);
+        }
+    }
+    else
+    {
+        // File not in memory cache - use local_path or network_path
+        std::wstring full_path = entry->local_path.empty() ? entry->network_path : entry->local_path;
+        file_desc->handle = CreateFileW(full_path.c_str(), GrantedAccess, 
+                                      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                      nullptr, OPEN_EXISTING, create_flags, nullptr);
+    }
 
-    file_desc->handle = CreateFileW(full_path.c_str(), GrantedAccess, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                    nullptr, OPEN_EXISTING, create_flags, nullptr);
-
-    if (file_desc->handle == INVALID_HANDLE_VALUE)
+    // For memory-cached files, we allow INVALID_HANDLE_VALUE since Read() can serve from memory
+    if (file_desc->handle == INVALID_HANDLE_VALUE && 
+        !(entry->state == FileState::CACHED && entry->local_path.empty() && 
+          memory_cache_.isFileInMemoryCache(entry->virtual_path)))
     {
         delete file_desc;
         return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
@@ -454,6 +492,55 @@ CachePolicy HybridFileSystem::determineCachePolicy(const std::wstring &virtual_p
     // Default policy for compiler files is on-demand caching
     // This provides good performance while managing memory usage
     return CachePolicy::ON_DEMAND;
+}
+
+std::wstring HybridFileSystem::createTemporaryFileForMemoryCached(CacheEntry *entry)
+{
+    // Get cached content from memory
+    auto cached = memory_cache_.getMemoryCachedFile(entry->virtual_path);
+    if (!cached.has_value())
+    {
+        return L""; // No content in cache
+    }
+    
+    const auto& content = cached.value();
+    
+    // Create temporary file path
+    wchar_t temp_path[MAX_PATH];
+    wchar_t temp_dir[MAX_PATH];
+    
+    if (!GetTempPathW(MAX_PATH, temp_dir))
+    {
+        return L"";
+    }
+    
+    if (!GetTempFileNameW(temp_dir, L"CWF", 0, temp_path))
+    {
+        return L"";
+    }
+    
+    // Write memory content to temporary file
+    HANDLE temp_file = CreateFileW(temp_path, GENERIC_WRITE, 0, nullptr, 
+                                   CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
+    
+    if (temp_file == INVALID_HANDLE_VALUE)
+    {
+        return L"";
+    }
+    
+    DWORD bytes_written;
+    BOOL write_result = WriteFile(temp_file, content.data(), static_cast<DWORD>(content.size()), 
+                                  &bytes_written, nullptr);
+    
+    CloseHandle(temp_file);
+    
+    if (!write_result || bytes_written != content.size())
+    {
+        DeleteFileW(temp_path); // Clean up on failure
+        return L"";
+    }
+    
+    return std::wstring(temp_path);
 }
 
 NTSTATUS HybridFileSystem::evictIfNeeded()
