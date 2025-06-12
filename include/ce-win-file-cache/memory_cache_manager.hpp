@@ -1,0 +1,48 @@
+#pragma once
+
+#include "../types/config.hpp"
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <mutex>
+#include <optional>
+
+namespace CeWinFileCache
+{
+
+class MemoryCacheManager
+{
+public:
+    MemoryCacheManager() = default;
+    ~MemoryCacheManager() = default;
+
+    MemoryCacheManager(const MemoryCacheManager&) = delete;
+    MemoryCacheManager& operator=(const MemoryCacheManager&) = delete;
+
+    std::vector<uint8_t> loadNetworkFileToMemory(const std::wstring& network_path);
+
+    bool isFileInMemoryCache(const std::wstring& virtual_path);
+
+    std::optional<std::vector<uint8_t>> getMemoryCachedFile(const std::wstring& virtual_path);
+
+    void addFileToMemoryCache(const std::wstring& virtual_path, 
+                            const std::vector<uint8_t>& content);
+
+    std::vector<uint8_t> getFileContent(const std::wstring& virtual_path, 
+                                      const Config& config);
+
+    void clearCache();
+
+    size_t getCacheSize() const;
+
+    size_t getCachedFileCount() const;
+
+private:
+    mutable std::mutex cache_mutex;
+    std::unordered_map<std::wstring, std::vector<uint8_t>> memory_cache;
+
+    std::wstring resolveVirtualToNetworkPath(const std::wstring& virtual_path, 
+                                            const Config& config);
+};
+
+} // namespace CeWinFileCache

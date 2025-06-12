@@ -3,7 +3,10 @@
 // Unified Windows compatibility header
 // Handles Wine cross-compilation and native Windows compilation
 
-#ifdef WINE_CROSS_COMPILE
+#ifdef NO_WINFSP
+// macOS/Linux compatibility mode
+#include "macos_compat.hpp"
+#elif defined(WINE_CROSS_COMPILE)
 #include "wine_compat.hpp"
 #else
 // Native Windows includes

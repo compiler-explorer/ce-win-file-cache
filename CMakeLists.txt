@@ -148,6 +148,7 @@ endif()
 set(SOURCES
     src/hybrid_filesystem.cpp
     src/cache_manager.cpp
+    src/memory_cache_manager.cpp
     src/network_client.cpp
     src/config_parser.cpp
     src/main.cpp
@@ -158,11 +159,16 @@ if(USE_WINE_WINDOWS_API)
     list(APPEND SOURCES src/wine_stubs.cpp)
 endif()
 
-# Create executable
-add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+# Only build main executable on Windows or with Wine
+if(NOT APPLE OR USE_WINE_WINDOWS_API)
+    # Create executable
+    add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+else()
+    message(STATUS "Skipping main CeWinFileCacheFS target on macOS (use cache_test instead)")
+endif()
 
 # Windows-specific settings (native Windows or Wine)
-if(WIN32 OR USE_WINE_WINDOWS_API)
+if((WIN32 OR USE_WINE_WINDOWS_API) AND TARGET ${PROJECT_NAME})
     # Set compiler definitions
     target_compile_definitions(${PROJECT_NAME} PRIVATE
         _CONSOLE
@@ -237,11 +243,67 @@ if(WIN32 OR USE_WINE_WINDOWS_API)
     endif()
 endif()
 
-# Set output directory
-set_target_properties(${PROJECT_NAME} PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-)
+# Set output directory for main target if it exists
+if(TARGET ${PROJECT_NAME})
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    )
+endif()
 
 # Create build directories
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/cache)
+
+# ========================================
+# Optional cache_test target for testing memory cache manager
+# ========================================
+option(BUILD_CACHE_TEST "Build the cache test program" OFF)
+
+if(BUILD_CACHE_TEST OR APPLE)
+    message(STATUS "Building cache_test target")
+    
+    # Test program sources
+    set(TEST_SOURCES
+        src/test_cache_main.cpp
+        src/memory_cache_manager.cpp
+        src/config_parser.cpp
+    )
+    
+    # Create test executable
+    add_executable(cache_test ${TEST_SOURCES})
+    
+    # Define NO_WINFSP for the test program
+    target_compile_definitions(cache_test PRIVATE NO_WINFSP)
+    
+    # Include directories for test program
+    target_include_directories(cache_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    
+    # Set C++ standard
+    set_target_properties(cache_test PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    )
+    
+    # Enable warnings for test program
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(cache_test PRIVATE -Wall -Wextra)
+    endif()
+    
+    message(STATUS "cache_test will be built in: ${CMAKE_BINARY_DIR}/bin")
+    
+    # Also build real file demo
+    add_executable(cache_demo src/real_file_cache_demo.cpp src/memory_cache_manager.cpp src/config_parser.cpp)
+    target_compile_definitions(cache_demo PRIVATE NO_WINFSP)
+    target_include_directories(cache_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    set_target_properties(cache_demo PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    )
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(cache_demo PRIVATE -Wall -Wextra)
+    endif()
+endif()
