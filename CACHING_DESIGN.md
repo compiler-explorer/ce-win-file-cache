@@ -29,6 +29,9 @@ std::vector<uint8_t> loadFileToMemory(const std::wstring& networkPath);
 bool isFileInMemoryCache(const std::wstring& virtualPath);
 std::vector<uint8_t> getFileFromCache(const std::wstring& virtualPath);
 void addFileToMemoryCache(const std::wstring& virtualPath, std::vector<uint8_t> content);
+
+// In-memory cache storage
+std::unordered_map<std::wstring, std::vector<uint8_t>> memoryCache;
 ```
 
 **Advantages**:
@@ -117,21 +120,19 @@ Implement these functions with network fallback and no validation:
 namespace CeWinFileCache {
 namespace CacheOperations {
 
-// Basic file operations with network fallback
-bool copyNetworkFileToCache(const std::wstring& networkPath, 
-                           const std::wstring& localCachePath);
+// Basic in-memory operations with network fallback
+std::vector<uint8_t> loadNetworkFileToMemory(const std::wstring& networkPath);
 
-bool isFileInCache(const std::wstring& virtualPath, 
-                  const Config& config);
+bool isFileInMemoryCache(const std::wstring& virtualPath);
 
-std::wstring getCacheFilePath(const std::wstring& virtualPath, 
-                             const Config& config);
+std::vector<uint8_t> getMemoryCachedFile(const std::wstring& virtualPath);
 
-bool ensureCacheDirectoryExists(const std::wstring& directoryPath);
+void addFileToMemoryCache(const std::wstring& virtualPath, 
+                         const std::vector<uint8_t>& content);
 
 // Network fallback operations
-std::wstring getFileContent(const std::wstring& virtualPath, 
-                           const Config& config);
+std::vector<uint8_t> getFileContent(const std::wstring& virtualPath, 
+                                   const Config& config);
 
 // Cache policy with template support
 enum CachePolicy { ALWAYS_CACHE, ON_DEMAND, NEVER_CACHE };
@@ -140,27 +141,29 @@ CachePolicy determineCachePolicy(const std::wstring& virtualPath,
                                 const std::wstring& compilerName,
                                 const Config& config);
 
-// Cache stats (simple - no size limits yet)
-struct CacheStats {
+// Memory cache stats
+struct MemoryCacheStats {
     size_t totalFiles;
-    size_t totalSizeBytes;
+    size_t totalMemoryBytes;
+    size_t mapOverheadBytes;     // std::unordered_map overhead
     std::vector<std::wstring> cachedCompilers;
 };
 
-CacheStats getCacheStatistics(const Config& config);
+MemoryCacheStats getMemoryCacheStatistics();
 
-// Cache size estimation
-struct CacheEstimation {
-    size_t totalBytes;
+// Memory cache size estimation
+struct MemoryCacheEstimation {
+    size_t totalMemoryBytes;
     size_t fileCount;
-    size_t overheadBytes;        // Filesystem overhead, metadata, etc.
-    size_t alwaysCacheBytes;     // Files that must be cached
-    size_t onDemandBytes;        // Files cached on first access
-    size_t neverCacheBytes;      // Files that won't be cached
+    size_t mapOverheadBytes;     // Memory overhead for std::unordered_map
+    size_t keyOverheadBytes;     // Memory for std::wstring keys
+    size_t alwaysCacheBytes;     // Files that must be cached in memory
+    size_t onDemandBytes;        // Files cached in memory on first access
+    size_t neverCacheBytes;      // Files that won't be cached (always network)
 };
 
-CacheEstimation estimateCompilerCacheSize(const std::wstring& networkPath, 
-                                         const CompilerConfig& config);
+MemoryCacheEstimation estimateCompilerMemoryUsage(const std::wstring& networkPath, 
+                                                  const CompilerConfig& config);
 
 } // namespace CacheOperations
 } // namespace CeWinFileCache
@@ -185,13 +188,13 @@ int testCacheOperations(const Config& config)
         std::wcout << L"Testing cache operations for: " << virtualPath << std::endl;
         
         // Test cases:
-        // 1. Cache directory creation (hierarchical structure)
-        // 2. File copy from real network location to cache
-        // 3. Cache hit detection (simple existence check)
-        // 4. Cache path generation (hierarchical mapping)
+        // 1. Load file from network into memory
+        // 2. Store file content in memory cache (std::unordered_map)
+        // 3. Cache hit detection (memory map lookup)
+        // 4. Memory cache retrieval
         // 5. Network fallback (always works)
         // 6. Cache policy determination (template-based)
-        // 7. Cache statistics (file count, total size)
+        // 7. Memory usage statistics (RAM consumption)
         
         // No validation needed - files are read-only
         // Network fallback ensures reliability
@@ -202,43 +205,43 @@ int testCacheOperations(const Config& config)
 
 int testCacheEstimation(const Config& config)
 {
-    std::wcout << L"=== Cache Size Estimation Test ===" << std::endl;
+    std::wcout << L"=== Memory Cache Size Estimation Test ===" << std::endl;
     
     // Estimate memory usage for configured compilers
-    size_t totalEstimatedSize = 0;
+    size_t totalEstimatedMemory = 0;
     size_t totalFileCount = 0;
+    size_t totalMapOverhead = 0;
     
     for (const auto& [compilerName, compilerConfig] : config.compilers) {
         std::wcout << L"Analyzing compiler: " << compilerName << std::endl;
         
-        // Scan network path to estimate sizes
+        // Scan network path to estimate memory usage
         std::wstring networkPath = compilerConfig.network_path;
         
         // Estimate based on cache policy patterns
-        auto estimation = estimateCompilerCacheSize(networkPath, compilerConfig);
+        auto estimation = estimateCompilerMemoryUsage(networkPath, compilerConfig);
         
         std::wcout << L"  Network path: " << networkPath << std::endl;
-        std::wcout << L"  Estimated cache size: " << (estimation.totalBytes / 1024 / 1024) << L" MB" << std::endl;
+        std::wcout << L"  Estimated memory usage: " << (estimation.totalMemoryBytes / 1024 / 1024) << L" MB" << std::endl;
         std::wcout << L"  Estimated file count: " << estimation.fileCount << std::endl;
-        std::wcout << L"  Cache overhead: " << (estimation.overheadBytes / 1024) << L" KB" << std::endl;
+        std::wcout << L"  Map overhead: " << (estimation.mapOverheadBytes / 1024) << L" KB" << std::endl;
+        std::wcout << L"  Key overhead: " << (estimation.keyOverheadBytes / 1024) << L" KB" << std::endl;
         std::wcout << L"  Always cache files: " << estimation.alwaysCacheBytes / 1024 / 1024 << L" MB" << std::endl;
         std::wcout << L"  On-demand files: " << estimation.onDemandBytes / 1024 / 1024 << L" MB" << std::endl;
         
-        totalEstimatedSize += estimation.totalBytes;
+        totalEstimatedMemory += estimation.totalMemoryBytes;
         totalFileCount += estimation.fileCount;
+        totalMapOverhead += estimation.mapOverheadBytes + estimation.keyOverheadBytes;
     }
     
-    std::wcout << L"\n=== Total Estimation ===" << std::endl;
-    std::wcout << L"Total estimated cache size: " << (totalEstimatedSize / 1024 / 1024) << L" MB" << std::endl;
+    std::wcout << L"\n=== Total Memory Estimation ===" << std::endl;
+    std::wcout << L"Total estimated memory usage: " << (totalEstimatedMemory / 1024 / 1024) << L" MB" << std::endl;
     std::wcout << L"Total file count: " << totalFileCount << std::endl;
-    std::wcout << L"Configured cache limit: " << config.global.total_cache_size_mb << L" MB" << std::endl;
+    std::wcout << L"Total map overhead: " << (totalMapOverhead / 1024) << L" KB" << std::endl;
+    std::wcout << L"Available system RAM: " << L"[query system memory]" << L" MB" << std::endl;
     
-    if (totalEstimatedSize / 1024 / 1024 > config.global.total_cache_size_mb) {
-        std::wcout << L"⚠️  WARNING: Estimated size exceeds configured limit!" << std::endl;
-        std::wcout << L"   Consider increasing total_cache_size_mb or adjusting cache policies" << std::endl;
-    } else {
-        std::wcout << L"✅ Estimated size fits within configured limits" << std::endl;
-    }
+    // Note: No configured limit check since users will decide based on this output
+    std::wcout << L"\n💡 Use this information to decide on memory limits and LRU policies" << std::endl;
     
     return 0;
 }
@@ -250,36 +253,37 @@ Combine our working path resolution with new caching operations:
 
 ```cpp
 // Integration function
-std::wstring getCachedOrNetworkFile(const std::wstring& virtualPath, 
-                                   const Config& config)
+std::vector<uint8_t> getCachedOrNetworkFile(const std::wstring& virtualPath, 
+                                           const Config& config)
 {
     // 1. Use existing path resolution to get network path
-    // 2. Check if file is in cache
-    // 3. If not in cache, copy from network
-    // 4. Return cache path
+    // 2. Check if file is in memory cache
+    // 3. If not in cache, load from network into memory
+    // 4. Return file content from memory
 }
 ```
 
 ### Phase 3: LRU Eviction (TODO #2)
 
-Implement alongside basic caching:
+Implement memory-based LRU eviction alongside basic caching:
 
 ```cpp
-class LRUCacheManager {
+class MemoryLRUManager {
 public:
-    void recordFileAccess(const std::wstring& filePath);
-    std::vector<std::wstring> getFilesToEvict(size_t bytesNeeded);
-    bool evictFile(const std::wstring& filePath);
+    void recordFileAccess(const std::wstring& virtualPath);
+    std::vector<std::wstring> getFilesToEvict(size_t memoryBytesNeeded);
+    bool evictFileFromMemory(const std::wstring& virtualPath);
+    size_t getCurrentMemoryUsage() const;
     
 private:
-    struct FileEntry {
-        std::wstring path;
+    struct MemoryFileEntry {
+        std::wstring virtualPath;
         std::chrono::system_clock::time_point lastAccess;
-        size_t sizeBytes;
+        size_t memorySizeBytes;
     };
     
-    std::list<FileEntry> accessOrder_;  // LRU order
-    std::unordered_map<std::wstring, std::list<FileEntry>::iterator> fileMap_;
+    std::list<MemoryFileEntry> accessOrder_;  // LRU order
+    std::unordered_map<std::wstring, std::list<MemoryFileEntry>::iterator> fileMap_;
 };
 ```
 
@@ -300,7 +304,9 @@ std::unordered_map<std::wstring, std::vector<uint8_t>> memoryCache;
 ### 2. File Validation Strategy: **Read-Only Assumption** ✅
 ```cpp
 // No validation needed - files are immutable
-// If files change, restart server to invalidate memory cache
+// If files change, restart server to clear memory cache
+extern std::unordered_map<std::wstring, std::vector<uint8_t>> memoryCache;
+
 bool isFileInMemoryCache(const std::wstring& virtualPath) {
     return memoryCache.find(virtualPath) != memoryCache.end();
 }
@@ -353,17 +359,15 @@ compilers:
 
 ### 4. Error Handling Strategy: **Fallback to Network Always** ✅
 ```cpp
-std::wstring getFileContent(const std::wstring& virtualPath, const Config& config) {
-    std::wstring cachedPath = getCacheFilePath(virtualPath, config);
-    
-    // Try cache first
-    if (std::filesystem::exists(cachedPath)) {
-        return readFromCache(cachedPath);
+std::vector<uint8_t> getFileContent(const std::wstring& virtualPath, const Config& config) {
+    // Try memory cache first
+    if (isFileInMemoryCache(virtualPath)) {
+        return getMemoryCachedFile(virtualPath);
     }
     
     // Always fallback to network
     std::wstring networkPath = resolveNetworkPath(virtualPath, config);
-    return readFromNetwork(networkPath);
+    return loadNetworkFileToMemory(networkPath);
 }
 ```
 
@@ -378,28 +382,28 @@ std::wstring getFileContent(const std::wstring& virtualPath, const Config& confi
 
 ## Implementation Timeline
 
-### Week 1: Basic Operations
+### Week 1: Basic Memory Operations
 - [ ] Implement `testCacheOperations()` function
 - [ ] Add `--test-cache` command line option
-- [ ] Implement basic file copy operations
-- [ ] Add cache directory creation
+- [ ] Implement basic memory loading operations
+- [ ] Add memory cache storage (std::unordered_map)
 - [ ] Create comprehensive test cases
 
 ### Week 2: Integration
 - [ ] Integrate with existing path resolution
-- [ ] Implement cache hit/miss logic
-- [ ] Add file validation
+- [ ] Implement memory cache hit/miss logic
+- [ ] Add memory cache management
 - [ ] Test with real network files
 
-### Week 3: LRU Eviction
-- [ ] Implement LRU tracking
-- [ ] Add cache size monitoring
-- [ ] Implement eviction algorithm
+### Week 3: Memory-based LRU Eviction
+- [ ] Implement memory usage tracking
+- [ ] Add memory size monitoring
+- [ ] Implement memory-based eviction algorithm
 - [ ] Add `--test-eviction` command line option
 
 ### Week 4: Polish & Optimization
 - [ ] Error handling improvements
-- [ ] Performance testing
+- [ ] Memory usage optimization
 - [ ] Documentation updates
 - [ ] Integration with WinFsp filesystem
 
@@ -465,9 +469,8 @@ compilers:
     cache_size_mb: 64
 
 global:
-  total_cache_size_mb: 8192
+  max_memory_usage_mb: 8192
   eviction_policy: "lru"
-  cache_directory: "D:\\CompilerCache"
 ```
 
 This eliminates duplication while allowing customization per compiler.
@@ -489,44 +492,43 @@ CeWinFileCacheFS.exe --test-estimate  # ⏳ NEW - Cache size estimation
 CeWinFileCacheFS.exe --test-eviction  # ⏳ TODO #2 - LRU eviction
 ```
 
-### Cache Estimation Example Output:
+### Memory Cache Estimation Example Output:
 ```
-=== Cache Size Estimation Test ===
+=== Memory Cache Size Estimation Test ===
 Analyzing compiler: msvc-14.40
   Network path: \\127.0.0.1\efs\compilers\msvc\14.40.33807-14.40.33811.0
-  Estimated cache size: 1,245 MB
+  Estimated memory usage: 1,245 MB
   Estimated file count: 8,432
-  Cache overhead: 42 KB (directory entries, metadata)
+  Map overhead: 67 KB (std::unordered_map overhead)
+  Key overhead: 135 KB (std::wstring keys)
   Always cache files: 856 MB (executables, DLLs)
   On-demand files: 389 MB (headers, libs)
 
 Analyzing compiler: windows-kits-10
   Network path: \\127.0.0.1\efs\compilers\windows-kits-10
-  Estimated cache size: 2,108 MB
+  Estimated memory usage: 2,108 MB
   Estimated file count: 15,293
-  Cache overhead: 78 KB
+  Map overhead: 122 KB
+  Key overhead: 244 KB
   Always cache files: 1,924 MB (headers, libs, tools)
   On-demand files: 184 MB (WinMD files)
 
 Analyzing compiler: ninja
   Network path: \\127.0.0.1\efs\compilers\ninja
-  Estimated cache size: 3 MB
+  Estimated memory usage: 3 MB
   Estimated file count: 2
-  Cache overhead: 1 KB
+  Map overhead: 1 KB
+  Key overhead: 1 KB
   Always cache files: 3 MB (ninja.exe)
   On-demand files: 0 MB
 
-=== Total Estimation ===
-Total estimated cache size: 3,356 MB
+=== Total Memory Estimation ===
+Total estimated memory usage: 3,356 MB
 Total file count: 23,727
-Configured cache limit: 8192 MB
-✅ Estimated size fits within configured limits
+Total map overhead: 571 KB
+Available system RAM: [query system memory] MB
 
-Cache overhead breakdown:
-  - Directory structure: ~121 KB
-  - File metadata: ~24 KB  
-  - LRU tracking: ~48 KB
-  - Total overhead: ~193 KB
+💡 Use this information to decide on memory limits and LRU policies
 ```
 
 ## Success Criteria
@@ -534,12 +536,12 @@ Cache overhead breakdown:
 The caching implementation will be considered successful when:
 
 - [ ] `CeWinFileCacheFS.exe --test-cache` passes all test cases
-- [ ] `CeWinFileCacheFS.exe --test-estimate` provides accurate size predictions
-- [ ] Files are correctly copied from network to cache
-- [ ] Cache hits are detected and served from local storage
+- [ ] `CeWinFileCacheFS.exe --test-estimate` provides accurate memory usage predictions
+- [ ] Files are correctly loaded from network into memory
+- [ ] Cache hits are detected and served from memory
 - [ ] Cache misses trigger network fetches
-- [ ] Cache size estimation helps with capacity planning
-- [ ] LRU eviction works when cache size limits are reached
+- [ ] Memory usage estimation helps with capacity planning
+- [ ] LRU eviction works when memory limits are reached
 - [ ] Integration with existing path resolution is seamless
 - [ ] Error conditions are handled gracefully
 
