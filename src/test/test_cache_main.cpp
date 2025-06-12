@@ -1,8 +1,8 @@
 // Minimal test program for memory cache manager
 // This can be compiled independently without Windows dependencies
 
-#include "../include/ce-win-file-cache/memory_cache_manager.hpp"
-#include "../include/ce-win-file-cache/config_parser.hpp"
+#include "../../include/ce-win-file-cache/memory_cache_manager.hpp"
+#include "../../include/ce-win-file-cache/config_parser.hpp"
 #include <iostream>
 #include <chrono>
 #include <locale>

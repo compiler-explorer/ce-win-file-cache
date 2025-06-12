@@ -1,5 +1,5 @@
-#include "../include/ce-win-file-cache/async_download_manager.hpp"
-#include "../include/ce-win-file-cache/config_parser.hpp"
+#include "../../include/ce-win-file-cache/async_download_manager.hpp"
+#include "../../include/ce-win-file-cache/config_parser.hpp"
 #include <iostream>
 #include <chrono>
 #include <thread>

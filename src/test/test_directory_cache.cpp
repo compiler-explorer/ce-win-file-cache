@@ -1,6 +1,6 @@
 // Test program for DirectoryCache functionality
-#include "../include/ce-win-file-cache/directory_cache.hpp"
-#include "../include/ce-win-file-cache/config_parser.hpp"
+#include "../../include/ce-win-file-cache/directory_cache.hpp"
+#include "../../include/ce-win-file-cache/config_parser.hpp"
 #include <iostream>
 #include <iomanip>
 #include <chrono>
