@@ -17,7 +17,6 @@ class NetworkClient
     NTSTATUS disconnect();
 
     // File operations
-    NTSTATUS copyFileToLocal(const std::wstring &network_path, const std::wstring &local_path);
     NTSTATUS getFileInfo(const std::wstring &network_path, WIN32_FILE_ATTRIBUTE_DATA *file_data);
     bool fileExists(const std::wstring &network_path);
 

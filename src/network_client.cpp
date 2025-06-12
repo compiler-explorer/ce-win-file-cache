@@ -45,26 +45,6 @@ NTSTATUS NetworkClient::disconnect()
     return STATUS_SUCCESS;
 }
 
-NTSTATUS NetworkClient::copyFileToLocal(const std::wstring &network_path, const std::wstring &local_path)
-{
-    // Ensure the local directory exists
-    size_t last_slash = local_path.find_last_of(L'\\');
-    if (last_slash != std::wstring::npos)
-    {
-        std::wstring dir_path = local_path.substr(0, last_slash);
-        SHCreateDirectoryExW(nullptr, dir_path.c_str(), nullptr);
-    }
-
-    if (!CopyFileW(network_path.c_str(), local_path.c_str(), FALSE))
-    {
-        DWORD error = GetLastError();
-        std::wcerr << L"Failed to copy file from " << network_path << L" to " << local_path << L". Error: " << error << std::endl;
-        return CeWinFileCache::WineCompat::NtStatusFromWin32(error);
-    }
-
-    return STATUS_SUCCESS;
-}
-
 NTSTATUS NetworkClient::getFileInfo(const std::wstring &network_path, WIN32_FILE_ATTRIBUTE_DATA *file_data)
 {
     if (!GetFileAttributesExW(network_path.c_str(), GetFileExInfoStandard, file_data))

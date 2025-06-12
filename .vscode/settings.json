@@ -11,10 +11,10 @@
         "/usr/include/wine/wine/windows"
     ],
     "C_Cpp.default.defines": [
-        "WINE_CROSS_COMPILE",
         "_WIN32_WINNT=0x0A00",
         "UNICODE",
-        "_UNICODE"
+        "_UNICODE",
+        "NO_WINFSP"
     ],
     "cmake.configureArgs": [
         "-DUSE_WINE_WINDOWS_API=ON"

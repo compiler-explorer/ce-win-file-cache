@@ -57,7 +57,7 @@ class HybridFileSystem : public Fsp::FileSystemBase
     std::unordered_map<std::wstring, std::unique_ptr<CacheEntry>> cache_entries;
     std::mutex cache_mutex;
     size_t current_cache_size;
-    UINT64 creation_time;
+    uint64_t creation_time;
 
     // In-memory cache for fast file access
     MemoryCacheManager memory_cache;

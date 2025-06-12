@@ -66,7 +66,8 @@
                 "/usr/include/c++/*"
             ],
             "defines": [
-                "_GNU_SOURCE"
+                "_GNU_SOURCE",
+                "NO_WINFSP"
             ],
             "compilerPath": "/usr/bin/g++",
             "cStandard": "c17",
