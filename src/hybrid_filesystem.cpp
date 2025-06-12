@@ -45,8 +45,8 @@ NTSTATUS HybridFileSystem::Initialize(const Config &config)
         return result;
     }
 
-    // Initialize async download manager with 4 worker threads
-    download_manager = std::make_unique<AsyncDownloadManager>(memory_cache, config, 4);
+    // Initialize async download manager with configured number of worker threads
+    download_manager = std::make_unique<AsyncDownloadManager>(memory_cache, config, config.global.download_threads);
 
     return STATUS_SUCCESS;
 }

@@ -124,7 +124,7 @@ std::optional<Config> ConfigParser::parseYamlString(std::string yaml_content)
         else if (current_section == "global")
         {
             // Parse global config
-            std::regex property_regex(R"(^\s+([^:]+):\s*(.+)$)");
+            std::regex property_regex(R"(^\s*([^:]+):\s*(.+)$)");
             std::smatch match;
 
             if (std::regex_match(line, match, property_regex))
@@ -151,6 +151,10 @@ std::optional<Config> ConfigParser::parseYamlString(std::string yaml_content)
                         value = value.substr(1, value.length() - 2);
                     }
                     config.global.cache_directory = std::wstring(value.begin(), value.end());
+                }
+                else if (key == "download_threads")
+                {
+                    config.global.download_threads = std::stoull(value);
                 }
             }
         }

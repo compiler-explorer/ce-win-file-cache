@@ -16,7 +16,8 @@
       "Bash(./build-msvc/bin/CeWinFileCacheFS.exe --test-config)",
       "Bash(./build-msvc/bin/CeWinFileCacheFS.exe --test-paths)",
       "Bash(./build-msvc/bin/CeWinFileCacheFS.exe --test-network)",
-      "Bash(./build-msvc/bin/CeWinFileCacheFS.exe --test)"
+      "Bash(./build-msvc/bin/CeWinFileCacheFS.exe --test)",
+      "Bash(cmake:*)"
     ],
     "deny": []
   }

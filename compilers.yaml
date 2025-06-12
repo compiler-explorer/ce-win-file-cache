@@ -32,3 +32,4 @@ global:
   total_cache_size_mb: 8192
   eviction_policy: "lru"
   cache_directory: "D:\\\\CompilerCache"
+  download_threads: 6

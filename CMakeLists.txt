@@ -357,4 +357,74 @@ if(BUILD_CACHE_TEST OR APPLE)
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         target_compile_options(filesystem_async_test PRIVATE -Wall -Wextra)
     endif()
+    
+    # Config threads test
+    add_executable(config_threads_test
+        src/test_config_threads.cpp
+        src/config_parser.cpp
+    )
+    target_compile_definitions(config_threads_test PRIVATE NO_WINFSP)
+    target_include_directories(config_threads_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    set_target_properties(config_threads_test PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    )
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(config_threads_test PRIVATE -Wall -Wextra)
+    endif()
+    
+    # Config async test
+    add_executable(config_async_test
+        src/test_config_async.cpp
+        src/async_download_manager.cpp
+        src/memory_cache_manager.cpp
+        src/config_parser.cpp
+    )
+    target_compile_definitions(config_async_test PRIVATE NO_WINFSP)
+    target_include_directories(config_async_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    set_target_properties(config_async_test PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    )
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(config_async_test PRIVATE -Wall -Wextra)
+    endif()
+    
+    # Single thread test
+    add_executable(single_thread_test
+        src/test_single_thread.cpp
+        src/async_download_manager.cpp
+        src/memory_cache_manager.cpp
+        src/config_parser.cpp
+    )
+    target_compile_definitions(single_thread_test PRIVATE NO_WINFSP)
+    target_include_directories(single_thread_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    set_target_properties(single_thread_test PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    )
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(single_thread_test PRIVATE -Wall -Wextra)
+    endif()
+    
+    # Edge cases test
+    add_executable(edge_cases_test
+        src/test_edge_cases.cpp
+        src/async_download_manager.cpp
+        src/memory_cache_manager.cpp
+        src/config_parser.cpp
+    )
+    target_compile_definitions(edge_cases_test PRIVATE NO_WINFSP)
+    target_include_directories(edge_cases_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    set_target_properties(edge_cases_test PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    )
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(edge_cases_test PRIVATE -Wall -Wextra)
+    endif()
 endif()

@@ -20,6 +20,7 @@ struct GlobalConfig
     size_t total_cache_size_mb;
     std::wstring eviction_policy;
     std::wstring cache_directory;
+    size_t download_threads = 4; // Default to 4 threads
 };
 
 struct Config
