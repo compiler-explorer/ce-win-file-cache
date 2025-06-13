@@ -4,27 +4,18 @@
 
 #ifdef HAVE_PROMETHEUS
 
+#include "prometheus_metrics_impl.hpp"
 #include <memory>
 #include <string>
-#include <chrono>
-
-// Forward declarations to avoid including prometheus headers in public interface
-namespace prometheus {
-    class Registry;
-    class Exposer;
-    class Counter;
-    class Gauge;
-    class Histogram;
-}
 
 namespace CeWinFileCache
 {
 
 class MetricsCollector
 {
-    public:
+public:
     explicit MetricsCollector(const MetricsConfig& config);
-    ~MetricsCollector();
+    ~MetricsCollector() = default;
 
     // Disable copy/move for simplicity
     MetricsCollector(const MetricsCollector&) = delete;
@@ -42,25 +33,24 @@ class MetricsCollector
     // Download metrics
     void recordDownloadQueued();
     void recordDownloadStarted();
-    void recordDownloadCompleted(double duration_seconds);
+    void recordDownloadCompleted(double durationSeconds);
     void recordDownloadFailed(const std::string& reason = "unknown");
     void updateActiveDownloads(size_t count);
     void updatePendingDownloads(size_t count);
 
     // Filesystem metrics
     void recordFilesystemOperation(const std::string& operation);
-    void recordFileOpenDuration(double duration_seconds);
+    void recordFileOpenDuration(double durationSeconds);
 
     // Network metrics
     void recordNetworkOperation(const std::string& operation, bool success);
-    void recordNetworkLatency(double duration_seconds);
+    void recordNetworkLatency(double durationSeconds);
 
     // Get metrics endpoint URL
     std::string getMetricsUrl() const;
 
-    private:
-    class Impl;
-    std::unique_ptr<Impl> pimpl;
+private:
+    std::unique_ptr<PrometheusMetricsImpl> implementation;
 };
 
 // Global metrics instance (optional singleton pattern)

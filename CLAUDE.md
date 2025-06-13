@@ -7,6 +7,7 @@ This document describes the coding conventions for C/C++ projects.
 - **Classes/Structs**: PascalCase (e.g., `TextParser`, `DataProcessor`)
 - **Methods/Functions**: camelCase (e.g., `handleData`, `fromStream`)
 - **Variables**: snake_case (e.g., `file_index`, `is_valid`)
+- **Private Members**: use snake_case like other variables, do NOT add trailing underscore suffixes (e.g., use `member_name` not `member_name_`) 
 - **Namespaces**: PascalCase (e.g., `MyProject`)
 - **Files**: lowercase with underscores (e.g., `parser.cpp`, `parser.hpp`)
 
@@ -47,6 +48,7 @@ if (condition)
 - Separate components into their own subdirectories
 - Use inheritance for polymorphism (e.g., interface base classes)
 - Keep utility functions in `utils/`
+- Don't use "pimpl" as a technique to hide implementation, always add a properly named headers, sources and classes
 
 ## Error Handling
 

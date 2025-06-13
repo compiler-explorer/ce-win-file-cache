@@ -199,7 +199,7 @@ set(SOURCES
 
 # Add metrics source if prometheus is available
 if(HAVE_PROMETHEUS)
-    list(APPEND SOURCES src/metrics_collector.cpp)
+    list(APPEND SOURCES src/metrics_collector.cpp src/prometheus_metrics_impl.cpp)
 endif()
 
 # Add Wine-specific stubs when using Wine

@@ -31,7 +31,7 @@ foreach(TEST_PROGRAM ${TEST_PROGRAMS})
     # Add metrics source file conditionally for metrics_test
     set(PROGRAM_SOURCES ${${TEST_PROGRAM}_SOURCES})
     if(TEST_PROGRAM STREQUAL "metrics_test" AND HAVE_PROMETHEUS)
-        list(APPEND PROGRAM_SOURCES ../metrics_collector.cpp)
+        list(APPEND PROGRAM_SOURCES ../metrics_collector.cpp ../prometheus_metrics_impl.cpp)
     endif()
     
     add_executable(${TEST_PROGRAM} ${PROGRAM_SOURCES})
