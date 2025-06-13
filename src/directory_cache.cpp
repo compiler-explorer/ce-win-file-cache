@@ -41,7 +41,7 @@ NTSTATUS DirectoryCache::buildDirectoryTreeFromConfig(const Config &config)
         directory_tree.addDirectory(virtual_root, compiler_config.network_path);
 
         // Enumerate network directory to build complete tree
-        NTSTATUS result = enumerateNetworkDirectory(compiler_config.network_path, virtual_root);
+        (void)enumerateNetworkDirectory(compiler_config.network_path, virtual_root);
         // Don't fail initialization if some network paths are inaccessible
         // Directory tree will be built on-demand during access
     }

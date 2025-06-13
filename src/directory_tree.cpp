@@ -17,7 +17,7 @@ DirectoryNode *DirectoryTree::findNode(const std::wstring &virtual_path)
     return findOrCreatePath(virtual_path, false);
 }
 
-DirectoryNode *DirectoryTree::createPath(const std::wstring &virtual_path, NodeType type)
+DirectoryNode *DirectoryTree::createPath(const std::wstring &virtual_path, NodeType /*type*/)
 {
     std::lock_guard<std::mutex> lock(tree_mutex);
     return findOrCreatePath(virtual_path, true);

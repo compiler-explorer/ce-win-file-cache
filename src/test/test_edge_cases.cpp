@@ -23,7 +23,7 @@ int main()
 
         // Try to queue a download
         NTSTATUS status = download_manager.queueDownload(L"/test", L"/nonexistent", nullptr, CachePolicy::ALWAYS_CACHE,
-                                                         [](NTSTATUS s, const std::wstring &e)
+                                                         [](NTSTATUS s, const std::wstring & /*e*/)
                                                          {
                                                              std::cout << "Callback called with status: " << s << std::endl;
                                                          });
@@ -55,7 +55,7 @@ int main()
 
         std::atomic<bool> completed(false);
         download_manager.queueDownload(L"/test", L"large_thread_test.txt", nullptr, CachePolicy::ALWAYS_CACHE,
-                                       [&completed](NTSTATUS s, const std::wstring &e)
+                                       [&completed](NTSTATUS s, const std::wstring & /*e*/)
                                        {
                                            completed = true;
                                            std::cout << "Download completed with status: " << s << std::endl;
@@ -95,7 +95,7 @@ int main()
         {
             std::wstring path = L"/rapid/" + std::to_wstring(i);
             download_manager.queueDownload(path, L"rapid_test.txt", nullptr, CachePolicy::ALWAYS_CACHE,
-                                           [i](NTSTATUS s, const std::wstring &e)
+                                           [i](NTSTATUS /*s*/, const std::wstring & /*e*/)
                                            {
                                                std::cout << "Rapid download " << i << " completed" << std::endl;
                                            });
@@ -127,7 +127,7 @@ int main()
             for (int i = 0; i < 3; ++i)
             {
                 download_manager.queueDownload(L"/shutdown/" + std::to_wstring(i), L"/nonexistent", nullptr, CachePolicy::ALWAYS_CACHE,
-                                               [](NTSTATUS s, const std::wstring &e)
+                                               [](NTSTATUS /*s*/, const std::wstring & /*e*/)
                                                {
                                                });
             }

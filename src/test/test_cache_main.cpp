@@ -3,15 +3,14 @@
 
 #include "../../include/ce-win-file-cache/config_parser.hpp"
 #include "../../include/ce-win-file-cache/memory_cache_manager.hpp"
+#include "../../include/ce-win-file-cache/string_utils.hpp"
 #include <chrono>
-#include <codecvt>
 #include <iostream>
-#include <locale>
 
 using namespace CeWinFileCache;
 
 // Test function for cache operations
-int testCacheOperations(const Config &config)
+int testCacheOperations(const Config & /*config*/)
 {
     std::wcout << L"=== Cache Operations Test ===" << std::endl;
 
@@ -36,11 +35,10 @@ int testCacheOperations(const Config &config)
         // For testing, we'll simulate loading
         std::wcout << L"    Simulating load (file may not exist on this system)" << std::endl;
 
-        // Create mock content
+        // Create mock content by converting path to UTF-8 bytes
         std::vector<uint8_t> mock_content;
-        std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-        std::string path_str = converter.to_bytes(virtual_path);
-        for (char c : path_str)
+        std::string utf8_path = StringUtils::wideToUtf8(virtual_path);
+        for (char c : utf8_path)
         {
             mock_content.push_back(static_cast<uint8_t>(c));
         }

@@ -153,6 +153,7 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
 )
 
+
 # Configure nlohmann/json options
 set(JSON_BuildTests OFF CACHE INTERNAL "")  # Don't build tests
 set(JSON_Install OFF CACHE INTERNAL "")  # Don't install (we're using FetchContent)
@@ -225,6 +226,7 @@ set(SOURCES
     src/async_download_manager.cpp
     src/config_parser.cpp
     src/glob_matcher.cpp
+    src/string_utils.cpp
     src/main.cpp
 )
 

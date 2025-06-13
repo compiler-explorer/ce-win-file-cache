@@ -261,7 +261,7 @@ class TestAsyncDownload
     }
 };
 
-int main(int argc, char **argv)
+int main(int /*argc*/, char ** /*argv*/)
 {
     std::cout << "=== Async Download Manager Test with Metrics ===" << std::endl;
 

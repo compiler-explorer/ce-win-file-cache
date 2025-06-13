@@ -1,11 +1,10 @@
 #include "../include/ce-win-file-cache/memory_cache_manager.hpp"
+#include "../include/ce-win-file-cache/string_utils.hpp"
 #include <algorithm>
 #include <chrono>
-#include <codecvt>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <locale>
 
 namespace CeWinFileCache
 {
@@ -26,9 +25,8 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
 #ifdef _WIN32
         std::ifstream file(network_path, std::ios::binary | std::ios::ate);
 #else
-        // Convert wstring to string for non-Windows platforms
-        std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-        std::string narrow_path = converter.to_bytes(network_path);
+        // Convert wstring to UTF-8 string for non-Windows platforms
+        std::string narrow_path = StringUtils::wideToUtf8(network_path);
         std::ifstream file(narrow_path, std::ios::binary | std::ios::ate);
 #endif
         if (!file.is_open())
