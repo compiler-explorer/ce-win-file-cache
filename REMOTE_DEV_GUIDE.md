@@ -111,7 +111,7 @@ else if (arg == L"--test-cache")
 1. **Storage**: Pure in-memory (`std::unordered_map`)
 2. **Validation**: None needed (files are immutable)
 3. **Error Handling**: Always fallback to network
-4. **Cache Policy**: Pattern-based from YAML config
+4. **Cache Policy**: Pattern-based from JSON config
 5. **Testing**: Use real compiler files
 
 ### File Locations
@@ -119,7 +119,7 @@ else if (arg == L"--test-cache")
 - **Header**: `include/ce-win-file-cache/cache_manager.hpp`
 - **Implementation**: `src/cache_manager.cpp`
 - **Tests**: Add to `src/main.cpp` following existing pattern
-- **Config**: Extend existing `compilers.yaml`
+- **Config**: Extend existing `compilers.json`
 
 ### Working Without MSVC/WinFsp
 
@@ -146,18 +146,25 @@ Implementation is complete when:
 
 ### Configuration Example
 
-```yaml
-compilers:
-  msvc-14.40:
-    network_path: "\\\\127.0.0.1\\efs\\compilers\\msvc\\14.40.33807-14.40.33811.0"
-    cache_size_mb: 2048
-    cache_always:
-      - "bin/**/*.exe"
-      - "bin/**/*.dll"
-    cache_on_demand:
-      - "include/**/*.h"
-    never_cache:
-      - "**/*.tmp"
+```json
+{
+  "compilers": {
+    "msvc-14.40": {
+      "network_path": "\\\\127.0.0.1\\efs\\compilers\\msvc\\14.40.33807-14.40.33811.0",
+      "cache_size_mb": 2048,
+      "cache_always": [
+        "bin/**/*.exe",
+        "bin/**/*.dll"
+      ],
+      "cache_on_demand": [
+        "include/**/*.h"
+      ],
+      "never_cache": [
+        "**/*.tmp"
+      ]
+    }
+  }
+}
 ```
 
 This keeps implementation simple and focused on the core caching logic without external dependencies.

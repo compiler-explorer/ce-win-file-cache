@@ -9,7 +9,7 @@ A WinFsp-based hybrid cache filesystem for Compiler Explorer, designed to effici
 - **Prometheus Metrics**: Comprehensive metrics collection for monitoring cache performance
 - **Always-Cached Directory Tree**: Fast directory navigation with complete metadata caching
 - **Memory Cache Manager**: High-performance in-memory caching with configurable size limits
-- **YAML Configuration**: Flexible configuration with support for multiple compiler versions
+- **JSON Configuration**: Flexible configuration with support for multiple compiler versions
 - **Cross-Platform Development**: Windows target with macOS development and testing support
 
 ## Prerequisites
@@ -89,13 +89,15 @@ For cross-platform development and testing:
 ./run_all_tests.sh --quick    # Skip CMake configuration
 ```
 
-The test runner builds and executes 10 comprehensive test programs:
+The test runner builds and executes 12 comprehensive test programs:
 - Cache operations and performance validation
 - Async download manager with stress testing
 - Prometheus metrics collection and validation  
 - Directory tree caching and navigation
 - Configuration loading and validation
 - Edge case handling and error scenarios
+- Glob pattern matching with comprehensive unit tests
+- JSON configuration parsing and validation
 
 ### Testing the Build
 
@@ -124,50 +126,59 @@ After building, test the installation:
 
 ## Configuration
 
-Create a `compilers.yaml` file (see included example):
+Create a `compilers.json` file (see included example):
 
-```yaml
-compilers:
-  msvc-14.40:
-    network_path: "\\\\127.0.0.1\\efs\\compilers\\msvc\\14.40.33807-14.40.33811.0"
-    cache_size_mb: 2048
-    cache_always:
-      - "bin/Hostx64/x64/*.exe"
-      - "bin/Hostx64/x64/*.dll"
-      - "include/**/*.h"
-      - "lib/x64/*.lib"
-    prefetch_patterns:
-      - "include/**/*.h"
-      - "include/**/*.hpp"
-      
-  windows-kits-10:
-    network_path: "\\\\127.0.0.1\\efs\\compilers\\windows-kits-10"
-    cache_size_mb: 1024
-    cache_always:
-      - "Include/**/*.h"
-      - "Lib/**/*.lib"
-      - "bin/**/*.exe"
-    prefetch_patterns:
-      - "Include/**/*.h"
-      
-  ninja:
-    network_path: "\\\\127.0.0.1\\efs\\compilers\\ninja"
-    cache_size_mb: 64
-    cache_always:
-      - "*.exe"
-    prefetch_patterns: []
-
-global_settings:
-  total_cache_size_mb: 8192
-  eviction_policy: "lru"
-  cache_directory: "D:\\CompilerCache"
-  download_threads: 6
-  
-metrics:
-  enabled: true
-  bind_address: "127.0.0.1"
-  port: 8080
-  endpoint_path: "/metrics"
+```json
+{
+  "global": {
+    "total_cache_size_mb": 8192,
+    "eviction_policy": "lru",
+    "cache_directory": "D:\\CompilerCache",
+    "download_threads": 6
+  },
+  "metrics": {
+    "enabled": true,
+    "bind_address": "127.0.0.1",
+    "port": 8080,
+    "endpoint_path": "/metrics"
+  },
+  "compilers": {
+    "msvc-14.40": {
+      "network_path": "\\\\127.0.0.1\\efs\\compilers\\msvc\\14.40.33807-14.40.33811.0",
+      "cache_size_mb": 2048,
+      "cache_always": [
+        "bin/Hostx64/x64/*.exe",
+        "bin/Hostx64/x64/*.dll",
+        "include/**/*.h",
+        "lib/x64/*.lib"
+      ],
+      "prefetch_patterns": [
+        "include/**/*.h",
+        "include/**/*.hpp"
+      ]
+    },
+    "windows-kits-10": {
+      "network_path": "\\\\127.0.0.1\\efs\\compilers\\windows-kits-10",
+      "cache_size_mb": 1024,
+      "cache_always": [
+        "Include/**/*.h",
+        "Lib/**/*.lib",
+        "bin/**/*.exe"
+      ],
+      "prefetch_patterns": [
+        "Include/**/*.h"
+      ]
+    },
+    "ninja": {
+      "network_path": "\\\\127.0.0.1\\efs\\compilers\\ninja",
+      "cache_size_mb": 64,
+      "cache_always": [
+        "*.exe"
+      ],
+      "prefetch_patterns": []
+    }
+  }
+}
 ```
 
 ## Usage
@@ -176,13 +187,13 @@ metrics:
 
 Mount the filesystem:
 ```cmd
-CompilerCacheFS.exe --config compilers.yaml --mount M:
+CompilerCacheFS.exe --config compilers.json --mount M:
 ```
 
 ### Command Line Options
 
 #### Runtime Options
-- `-c, --config FILE`: Configuration file (default: compilers.yaml)
+- `-c, --config FILE`: Configuration file (default: compilers.json)
 - `-m, --mount POINT`: Mount point (default: M:)
 - `-u, --volume-prefix`: Volume prefix for UNC paths
 - `-d, --debug [LEVEL]`: Enable debug logging
@@ -204,13 +215,13 @@ CeWinFileCacheFS.exe --test
 CeWinFileCacheFS.exe
 
 # Mount to specific directory with custom config
-CeWinFileCacheFS.exe --config my-compilers.yaml --mount C:\\compilers
+CeWinFileCacheFS.exe --config my-compilers.json --mount C:\\compilers
 
 # Enable debug logging
 CeWinFileCacheFS.exe --debug --mount M:
 
 # Test specific functionality
-CeWinFileCacheFS.exe --test-paths --config compilers.yaml
+CeWinFileCacheFS.exe --test-paths --config compilers.json
 ```
 
 ## Architecture
@@ -318,14 +329,14 @@ Metrics include dynamic labels for detailed analysis:
 - **Async Download Manager**: Multi-threaded downloads with comprehensive testing
 - **Directory Tree Caching**: Always-cached directory structure for fast navigation
 - **Prometheus Metrics**: Complete metrics collection with dynamic labels
-- **YAML Configuration**: Full configuration parsing and validation
+- **JSON Configuration**: Full configuration parsing and validation
+- **Glob Pattern Matching**: Proper glob matching for file patterns (*, **, ?)
 - **Test Infrastructure**: Comprehensive test suite with automated runner
 
 ### 📝 Remaining Work
 - **WinFsp Integration**: Connect cache system to Windows filesystem driver
 - **Production Deployment**: Logging, error recovery, and monitoring enhancements
 - **Performance Optimization**: Profile and optimize cache algorithms
-- **Configuration Management**: Enhanced cache policies and pattern matching
 
 ## Roadmap
 
