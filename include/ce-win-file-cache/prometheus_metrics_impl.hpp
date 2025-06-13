@@ -5,6 +5,7 @@
 #include "../types/config.hpp"
 #include <memory>
 #include <string>
+#include <string_view>
 
 // Forward declarations
 namespace prometheus {
@@ -27,8 +28,8 @@ public:
     ~PrometheusMetricsImpl();
     
     // Cache metrics
-    void recordCacheHit(const std::string& operation);
-    void recordCacheMiss(const std::string& operation);
+    void recordCacheHit(std::string_view operation);
+    void recordCacheMiss(std::string_view operation);
     void updateCacheSize(size_t bytes);
     void updateCacheEntryCount(size_t count);
     void recordCacheEviction();
@@ -37,16 +38,16 @@ public:
     void recordDownloadQueued();
     void recordDownloadStarted();
     void recordDownloadCompleted(double durationSeconds);
-    void recordDownloadFailed(const std::string& reason);
+    void recordDownloadFailed(std::string_view reason);
     void updateActiveDownloads(size_t count);
     void updatePendingDownloads(size_t count);
 
     // Filesystem metrics
-    void recordFilesystemOperation(const std::string& operation);
+    void recordFilesystemOperation(std::string_view operation);
     void recordFileOpenDuration(double durationSeconds);
 
     // Network metrics
-    void recordNetworkOperation(const std::string& operation, bool success);
+    void recordNetworkOperation(std::string_view operation, bool success);
     void recordNetworkLatency(double durationSeconds);
 
     // Configuration

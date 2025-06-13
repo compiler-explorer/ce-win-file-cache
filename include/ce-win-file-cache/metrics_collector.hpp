@@ -7,6 +7,7 @@
 #include "prometheus_metrics_impl.hpp"
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace CeWinFileCache
 {
@@ -24,8 +25,8 @@ public:
     MetricsCollector& operator=(MetricsCollector&&) = delete;
 
     // Cache metrics
-    void recordCacheHit(const std::string& operation = "read");
-    void recordCacheMiss(const std::string& operation = "read");
+    void recordCacheHit(std::string_view operation = "read");
+    void recordCacheMiss(std::string_view operation = "read");
     void updateCacheSize(size_t bytes);
     void updateCacheEntryCount(size_t count);
     void recordCacheEviction();
@@ -34,16 +35,16 @@ public:
     void recordDownloadQueued();
     void recordDownloadStarted();
     void recordDownloadCompleted(double durationSeconds);
-    void recordDownloadFailed(const std::string& reason = "unknown");
+    void recordDownloadFailed(std::string_view reason = "unknown");
     void updateActiveDownloads(size_t count);
     void updatePendingDownloads(size_t count);
 
     // Filesystem metrics
-    void recordFilesystemOperation(const std::string& operation);
+    void recordFilesystemOperation(std::string_view operation);
     void recordFileOpenDuration(double durationSeconds);
 
     // Network metrics
-    void recordNetworkOperation(const std::string& operation, bool success);
+    void recordNetworkOperation(std::string_view operation, bool success);
     void recordNetworkLatency(double durationSeconds);
 
     // Get metrics endpoint URL
@@ -82,8 +83,8 @@ class MetricsCollector
     ~MetricsCollector() = default;
 
     // Stub methods - no-op when metrics disabled
-    void recordCacheHit(const std::string& = "read") {}
-    void recordCacheMiss(const std::string& = "read") {}
+    void recordCacheHit(std::string_view = "read") {}
+    void recordCacheMiss(std::string_view = "read") {}
     void updateCacheSize(size_t) {}
     void updateCacheEntryCount(size_t) {}
     void recordCacheEviction() {}
@@ -91,14 +92,14 @@ class MetricsCollector
     void recordDownloadQueued() {}
     void recordDownloadStarted() {}
     void recordDownloadCompleted(double) {}
-    void recordDownloadFailed(const std::string& = "unknown") {}
+    void recordDownloadFailed(std::string_view = "unknown") {}
     void updateActiveDownloads(size_t) {}
     void updatePendingDownloads(size_t) {}
 
-    void recordFilesystemOperation(const std::string&) {}
+    void recordFilesystemOperation(std::string_view) {}
     void recordFileOpenDuration(double) {}
 
-    void recordNetworkOperation(const std::string&, bool) {}
+    void recordNetworkOperation(std::string_view, bool) {}
     void recordNetworkLatency(double) {}
 
     std::string getMetricsUrl() const { return "metrics disabled"; }

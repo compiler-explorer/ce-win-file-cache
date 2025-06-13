@@ -24,11 +24,11 @@ std::optional<Config> ConfigParser::parseYamlFile(std::wstring_view file_path)
     return parseYamlString(content);
 }
 
-std::optional<Config> ConfigParser::parseYamlString(std::string yaml_content)
+std::optional<Config> ConfigParser::parseYamlString(std::string_view yaml_content)
 {
     Config config;
 
-    std::istringstream stream(yaml_content.data());
+    std::istringstream stream{std::string(yaml_content)};
     std::string line;
 
     int line_count = 0;
@@ -219,12 +219,12 @@ std::optional<Config> ConfigParser::parseYamlString(std::string yaml_content)
     return config;
 }
 
-std::vector<std::wstring> ConfigParser::parseStringArray(const std::string &yaml_array)
+std::vector<std::wstring> ConfigParser::parseStringArray(std::string_view yaml_array)
 {
     std::vector<std::wstring> result;
 
     // Simple array parsing - supports both inline and multiline arrays
-    std::string cleaned = yaml_array;
+    std::string cleaned(yaml_array);
 
     // Remove square brackets if present
     if (cleaned.front() == '[' && cleaned.back() == ']')

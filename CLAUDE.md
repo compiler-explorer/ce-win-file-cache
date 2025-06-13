@@ -35,7 +35,7 @@ if (condition)
 
 - **Standard**: C++20
 - **Modern Features to Use**:
-  - `std::string_view` for string parameters
+  - `std::string_view` for string parameters that are read-only (used but not changed)
   - `std::optional` for nullable returns
   - `std::unique_ptr` for ownership
   - `auto` for obvious type inference
@@ -56,6 +56,23 @@ if (condition)
 - Return `std::optional` for functions that may fail
 - Implement reasonable limits (e.g., max iterations, buffer sizes)
 - Report errors to stderr
+
+## String Parameter Guidelines
+
+- **Use `std::string_view`** for function parameters that accept strings which are only read (not modified or stored)
+- **Use `const std::string&`** for parameters that need to be stored or when the function might outlive the caller's string
+- **Use `std::string`** for parameters that will be modified or when taking ownership
+- **Examples**:
+  ```cpp
+  // Good: read-only parameter
+  bool validatePath(std::string_view path);
+  
+  // Good: parameter will be stored
+  void setConfigPath(const std::string& path);
+  
+  // Good: parameter will be modified
+  void processPath(std::string& path);
+  ```
 
 ## Comments
 

@@ -17,7 +17,7 @@ namespace fs = std::filesystem;
 class TestAsyncDownload
 {
     public:
-    static void fetchMetrics(const std::string& stage)
+    static void fetchMetrics(std::string_view stage)
     {
         std::cout << "\n=== METRICS " << stage << " ===" << std::endl;
         int result = std::system("curl -s http://127.0.0.1:8082/metrics 2>/dev/null || echo 'Metrics server not available'");

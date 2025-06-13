@@ -137,20 +137,20 @@ PrometheusMetricsImpl::PrometheusMetricsImpl(const MetricsConfig& config) : conf
 
 PrometheusMetricsImpl::~PrometheusMetricsImpl() = default;
 
-void PrometheusMetricsImpl::recordCacheHit(const std::string& operation)
+void PrometheusMetricsImpl::recordCacheHit(std::string_view operation)
 {
     if (cacheHitsFamily)
     {
-        auto& counter = cacheHitsFamily->Add({{"operation", operation}});
+        auto& counter = cacheHitsFamily->Add({{"operation", std::string(operation)}});
         counter.Increment();
     }
 }
 
-void PrometheusMetricsImpl::recordCacheMiss(const std::string& operation)
+void PrometheusMetricsImpl::recordCacheMiss(std::string_view operation)
 {
     if (cacheMissesFamily)
     {
-        auto& counter = cacheMissesFamily->Add({{"operation", operation}});
+        auto& counter = cacheMissesFamily->Add({{"operation", std::string(operation)}});
         counter.Increment();
     }
 }
@@ -204,11 +204,11 @@ void PrometheusMetricsImpl::recordDownloadCompleted(double durationSeconds)
     }
 }
 
-void PrometheusMetricsImpl::recordDownloadFailed(const std::string& reason)
+void PrometheusMetricsImpl::recordDownloadFailed(std::string_view reason)
 {
     if (downloadsFailedTotalFamily)
     {
-        auto& counter = downloadsFailedTotalFamily->Add({{"reason", reason}});
+        auto& counter = downloadsFailedTotalFamily->Add({{"reason", std::string(reason)}});
         counter.Increment();
     }
 }
@@ -229,11 +229,11 @@ void PrometheusMetricsImpl::updatePendingDownloads(size_t count)
     }
 }
 
-void PrometheusMetricsImpl::recordFilesystemOperation(const std::string& operation)
+void PrometheusMetricsImpl::recordFilesystemOperation(std::string_view operation)
 {
     if (filesystemOperationsTotalFamily)
     {
-        auto& counter = filesystemOperationsTotalFamily->Add({{"operation", operation}});
+        auto& counter = filesystemOperationsTotalFamily->Add({{"operation", std::string(operation)}});
         counter.Increment();
     }
 }
@@ -246,12 +246,12 @@ void PrometheusMetricsImpl::recordFileOpenDuration(double durationSeconds)
     }
 }
 
-void PrometheusMetricsImpl::recordNetworkOperation(const std::string& operation, bool success)
+void PrometheusMetricsImpl::recordNetworkOperation(std::string_view operation, bool success)
 {
     if (networkOperationsTotalFamily)
     {
         std::string status = success ? "success" : "failure";
-        auto& counter = networkOperationsTotalFamily->Add({{"operation", operation}, {"status", status}});
+        auto& counter = networkOperationsTotalFamily->Add({{"operation", std::string(operation)}, {"status", status}});
         counter.Increment();
     }
 }

@@ -12,7 +12,7 @@ MetricsCollector::MetricsCollector(const MetricsConfig& config)
 {
 }
 
-void MetricsCollector::recordCacheHit(const std::string& operation)
+void MetricsCollector::recordCacheHit(std::string_view operation)
 {
     if (implementation)
     {
@@ -20,7 +20,7 @@ void MetricsCollector::recordCacheHit(const std::string& operation)
     }
 }
 
-void MetricsCollector::recordCacheMiss(const std::string& operation)
+void MetricsCollector::recordCacheMiss(std::string_view operation)
 {
     if (implementation)
     {
@@ -76,7 +76,7 @@ void MetricsCollector::recordDownloadCompleted(double durationSeconds)
     }
 }
 
-void MetricsCollector::recordDownloadFailed(const std::string& reason)
+void MetricsCollector::recordDownloadFailed(std::string_view reason)
 {
     if (implementation)
     {
@@ -100,7 +100,7 @@ void MetricsCollector::updatePendingDownloads(size_t count)
     }
 }
 
-void MetricsCollector::recordFilesystemOperation(const std::string& operation)
+void MetricsCollector::recordFilesystemOperation(std::string_view operation)
 {
     if (implementation)
     {
@@ -116,7 +116,7 @@ void MetricsCollector::recordFileOpenDuration(double durationSeconds)
     }
 }
 
-void MetricsCollector::recordNetworkOperation(const std::string& operation, bool success)
+void MetricsCollector::recordNetworkOperation(std::string_view operation, bool success)
 {
     if (implementation)
     {
