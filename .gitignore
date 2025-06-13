@@ -46,9 +46,9 @@
 *.ilk
 
 # Build directories
-/build/
-/out/
-/bin/
+build-msvc/
+build-macos
+bin/
 
 # Visual Studio
 /.vs/
