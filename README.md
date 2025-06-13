@@ -4,19 +4,26 @@ A WinFsp-based hybrid cache filesystem for Compiler Explorer, designed to effici
 
 ## Features
 
-- **Hybrid Caching**: Intelligent caching of compiler executables and headers
-- **Network Fallback**: Seamless access to files from network shares
-- **Multiple Compilers**: Support for multiple MSVC versions simultaneously
-- **LRU Eviction**: Automatic cache management with configurable size limits
-- **Pattern-based Caching**: Configure which files should always be cached
-- **Performance Optimized**: Designed for high-performance compiler workloads
+- **Hybrid Caching**: Intelligent caching of compiler executables and headers with LRU eviction
+- **Async Download Manager**: Multi-threaded download system with configurable worker pools
+- **Prometheus Metrics**: Comprehensive metrics collection for monitoring cache performance
+- **Always-Cached Directory Tree**: Fast directory navigation with complete metadata caching
+- **Memory Cache Manager**: High-performance in-memory caching with configurable size limits
+- **YAML Configuration**: Flexible configuration with support for multiple compiler versions
+- **Cross-Platform Development**: Windows target with macOS development and testing support
 
 ## Prerequisites
 
+### For Production (Windows)
 - Windows 10/11 or Windows Server 2016+
 - [WinFsp](https://github.com/winfsp/winfsp) installed
 - Visual Studio 2019+ or compatible C++ compiler with C++20 support
 - CMake 3.20+
+
+### For Development (macOS/Linux)
+- C++20 compatible compiler (GCC 10+, Clang 12+)
+- CMake 3.20+
+- prometheus-cpp (automatically downloaded via FetchContent)
 
 ## Building
 
@@ -68,9 +75,33 @@ For cross-platform development or CI on Linux:
 wine build-wine/bin/CeWinFileCacheFS.exe --help
 ```
 
+### macOS/Linux Development Build
+
+For cross-platform development and testing:
+
+```bash
+# Build and run comprehensive test suite
+./run_all_tests.sh
+
+# Available options
+./run_all_tests.sh --help     # Show usage information  
+./run_all_tests.sh --clean    # Clean build before testing
+./run_all_tests.sh --quick    # Skip CMake configuration
+```
+
+The test runner builds and executes 10 comprehensive test programs:
+- Cache operations and performance validation
+- Async download manager with stress testing
+- Prometheus metrics collection and validation  
+- Directory tree caching and navigation
+- Configuration loading and validation
+- Edge case handling and error scenarios
+
 ### Testing the Build
 
 After building, test the installation:
+
+**On Windows:**
 ```cmd
 # Test config parsing
 .\build-msvc\bin\CeWinFileCacheFS.exe --test-config
@@ -83,6 +114,12 @@ After building, test the installation:
 
 # Run all tests
 .\build-msvc\bin\CeWinFileCacheFS.exe --test
+```
+
+**On macOS/Linux:**
+```bash
+# Run comprehensive test suite
+./run_all_tests.sh
 ```
 
 ## Configuration
@@ -120,10 +157,17 @@ compilers:
       - "*.exe"
     prefetch_patterns: []
 
-global:
+global_settings:
   total_cache_size_mb: 8192
   eviction_policy: "lru"
   cache_directory: "D:\\CompilerCache"
+  download_threads: 6
+  
+metrics:
+  enabled: true
+  bind_address: "127.0.0.1"
+  port: 8080
+  endpoint_path: "/metrics"
 ```
 
 ## Usage
@@ -243,11 +287,52 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 4. Add tests if applicable
 5. Submit a pull request
 
+## Monitoring and Metrics
+
+The system provides comprehensive Prometheus metrics for monitoring cache performance:
+
+### Available Metrics
+
+- **Cache metrics**: Hit/miss rates, cache size, eviction counts
+- **Download metrics**: Queue depth, completion rates, failure reasons, duration histograms
+- **Filesystem metrics**: Operation counts and file open duration
+- **Network metrics**: Operation success rates and latency
+
+### Accessing Metrics
+
+When metrics are enabled in configuration:
+```bash
+# View metrics in Prometheus format
+curl http://127.0.0.1:8080/metrics
+```
+
+Metrics include dynamic labels for detailed analysis:
+- Cache hits/misses by operation type
+- Download failures by specific reason
+- Network operations by success/failure status
+
+## Current Implementation Status
+
+### ✅ Completed Components
+- **Memory Cache Manager**: Full LRU caching with metrics integration
+- **Async Download Manager**: Multi-threaded downloads with comprehensive testing
+- **Directory Tree Caching**: Always-cached directory structure for fast navigation
+- **Prometheus Metrics**: Complete metrics collection with dynamic labels
+- **YAML Configuration**: Full configuration parsing and validation
+- **Test Infrastructure**: Comprehensive test suite with automated runner
+
+### 📝 Remaining Work
+- **WinFsp Integration**: Connect cache system to Windows filesystem driver
+- **Production Deployment**: Logging, error recovery, and monitoring enhancements
+- **Performance Optimization**: Profile and optimize cache algorithms
+- **Configuration Management**: Enhanced cache policies and pattern matching
+
 ## Roadmap
 
-- [ ] Write support for compiler outputs
+- [ ] WinFsp filesystem driver integration
+- [ ] Write support for compiler outputs  
 - [ ] File integrity verification
 - [ ] Compression for cached files
-- [ ] Metrics and monitoring
 - [ ] GUI configuration tool
+- [ ] Production logging and monitoring
 - [ ] Docker container support

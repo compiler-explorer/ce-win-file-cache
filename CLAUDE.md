@@ -283,18 +283,18 @@ rm -rf build-msvc && ./build-msvc.sh
 - **YAML Configuration Parsing**: Fixed regex issues, handles compiler names with hyphens correctly
 - **Path Resolution (TODO #3)**: Virtual paths like `/msvc-14.40/bin/cl.exe` → network UNC paths
 - **Network Path Mapping (TODO #4)**: Complete validation of path mapping with test cases
-- **Build System**: Native Windows build with MSVC, WSL cross-compilation, environment setup
+- **Build System**: Native Windows build with MSVC, WSL cross-compilation, environment setup, macOS test runner
 - **Test Framework**: Isolated test functions with command-line options (`--test-config`, `--test-paths`, `--test-network`)
-
-### 🔄 In Progress
-- **Basic Caching Logic (TODO #1)**: Core filesystem operations need implementation
-- **LRU Eviction (TODO #2)**: Cache management and size limits
+- **Prometheus Metrics Integration**: Complete metrics collection with dynamic labels, refactored from pimpl pattern
+- **Memory Cache Manager**: Fully functional in-memory caching with LRU eviction and metrics integration
+- **Async Download Manager**: Multi-threaded download system with comprehensive testing and metrics
+- **Directory Tree Caching**: Always-cached directory structure with comprehensive testing
 
 ### 📝 Remaining TODOs
-- **Async File Handling (TODO #5)**: Replace synchronous operations
-- **Cache Policy Configuration (TODO #6)**: Pattern-based caching rules
-- **Proper Glob Matching (TODO #7)**: Enhanced pattern matching
-- **Const-Correctness (TODO #8)**: Code quality improvements
+- **WinFsp Integration**: Integration with Windows filesystem driver for production use
+- **Cache Policy Configuration**: Pattern-based caching rules and fine-grained control
+- **Proper Glob Matching**: Enhanced pattern matching beyond basic string operations
+- **Production Hardening**: Error recovery, logging, and monitoring for production deployment
 
 ## Key Learnings from Development
 
@@ -309,23 +309,32 @@ rm -rf build-msvc && ./build-msvc.sh
 - **Solution**: Use original line for regex matching, trimmed line for empty/comment detection
 - **Lesson**: Always test parsing with real data early in development
 
+### Metrics Implementation Evolution
+- **Initial approach**: Pimpl pattern to hide prometheus-cpp dependencies
+- **Refactoring**: Created `PrometheusMetricsImpl` class in separate header/source files
+- **Key improvement**: Eliminated forward declaration issues and improved code organization
+- **Dynamic labels**: Implemented proper Counter families for dynamic reason tracking
+- **Coding standards**: Clarified snake_case usage vs trailing underscore suffixes
+
 ### Path Resolution Architecture
 - **Virtual paths**: `/compiler-name/relative/path`
 - **Network paths**: `\\\\server\\share\\compiler-name\\relative\\path`
 - **Key insight**: Convert forward slashes to backslashes for Windows compatibility
 
 ### Testing Strategy
-- **Isolated functions**: Each TODO implemented as standalone, testable function
+- **Isolated functions**: Each component implemented as standalone, testable function
 - **No WinFsp dependency**: Tests run without mounting filesystem
 - **Command-line driven**: Easy to integrate into CI/CD pipelines
+- **Comprehensive test runner**: Automated macOS test script (`run_all_tests.sh`) with 10 test programs
+- **Metrics validation**: Prometheus metrics tested with dynamic labels and proper cleanup
 
 ## Development Recommendations
 
 ### For Future Work
-1. **Test-Driven Development**: Implement TODO #1 (caching) with isolated test functions first
-2. **Incremental Approach**: Build one cache operation at a time (read, write, evict)
-3. **Mock Network Access**: Create fake network shares for testing
-4. **Performance Metrics**: Add timing and cache hit/miss statistics
+1. **WinFsp Integration**: Connect the cache system to the Windows filesystem driver
+2. **Production Deployment**: Add proper logging, error recovery, and monitoring
+3. **Performance Optimization**: Profile and optimize cache hit rates and memory usage
+4. **Configuration Management**: Enhance cache policies and pattern-based rules
 
 ### Obsolete Files Identified
 These files can be safely removed as they represent outdated build approaches:
@@ -335,6 +344,47 @@ These files can be safely removed as they represent outdated build approaches:
 - `cl-wrapper.sh` / `link-wrapper.sh` - Complex path conversion, replaced by environment variables
 
 ### File Organization Insights
-- **Current active files**: `build-msvc.bat`, `build-msvc.sh`, `msvc-toolchain.cmake`
+- **Current active files**: `build-msvc.bat`, `build-msvc.sh`, `msvc-toolchain.cmake`, `run_all_tests.sh`
 - **Config format**: YAML with escaped backslashes for Windows UNC paths
 - **Build outputs**: Always in `build-msvc/` directory with proper DLL/config copying
+- **Test infrastructure**: Comprehensive test suite with automated runner for macOS development
+
+## macOS Development and Testing
+
+### Test Runner Script
+
+The project includes a comprehensive test runner for macOS development:
+
+```bash
+# Full test suite with build
+./run_all_tests.sh
+
+# Available options
+./run_all_tests.sh --help     # Show usage information
+./run_all_tests.sh --clean    # Clean build before testing
+./run_all_tests.sh --quick    # Skip CMake configuration
+```
+
+### Test Coverage
+
+The test runner executes 10 comprehensive test programs:
+
+1. **cache_test** - Memory cache operations and performance validation
+2. **cache_demo** - Real-world performance demonstration with large files
+3. **directory_test** - Directory tree caching and navigation
+4. **async_test** - Async download manager with stress testing and metrics
+5. **filesystem_async_test** - Filesystem integration simulation
+6. **config_threads_test** - YAML configuration loading and validation
+7. **config_async_test** - Async manager configuration validation
+8. **single_thread_test** - Single-threaded operation edge cases
+9. **edge_cases_test** - Edge case handling (0 threads, large counts, rapid operations)
+10. **metrics_test** - Prometheus metrics collection with dynamic labels
+
+### Key Testing Features
+
+- **Automated build**: CMake configuration with test and metrics support
+- **Config file management**: Auto-creates missing configuration files
+- **Proper working directory**: Tests run from correct project root
+- **Colored output**: Clear success/failure indicators
+- **Comprehensive reporting**: Detailed summary with failure analysis
+- **Metrics validation**: Prometheus integration testing with cleanup verification
