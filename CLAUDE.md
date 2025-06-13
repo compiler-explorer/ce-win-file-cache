@@ -323,7 +323,7 @@ rm -rf build-msvc && ./build-msvc.sh
 
 ### Configuration Format Migration (YAML → JSON)
 - **Issue**: Custom YAML parser was complex and error-prone (~200 lines of regex-based parsing)
-- **Solution**: Migrated to nlohmann/json with automatic format detection (JSON preferred, YAML legacy)
+- **Solution**: Migrated to nlohmann/json for robust, type-safe configuration parsing
 - **Benefits**: Better type safety, faster parsing, smaller footprint, standard format
 - **Lesson**: Using well-maintained libraries reduces maintenance burden and improves reliability
 
@@ -363,7 +363,7 @@ These files can be safely removed as they represent outdated build approaches:
 
 ### File Organization Insights
 - **Current active files**: `build-msvc.bat`, `build-msvc.sh`, `msvc-toolchain.cmake`, `run_all_tests.sh`
-- **Config format**: JSON with escaped backslashes for Windows UNC paths (YAML legacy support)
+- **Config format**: JSON with escaped backslashes for Windows UNC paths
 - **Build outputs**: Always in `build-msvc/` directory with proper DLL/config copying
 - **Test infrastructure**: Comprehensive test suite with automated runner for macOS development
 
@@ -401,7 +401,7 @@ The test runner executes 10 comprehensive test programs:
 
 ### JSON Configuration Format
 
-The project uses JSON as the primary configuration format (with legacy YAML support). Example `compilers.json`:
+The project uses JSON as the configuration format. Example `compilers.json`:
 
 ```json
 {
@@ -437,11 +437,10 @@ The project uses JSON as the primary configuration format (with legacy YAML supp
 ```
 
 **Key Features:**
-- **Auto-detection**: File extension determines format (`.json` vs `.yaml`)
 - **Type safety**: Native JSON types (numbers, booleans, arrays)
 - **Better error messages**: nlohmann/json provides detailed parse error locations
 - **Standards compliance**: JSON is widely supported across tools and platforms
-- **Legacy support**: YAML files still work for backward compatibility
+- **Modern library**: Built on nlohmann/json for reliability and performance
 
 ### Key Testing Features
 

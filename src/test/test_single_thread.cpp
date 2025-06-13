@@ -159,7 +159,7 @@ int main()
     // Cleanup
     std::cout << "\nCleaning up..." << std::endl;
     std::filesystem::remove_all("test_files");
-    std::remove("test_single_thread.yaml");
+    std::remove("test_single_thread.json");
 
     if (completed == static_cast<int>(test_files.size()) && failed == 0)
     {

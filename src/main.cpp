@@ -17,33 +17,10 @@
 
 using namespace CeWinFileCache;
 
-// Helper function to load config file (auto-detects JSON vs YAML)
+// Helper function to load config file (JSON only)
 std::optional<Config> loadConfigFile(const std::wstring& config_file)
 {
-    // Convert to string for checking extension
-    std::string filename;
-    std::transform(config_file.begin(), config_file.end(), std::back_inserter(filename),
-                   [](wchar_t c) { return static_cast<char>(c); });
-    
-    // Check file extension to determine format
-    if (filename.ends_with(".json"))
-    {
-        return ConfigParser::parseJsonFile(config_file);
-    }
-    else if (filename.ends_with(".yaml") || filename.ends_with(".yml"))
-    {
-        return ConfigParser::parseYamlFile(config_file);
-    }
-    else
-    {
-        // Try JSON first (preferred format), then YAML as fallback
-        auto json_config = ConfigParser::parseJsonFile(config_file);
-        if (json_config.has_value())
-        {
-            return json_config;
-        }
-        return ConfigParser::parseYamlFile(config_file);
-    }
+    return ConfigParser::parseJsonFile(config_file);
 }
 
 // Command line parsing structure
@@ -81,7 +58,7 @@ void printUsage()
                << L"Examples:\n"
                << L"  CeWinFileCacheFS --config compilers.json --mount M:\n"
                << L"  CeWinFileCacheFS --mount C:\\compilers --debug\n"
-               << L"  CeWinFileCacheFS --test --config test.yaml\n"
+               << L"  CeWinFileCacheFS --test --config test.json\n"
                << std::endl;
 }
 
