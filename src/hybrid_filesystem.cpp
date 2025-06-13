@@ -1,6 +1,7 @@
 #include <ce-win-file-cache/hybrid_filesystem.hpp>
 #include <ce-win-file-cache/windows_compat.hpp>
 #include <iostream>
+#include <chrono>
 
 #ifndef NO_WINFSP
 
@@ -17,11 +18,19 @@ HybridFileSystem::HybridFileSystem() : Fsp::FileSystemBase(), current_cache_size
 
 HybridFileSystem::~HybridFileSystem()
 {
+    // Shutdown global metrics
+    GlobalMetrics::shutdown();
 }
 
 NTSTATUS HybridFileSystem::Initialize(const Config &config)
 {
-    config = config;
+    this->config = config;
+    
+    // Initialize global metrics if enabled
+    if (config.global.metrics.enabled)
+    {
+        GlobalMetrics::initialize(config.global.metrics);
+    }
 
     // Create cache directory if it doesn't exist
     if (!CreateDirectoryW(config.global.cache_directory.c_str(), nullptr))
@@ -146,7 +155,14 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
 
 NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 GrantedAccess, PVOID *PFileNode, PVOID *PFileDesc, OpenFileInfo *OpenFileInfo)
 {
+    auto start_time = std::chrono::high_resolution_clock::now();
     std::wstring virtual_path(FileName);
+    
+    // Record filesystem operation
+    if (auto* metrics = GlobalMetrics::instance())
+    {
+        metrics->recordFilesystemOperation("open");
+    }
 
     // Get or create cache entry
     CacheEntry *entry = getCacheEntry(virtual_path);
@@ -251,6 +267,14 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     entry->last_write_time = file_info.ftLastWriteTime;
 
     updateAccessTime(entry);
+    
+    // Record file open duration
+    if (auto* metrics = GlobalMetrics::instance())
+    {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration<double>(end_time - start_time).count();
+        metrics->recordFileOpenDuration(duration);
+    }
 
     return STATUS_SUCCESS;
 }
@@ -264,6 +288,12 @@ VOID HybridFileSystem::Close(PVOID FileNode, PVOID FileDesc)
 NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UINT64 Offset, ULONG Length, PULONG PBytesTransferred)
 {
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
+    
+    // Record filesystem operation
+    if (auto* metrics = GlobalMetrics::instance())
+    {
+        metrics->recordFilesystemOperation("read");
+    }
 
     // Try to serve from memory cache first for maximum performance
     if (file_desc->entry && file_desc->entry->state == FileState::CACHED && file_desc->entry->local_path.empty())

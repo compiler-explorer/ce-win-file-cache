@@ -11,6 +11,7 @@ set(TEST_PROGRAMS
     config_async_test
     single_thread_test
     edge_cases_test
+    metrics_test
 )
 
 # Define test program configurations
@@ -23,13 +24,31 @@ set(config_threads_test_SOURCES test_config_threads.cpp ../config_parser.cpp)
 set(config_async_test_SOURCES test_config_async.cpp ../async_download_manager.cpp ../memory_cache_manager.cpp ../config_parser.cpp)
 set(single_thread_test_SOURCES test_single_thread.cpp ../async_download_manager.cpp ../memory_cache_manager.cpp ../config_parser.cpp)
 set(edge_cases_test_SOURCES test_edge_cases.cpp ../async_download_manager.cpp ../memory_cache_manager.cpp ../config_parser.cpp)
+set(metrics_test_SOURCES test_metrics.cpp ../config_parser.cpp)
 
 # Create all test executables
 foreach(TEST_PROGRAM ${TEST_PROGRAMS})
-    add_executable(${TEST_PROGRAM} ${${TEST_PROGRAM}_SOURCES})
+    # Add metrics source file conditionally for metrics_test
+    set(PROGRAM_SOURCES ${${TEST_PROGRAM}_SOURCES})
+    if(TEST_PROGRAM STREQUAL "metrics_test" AND HAVE_PROMETHEUS)
+        list(APPEND PROGRAM_SOURCES ../metrics_collector.cpp)
+    endif()
+    
+    add_executable(${TEST_PROGRAM} ${PROGRAM_SOURCES})
     
     # Define NO_WINFSP for test programs
     target_compile_definitions(${TEST_PROGRAM} PRIVATE NO_WINFSP)
+    
+    # Add Prometheus definitions and libraries for metrics_test
+    if(TEST_PROGRAM STREQUAL "metrics_test")
+        if(HAVE_PROMETHEUS)
+            target_compile_definitions(${TEST_PROGRAM} PRIVATE HAVE_PROMETHEUS)
+            target_link_libraries(${TEST_PROGRAM} 
+                prometheus-cpp::core 
+                prometheus-cpp::pull
+            )
+        endif()
+    endif()
     
     # Include directories for test programs
     target_include_directories(${TEST_PROGRAM} PRIVATE

@@ -51,6 +51,14 @@ NTSTATUS AsyncDownloadManager::queueDownload(const std::wstring &virtual_path,
     download_queue.push(task);
     active_downloads[virtual_path] = task;
     pending_count++;
+    
+    // Record download queued metric
+    if (auto* metrics = GlobalMetrics::instance())
+    {
+        metrics->recordDownloadQueued();
+        metrics->updatePendingDownloads(pending_count.load());
+        metrics->updateActiveDownloads(active_count.load());
+    }
 
     queue_condition.notify_one();
 
@@ -129,6 +137,14 @@ void AsyncDownloadManager::workerThread()
                 download_queue.pop();
                 pending_count--;
                 active_count++;
+                
+                // Update download metrics
+                if (auto* metrics = GlobalMetrics::instance())
+                {
+                    metrics->recordDownloadStarted();
+                    metrics->updatePendingDownloads(pending_count.load());
+                    metrics->updateActiveDownloads(active_count.load());
+                }
             }
         }
 
@@ -136,6 +152,12 @@ void AsyncDownloadManager::workerThread()
         {
             processDownload(task);
             active_count--;
+            
+            // Update active downloads metric
+            if (auto* metrics = GlobalMetrics::instance())
+            {
+                metrics->updateActiveDownloads(active_count.load());
+            }
 
             {
                 std::lock_guard<std::mutex> lock(queue_mutex);
@@ -149,6 +171,7 @@ void AsyncDownloadManager::processDownload(std::shared_ptr<DownloadTask> task)
 {
     bool success = false;
     std::wstring error_message;
+    auto start_time = std::chrono::high_resolution_clock::now();
 
     try
     {
@@ -190,6 +213,27 @@ void AsyncDownloadManager::processDownload(std::shared_ptr<DownloadTask> task)
         std::string narrow_msg = e.what();
         error_message = std::wstring(narrow_msg.begin(), narrow_msg.end());
     }
+    
+    // Record download completion metrics
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration<double>(end_time - start_time).count();
+    
+    if (auto* metrics = GlobalMetrics::instance())
+    {
+        if (success)
+        {
+            metrics->recordDownloadCompleted(duration);
+        }
+        else
+        {
+            std::string reason = "unknown";
+            if (!error_message.empty())
+            {
+                reason = std::string(error_message.begin(), error_message.end());
+            }
+            metrics->recordDownloadFailed(reason);
+        }
+    }
 
     if (task->callback)
     {
@@ -199,14 +243,37 @@ void AsyncDownloadManager::processDownload(std::shared_ptr<DownloadTask> task)
 
 bool AsyncDownloadManager::downloadFile(const std::wstring &network_path, const std::wstring &virtual_path)
 {
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
     try
     {
+        // Record filesystem operation
+        if (auto* metrics = GlobalMetrics::instance())
+        {
+            metrics->recordFilesystemOperation("download");
+        }
+        
         std::string narrow_path(network_path.begin(), network_path.end());
         std::ifstream file(narrow_path, std::ios::binary);
 
         if (!file.is_open())
         {
+            // Record file open duration even for failed opens
+            if (auto* metrics = GlobalMetrics::instance())
+            {
+                auto end_time = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration<double>(end_time - start_time).count();
+                metrics->recordFileOpenDuration(duration);
+            }
             return false;
+        }
+        
+        // Record successful file open duration
+        if (auto* metrics = GlobalMetrics::instance())
+        {
+            auto open_time = std::chrono::high_resolution_clock::now();
+            auto open_duration = std::chrono::duration<double>(open_time - start_time).count();
+            metrics->recordFileOpenDuration(open_duration);
         }
 
         file.seekg(0, std::ios::end);

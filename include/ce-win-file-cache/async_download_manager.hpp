@@ -3,6 +3,7 @@
 #include "cache_manager.hpp"
 #include "config_parser.hpp"
 #include "memory_cache_manager.hpp"
+#include "metrics_collector.hpp"
 #include "windows_compat.hpp"
 #include <atomic>
 #include <condition_variable>

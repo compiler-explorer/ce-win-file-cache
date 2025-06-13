@@ -1,6 +1,7 @@
 #include "../../include/ce-win-file-cache/async_download_manager.hpp"
 #include "../../include/ce-win-file-cache/config_parser.hpp"
 #include "../../include/ce-win-file-cache/memory_cache_manager.hpp"
+#include "../../include/ce-win-file-cache/metrics_collector.hpp"
 #include <atomic>
 #include <chrono>
 #include <filesystem>
@@ -8,6 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <thread>
+#include <cstdlib>
 
 using namespace CeWinFileCache;
 namespace fs = std::filesystem;
@@ -15,6 +17,13 @@ namespace fs = std::filesystem;
 class TestAsyncDownload
 {
     public:
+    static void fetchMetrics(const std::string& stage)
+    {
+        std::cout << "\n=== METRICS " << stage << " ===" << std::endl;
+        int result = std::system("curl -s http://127.0.0.1:8082/metrics 2>/dev/null || echo 'Metrics server not available'");
+        std::cout << "\n=== END METRICS " << stage << " ===\n" << std::endl;
+        (void)result; // Suppress unused variable warning
+    }
     static void createTestFiles()
     {
         std::cout << "Creating test files..." << std::endl;
@@ -253,28 +262,70 @@ class TestAsyncDownload
 
 int main(int argc, char **argv)
 {
-    std::cout << "=== Async Download Manager Test ===" << std::endl;
+    std::cout << "=== Async Download Manager Test with Metrics ===" << std::endl;
+
+    // Initialize global metrics with custom port to avoid conflicts
+    MetricsConfig metrics_config;
+    metrics_config.enabled = true;
+    metrics_config.bind_address = "127.0.0.1";
+    metrics_config.port = 8082;  // Use different port to avoid conflicts
+    metrics_config.endpoint_path = "/metrics";
+    
+    std::cout << "Initializing metrics on port " << metrics_config.port << "..." << std::endl;
+    GlobalMetrics::initialize(metrics_config);
+    
+    if (auto* metrics = GlobalMetrics::instance())
+    {
+        std::cout << "Metrics server started at: " << metrics->getMetricsUrl() << std::endl;
+    }
+    else
+    {
+        std::cout << "Warning: Metrics server failed to initialize" << std::endl;
+    }
+    
+    // Wait for metrics server to start
+    std::cout << "Waiting 3 seconds for metrics server to start..." << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(3));
 
     try
     {
+        // Fetch initial metrics
+        TestAsyncDownload::fetchMetrics("BEFORE TESTS");
+        
         // Create test files
         TestAsyncDownload::createTestFiles();
 
-        // Run tests
+        // Run tests with metrics between each
+        std::cout << "\n--- Running Basic Test ---" << std::endl;
         TestAsyncDownload::runBasicTest();
+        TestAsyncDownload::fetchMetrics("AFTER BASIC TEST");
+        
+        std::cout << "\n--- Running Stress Test ---" << std::endl;
         TestAsyncDownload::runStressTest();
+        TestAsyncDownload::fetchMetrics("AFTER STRESS TEST");
+        
+        std::cout << "\n--- Running Concurrent Test ---" << std::endl;
         TestAsyncDownload::runConcurrentTest();
+        TestAsyncDownload::fetchMetrics("AFTER CONCURRENT TEST");
 
         // Cleanup
         TestAsyncDownload::cleanupTestFiles();
+        
+        // Final metrics
+        TestAsyncDownload::fetchMetrics("FINAL METRICS");
 
         std::cout << "\nAll tests completed successfully!" << std::endl;
+        std::cout << "Keeping metrics server running for 5 more seconds..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        
+        GlobalMetrics::shutdown();
         return 0;
     }
     catch (const std::exception &e)
     {
         std::cerr << "Test failed with exception: " << e.what() << std::endl;
         TestAsyncDownload::cleanupTestFiles();
+        GlobalMetrics::shutdown();
         return 1;
     }
 }

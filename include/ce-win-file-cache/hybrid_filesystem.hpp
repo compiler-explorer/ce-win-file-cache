@@ -4,6 +4,7 @@
 #include "../types/config.hpp"
 #include "directory_cache.hpp"
 #include "memory_cache_manager.hpp"
+#include "metrics_collector.hpp"
 #include "windows_compat.hpp"
 #include <memory>
 #include <mutex>

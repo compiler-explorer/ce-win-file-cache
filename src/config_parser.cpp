@@ -122,6 +122,13 @@ std::optional<Config> ConfigParser::parseYamlString(std::string yaml_content)
         }
         else if (current_section == "global")
         {
+            // Check for nested metrics section
+            if (line == "metrics:")
+            {
+                current_section = "global.metrics";
+                continue;
+            }
+
             // Parse global config
             std::regex property_regex(R"(^\s*([^:]+):\s*(.+)$)");
             std::smatch match;
@@ -154,6 +161,42 @@ std::optional<Config> ConfigParser::parseYamlString(std::string yaml_content)
                 else if (key == "download_threads")
                 {
                     config.global.download_threads = std::stoull(value);
+                }
+            }
+        }
+        else if (current_section == "global.metrics")
+        {
+            // Parse metrics configuration values
+            std::regex metrics_regex(R"(^\s*([^:]+):\s*(.+)$)");
+            std::smatch match;
+            if (std::regex_match(line, match, metrics_regex))
+            {
+                std::string key = match[1].str();
+                std::string value = match[2].str();
+
+                if (key == "enabled")
+                {
+                    config.global.metrics.enabled = (value == "true" || value == "1");
+                }
+                else if (key == "bind_address")
+                {
+                    if (value.front() == '"' && value.back() == '"')
+                    {
+                        value = value.substr(1, value.length() - 2);
+                    }
+                    config.global.metrics.bind_address = value;
+                }
+                else if (key == "port")
+                {
+                    config.global.metrics.port = std::stoi(value);
+                }
+                else if (key == "endpoint_path")
+                {
+                    if (value.front() == '"' && value.back() == '"')
+                    {
+                        value = value.substr(1, value.length() - 2);
+                    }
+                    config.global.metrics.endpoint_path = value;
                 }
             }
         }

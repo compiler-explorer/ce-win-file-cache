@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../types/config.hpp"
+#include "metrics_collector.hpp"
 #include <mutex>
 #include <optional>
 #include <string>

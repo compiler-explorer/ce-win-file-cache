@@ -4,6 +4,9 @@ project(CeWinFileCacheFS VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Option to enable Prometheus metrics
+option(ENABLE_METRICS "Enable Prometheus metrics collection" ON)
+
 # Option to use Wine's Windows API implementation for cross-compilation
 option(USE_WINE_WINDOWS_API "Use Wine's Windows API implementation for cross-compilation" OFF)
 
@@ -131,6 +134,43 @@ if(WIN32 OR USE_WINE_WINDOWS_API)
     message(STATUS "WinFsp library: ${WINFSP_LIBRARY}")
 endif()
 
+# Prometheus metrics support
+if(ENABLE_METRICS)
+    # First try to find system-installed prometheus-cpp
+    find_package(prometheus-cpp CONFIG QUIET)
+    if(prometheus-cpp_FOUND)
+        message(STATUS "Found system prometheus-cpp, enabling metrics support")
+        set(HAVE_PROMETHEUS TRUE)
+    else()
+        message(STATUS "System prometheus-cpp not found, downloading via FetchContent...")
+        
+        include(FetchContent)
+        
+        # Download and build prometheus-cpp
+        FetchContent_Declare(
+            prometheus-cpp
+            GIT_REPOSITORY https://github.com/jupp0r/prometheus-cpp.git
+            GIT_TAG        v1.3.0  # Use a stable release
+            GIT_SHALLOW    TRUE
+        )
+        
+        # Configure prometheus-cpp options
+        set(ENABLE_PUSH OFF CACHE BOOL "" FORCE)  # We only need pull metrics
+        set(ENABLE_COMPRESSION OFF CACHE BOOL "" FORCE)  # Disable compression for simplicity
+        set(ENABLE_TESTING OFF CACHE BOOL "" FORCE)  # Don't build tests
+        set(USE_THIRDPARTY_LIBRARIES ON CACHE BOOL "" FORCE)  # Use bundled dependencies
+        set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)  # Build static libraries
+        
+        FetchContent_MakeAvailable(prometheus-cpp)
+        
+        message(STATUS "prometheus-cpp downloaded and configured successfully")
+        set(HAVE_PROMETHEUS TRUE)
+    endif()
+else()
+    message(STATUS "Metrics support disabled")
+    set(HAVE_PROMETHEUS FALSE)
+endif()
+
 # Include directories
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -152,9 +192,15 @@ set(SOURCES
     src/directory_tree.cpp
     src/directory_cache.cpp
     src/network_client.cpp
+    src/async_download_manager.cpp
     src/config_parser.cpp
     src/main.cpp
 )
+
+# Add metrics source if prometheus is available
+if(HAVE_PROMETHEUS)
+    list(APPEND SOURCES src/metrics_collector.cpp)
+endif()
 
 # Add Wine-specific stubs when using Wine
 if(USE_WINE_WINDOWS_API)
@@ -179,6 +225,11 @@ if((WIN32 OR USE_WINE_WINDOWS_API) AND TARGET ${PROJECT_NAME})
         WIN32_LEAN_AND_MEAN
     )
     
+    # Add Prometheus definitions if available
+    if(HAVE_PROMETHEUS)
+        target_compile_definitions(${PROJECT_NAME} PRIVATE HAVE_PROMETHEUS)
+    endif()
+    
     if(USE_WINE_WINDOWS_API)
         # Wine-specific settings
         if(WINE_LIBRARIES)
@@ -191,6 +242,14 @@ if((WIN32 OR USE_WINE_WINDOWS_API) AND TARGET ${PROJECT_NAME})
             target_link_libraries(${PROJECT_NAME} 
                 ${WINFSP_LIBRARY}
                 kernel32 user32 advapi32 netapi32 mpr shell32 shlwapi ole32 oleaut32
+            )
+        endif()
+        
+        # Add Prometheus libraries for Wine builds
+        if(HAVE_PROMETHEUS)
+            target_link_libraries(${PROJECT_NAME} 
+                prometheus-cpp::core 
+                prometheus-cpp::pull
             )
         endif()
         
@@ -225,6 +284,14 @@ if((WIN32 OR USE_WINE_WINDOWS_API) AND TARGET ${PROJECT_NAME})
             ole32.lib
             oleaut32.lib
         )
+        
+        # Add Prometheus libraries for native Windows builds
+        if(HAVE_PROMETHEUS)
+            target_link_libraries(${PROJECT_NAME} 
+                prometheus-cpp::core 
+                prometheus-cpp::pull
+            )
+        endif()
         
         # Enable strict warnings as per CLAUDE.md
         target_compile_options(${PROJECT_NAME} PRIVATE

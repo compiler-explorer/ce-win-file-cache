@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <locale>
+#include <chrono>
 
 namespace CeWinFileCache
 {
@@ -12,9 +13,16 @@ namespace CeWinFileCache
 std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstring &network_path)
 {
     std::vector<uint8_t> content;
+    auto start_time = std::chrono::high_resolution_clock::now();
 
     try
     {
+        // Record network operation attempt
+        if (auto* metrics = GlobalMetrics::instance())
+        {
+            metrics->recordNetworkOperation("file_read", false); // Mark as attempt initially
+        }
+
 #ifdef _WIN32
         std::ifstream file(network_path, std::ios::binary | std::ios::ate);
 #else
@@ -26,6 +34,13 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
         if (!file.is_open())
         {
             std::wcerr << L"Failed to open network file: " << network_path << std::endl;
+            // Record failed network operation
+            if (auto* metrics = GlobalMetrics::instance())
+            {
+                auto end_time = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration<double>(end_time - start_time).count();
+                metrics->recordNetworkLatency(duration);
+            }
             return content;
         }
 
@@ -38,11 +53,27 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
             std::wcerr << L"Failed to read network file: " << network_path << std::endl;
             content.clear();
         }
+        else
+        {
+            // Record successful network operation
+            if (auto* metrics = GlobalMetrics::instance())
+            {
+                metrics->recordNetworkOperation("file_read", true);
+            }
+        }
     }
     catch (const std::exception &e)
     {
         std::wcerr << L"Exception loading network file: " << network_path << L" - " << e.what() << std::endl;
         content.clear();
+    }
+
+    // Record network latency
+    if (auto* metrics = GlobalMetrics::instance())
+    {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration<double>(end_time - start_time).count();
+        metrics->recordNetworkLatency(duration);
     }
 
     return content;
@@ -61,9 +92,19 @@ std::optional<std::vector<uint8_t>> MemoryCacheManager::getMemoryCachedFile(cons
     auto it = memory_cache.find(virtual_path);
     if (it != memory_cache.end())
     {
+        // Record cache hit
+        if (auto* metrics = GlobalMetrics::instance())
+        {
+            metrics->recordCacheHit("read");
+        }
         return it->second;
     }
 
+    // Record cache miss
+    if (auto* metrics = GlobalMetrics::instance())
+    {
+        metrics->recordCacheMiss("read");
+    }
     return std::nullopt;
 }
 
@@ -71,6 +112,19 @@ void MemoryCacheManager::addFileToMemoryCache(const std::wstring &virtual_path, 
 {
     std::lock_guard<std::mutex> lock(cache_mutex);
     memory_cache[virtual_path] = content;
+    
+    // Update cache metrics
+    if (auto* metrics = GlobalMetrics::instance())
+    {
+        // Update cache size and entry count
+        size_t total_size = 0;
+        for (const auto &[path, file_content] : memory_cache)
+        {
+            total_size += file_content.size();
+        }
+        metrics->updateCacheSize(total_size);
+        metrics->updateCacheEntryCount(memory_cache.size());
+    }
 }
 
 std::vector<uint8_t> MemoryCacheManager::getFileContent(const std::wstring &virtual_path, const Config &config)
@@ -100,7 +154,20 @@ std::vector<uint8_t> MemoryCacheManager::getFileContent(const std::wstring &virt
 void MemoryCacheManager::clearCache()
 {
     std::lock_guard<std::mutex> lock(cache_mutex);
+    size_t cleared_entries = memory_cache.size();
     memory_cache.clear();
+    
+    // Update cache metrics after clearing
+    if (auto* metrics = GlobalMetrics::instance())
+    {
+        metrics->updateCacheSize(0);
+        metrics->updateCacheEntryCount(0);
+        // Record evictions (clearing counts as multiple evictions)
+        for (size_t i = 0; i < cleared_entries; ++i)
+        {
+            metrics->recordCacheEviction();
+        }
+    }
 }
 
 size_t MemoryCacheManager::getCacheSize() const
