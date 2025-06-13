@@ -198,9 +198,19 @@ The AsyncDownloadManager implements a thread pool pattern for asynchronous file 
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│ queue_condition.wait() blocks until:                │
-│ • !download_queue.empty() OR                        │
-│ • shutdown_requested == true                        │
+│ queue_condition.wait() operation:                  │
+│                                                     │
+│ 1. Atomically unlocks queue_mutex                  │
+│ 2. Blocks the thread                               │
+│ 3. When notified:                                  │
+│    - Re-acquires queue_mutex                       │
+│    - Checks predicate:                             │
+│      • !download_queue.empty() OR                  │
+│      • shutdown_requested == true                  │
+│    - If false, goes back to step 1                 │
+│    - If true, continues with mutex locked          │
+│                                                     │
+│ This atomic unlock/wait prevents deadlock!         │
 │                                                     │
 │ queue_condition.notify_one() wakes one worker      │
 │ queue_condition.notify_all() wakes all (shutdown)  │
