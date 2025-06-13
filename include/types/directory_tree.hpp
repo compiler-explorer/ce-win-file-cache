@@ -35,11 +35,9 @@ struct DirectoryNode
     DirectoryNode *parent;
 
     DirectoryNode(const std::wstring &node_name, NodeType node_type, DirectoryNode *parent_node = nullptr)
-    : name(node_name), type(node_type), file_size(0), file_attributes(0), parent(parent_node)
+    : name(node_name), type(node_type), file_size(0), 
+      creation_time{}, last_access_time{}, last_write_time{}, file_attributes(0), parent(parent_node)
     {
-        creation_time = {};
-        last_access_time = {};
-        last_write_time = {};
     }
 
     // Helper methods
@@ -71,9 +69,9 @@ struct DirectoryNode
     {
         std::vector<std::wstring> names;
         names.reserve(children.size());
-        for (const auto &[name, child] : children)
+        for (const auto &[child_name, child] : children)
         {
-            names.push_back(name);
+            names.push_back(child_name);
         }
         return names;
     }

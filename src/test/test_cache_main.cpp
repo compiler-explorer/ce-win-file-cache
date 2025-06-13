@@ -4,6 +4,7 @@
 #include "../../include/ce-win-file-cache/config_parser.hpp"
 #include "../../include/ce-win-file-cache/memory_cache_manager.hpp"
 #include "../../include/ce-win-file-cache/string_utils.hpp"
+#include "../../include/ce-win-file-cache/metrics_collector.hpp"
 #include <chrono>
 #include <iostream>
 
@@ -121,6 +122,16 @@ int main(int argc, char **argv)
     config.global.total_cache_size_mb = 1024;
     config.global.eviction_policy = L"lru";
 
+    // Initialize GlobalMetrics for this test
+    MetricsConfig metrics_config;
+    metrics_config.enabled = true;
+    metrics_config.bind_address = "127.0.0.1";
+    metrics_config.port = 8081; // Use different port to avoid conflicts
+    metrics_config.endpoint_path = "/metrics";
+    
+    GlobalMetrics::initialize(metrics_config);
+    std::cout << "Metrics initialized for cache test" << std::endl;
+
     // Add mock compiler configs
     CompilerConfig msvc_config;
     msvc_config.network_path = L"/mock/path/msvc";
@@ -132,5 +143,10 @@ int main(int argc, char **argv)
     ninja_config.cache_size_mb = 100;
     config.compilers[L"ninja"] = ninja_config;
 
-    return testCacheOperations(config);
+    int result = testCacheOperations(config);
+    
+    // Shutdown metrics
+    GlobalMetrics::shutdown();
+    
+    return result;
 }

@@ -15,7 +15,7 @@ namespace CeWinFileCache
 class CacheManager
 {
     public:
-    CacheManager(const GlobalConfig &config);
+    explicit CacheManager(const GlobalConfig &config);
     ~CacheManager();
 
     NTSTATUS initialize();
