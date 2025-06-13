@@ -1,11 +1,11 @@
 #include "../include/ce-win-file-cache/memory_cache_manager.hpp"
 #include <algorithm>
+#include <chrono>
 #include <codecvt>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <locale>
-#include <chrono>
 
 namespace CeWinFileCache
 {
@@ -18,7 +18,7 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
     try
     {
         // Record network operation attempt
-        if (auto* metrics = GlobalMetrics::instance())
+        if (auto *metrics = GlobalMetrics::instance())
         {
             metrics->recordNetworkOperation("file_read", false); // Mark as attempt initially
         }
@@ -35,7 +35,7 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
         {
             std::wcerr << L"Failed to open network file: " << network_path << std::endl;
             // Record failed network operation
-            if (auto* metrics = GlobalMetrics::instance())
+            if (auto *metrics = GlobalMetrics::instance())
             {
                 auto end_time = std::chrono::high_resolution_clock::now();
                 auto duration = std::chrono::duration<double>(end_time - start_time).count();
@@ -56,7 +56,7 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
         else
         {
             // Record successful network operation
-            if (auto* metrics = GlobalMetrics::instance())
+            if (auto *metrics = GlobalMetrics::instance())
             {
                 metrics->recordNetworkOperation("file_read", true);
             }
@@ -69,7 +69,7 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
     }
 
     // Record network latency
-    if (auto* metrics = GlobalMetrics::instance())
+    if (auto *metrics = GlobalMetrics::instance())
     {
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration<double>(end_time - start_time).count();
@@ -93,7 +93,7 @@ std::optional<std::vector<uint8_t>> MemoryCacheManager::getMemoryCachedFile(cons
     if (it != memory_cache.end())
     {
         // Record cache hit
-        if (auto* metrics = GlobalMetrics::instance())
+        if (auto *metrics = GlobalMetrics::instance())
         {
             metrics->recordCacheHit("read");
         }
@@ -101,7 +101,7 @@ std::optional<std::vector<uint8_t>> MemoryCacheManager::getMemoryCachedFile(cons
     }
 
     // Record cache miss
-    if (auto* metrics = GlobalMetrics::instance())
+    if (auto *metrics = GlobalMetrics::instance())
     {
         metrics->recordCacheMiss("read");
     }
@@ -112,9 +112,9 @@ void MemoryCacheManager::addFileToMemoryCache(const std::wstring &virtual_path, 
 {
     std::lock_guard<std::mutex> lock(cache_mutex);
     memory_cache[virtual_path] = content;
-    
+
     // Update cache metrics
-    if (auto* metrics = GlobalMetrics::instance())
+    if (auto *metrics = GlobalMetrics::instance())
     {
         // Update cache size and entry count
         size_t total_size = 0;
@@ -156,9 +156,9 @@ void MemoryCacheManager::clearCache()
     std::lock_guard<std::mutex> lock(cache_mutex);
     size_t cleared_entries = memory_cache.size();
     memory_cache.clear();
-    
+
     // Update cache metrics after clearing
-    if (auto* metrics = GlobalMetrics::instance())
+    if (auto *metrics = GlobalMetrics::instance())
     {
         metrics->updateCacheSize(0);
         metrics->updateCacheEntryCount(0);

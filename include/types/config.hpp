@@ -23,7 +23,7 @@ struct CompilerConfig
 
 struct MetricsConfig
 {
-    bool enabled = true;  // Enable metrics by default
+    bool enabled = true; // Enable metrics by default
     std::string bind_address = "127.0.0.1";
     int port = 8080;
     std::string endpoint_path = "/metrics";

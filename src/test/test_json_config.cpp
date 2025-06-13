@@ -10,7 +10,7 @@ int main()
 
     // Test 1: Parse JSON string
     std::cout << "\n1. Testing JSON string parsing..." << std::endl;
-    
+
     std::string test_json = R"({
         "compilers": {
             "test-compiler": {
@@ -38,11 +38,11 @@ int main()
     if (config.has_value())
     {
         std::cout << "  ✓ JSON parsing successful" << std::endl;
-        
+
         // Verify compiler config
         if (config->compilers.count(L"test-compiler") > 0)
         {
-            const auto& cc = config->compilers.at(L"test-compiler");
+            const auto &cc = config->compilers.at(L"test-compiler");
             std::wcout << L"  ✓ Compiler network_path: " << cc.network_path << std::endl;
             std::cout << "  ✓ Cache size: " << cc.cache_size_mb << " MB" << std::endl;
             std::cout << "  ✓ Cache patterns: " << cc.cache_always_patterns.size() << std::endl;
@@ -52,13 +52,13 @@ int main()
         {
             std::cout << "  ✗ Test compiler not found" << std::endl;
         }
-        
+
         // Verify global config
         std::cout << "  ✓ Global cache size: " << config->global.total_cache_size_mb << " MB" << std::endl;
         std::wcout << L"  ✓ Eviction policy: " << config->global.eviction_policy << std::endl;
         std::wcout << L"  ✓ Cache directory: " << config->global.cache_directory << std::endl;
         std::cout << "  ✓ Download threads: " << config->global.download_threads << std::endl;
-        
+
         // Verify metrics config
         std::cout << "  ✓ Metrics enabled: " << (config->global.metrics.enabled ? "true" : "false") << std::endl;
         std::cout << "  ✓ Metrics bind address: " << config->global.metrics.bind_address << std::endl;
@@ -73,18 +73,18 @@ int main()
 
     // Test 2: Parse main compilers.json file
     std::cout << "\n2. Testing compilers.json file parsing..." << std::endl;
-    
+
     auto file_config = ConfigParser::parseJsonFile(L"compilers.json");
     if (file_config.has_value())
     {
         std::cout << "  ✓ compilers.json parsing successful" << std::endl;
         std::cout << "  ✓ Found " << file_config->compilers.size() << " compilers" << std::endl;
-        
-        for (const auto& [name, compiler] : file_config->compilers)
+
+        for (const auto &[name, compiler] : file_config->compilers)
         {
             std::wcout << L"    - " << name << L" (" << compiler.cache_size_mb << L" MB)" << std::endl;
         }
-        
+
         std::cout << "  ✓ Global config loaded successfully" << std::endl;
         std::cout << "    Total cache: " << file_config->global.total_cache_size_mb << " MB" << std::endl;
         std::cout << "    Download threads: " << file_config->global.download_threads << std::endl;
@@ -97,7 +97,7 @@ int main()
 
     // Test 3: Error handling
     std::cout << "\n3. Testing error handling..." << std::endl;
-    
+
     std::string invalid_json = "{ invalid json }";
     auto error_config = ConfigParser::parseJsonString(invalid_json);
     if (!error_config.has_value())

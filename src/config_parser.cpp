@@ -33,7 +33,7 @@ std::optional<Config> ConfigParser::parseJsonString(std::string_view json_conten
         // Parse compilers section
         if (j.contains("compilers") && j["compilers"].is_object())
         {
-            for (const auto& [compiler_name, compiler_config] : j["compilers"].items())
+            for (const auto &[compiler_name, compiler_config] : j["compilers"].items())
             {
                 std::wstring wide_name(compiler_name.begin(), compiler_name.end());
                 CompilerConfig cc;
@@ -54,7 +54,7 @@ std::optional<Config> ConfigParser::parseJsonString(std::string_view json_conten
                 // Parse cache_always patterns
                 if (compiler_config.contains("cache_always") && compiler_config["cache_always"].is_array())
                 {
-                    for (const auto& pattern : compiler_config["cache_always"])
+                    for (const auto &pattern : compiler_config["cache_always"])
                     {
                         if (pattern.is_string())
                         {
@@ -67,7 +67,7 @@ std::optional<Config> ConfigParser::parseJsonString(std::string_view json_conten
                 // Parse prefetch_patterns
                 if (compiler_config.contains("prefetch_patterns") && compiler_config["prefetch_patterns"].is_array())
                 {
-                    for (const auto& pattern : compiler_config["prefetch_patterns"])
+                    for (const auto &pattern : compiler_config["prefetch_patterns"])
                     {
                         if (pattern.is_string())
                         {
@@ -84,7 +84,7 @@ std::optional<Config> ConfigParser::parseJsonString(std::string_view json_conten
         // Parse global section
         if (j.contains("global") && j["global"].is_object())
         {
-            const auto& global = j["global"];
+            const auto &global = j["global"];
 
             // Parse total_cache_size_mb
             if (global.contains("total_cache_size_mb") && global["total_cache_size_mb"].is_number())
@@ -115,7 +115,7 @@ std::optional<Config> ConfigParser::parseJsonString(std::string_view json_conten
             // Parse metrics section
             if (global.contains("metrics") && global["metrics"].is_object())
             {
-                const auto& metrics = global["metrics"];
+                const auto &metrics = global["metrics"];
 
                 if (metrics.contains("enabled") && metrics["enabled"].is_boolean())
                 {
@@ -155,12 +155,12 @@ std::optional<Config> ConfigParser::parseJsonString(std::string_view json_conten
 
         return config;
     }
-    catch (const nlohmann::json::exception& e)
+    catch (const nlohmann::json::exception &e)
     {
         std::cerr << "JSON parsing error: " << e.what() << std::endl;
         return std::nullopt;
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cerr << "Configuration parsing error: " << e.what() << std::endl;
         return std::nullopt;

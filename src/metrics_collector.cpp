@@ -7,8 +7,8 @@
 namespace CeWinFileCache
 {
 
-MetricsCollector::MetricsCollector(const MetricsConfig& config)
-    : implementation(std::make_unique<PrometheusMetricsImpl>(config))
+MetricsCollector::MetricsCollector(const MetricsConfig &config)
+: implementation(std::make_unique<PrometheusMetricsImpl>(config))
 {
 }
 
@@ -144,7 +144,7 @@ std::string MetricsCollector::getMetricsUrl() const
 // Global metrics singleton implementation
 std::unique_ptr<MetricsCollector> GlobalMetrics::metrics_instance = nullptr;
 
-void GlobalMetrics::initialize(const MetricsConfig& config)
+void GlobalMetrics::initialize(const MetricsConfig &config)
 {
     if (config.enabled)
     {
@@ -153,7 +153,7 @@ void GlobalMetrics::initialize(const MetricsConfig& config)
             metrics_instance = std::make_unique<MetricsCollector>(config);
             std::cout << "Global metrics initialized: " << metrics_instance->getMetricsUrl() << std::endl;
         }
-        catch (const std::exception& e)
+        catch (const std::exception &e)
         {
             std::cerr << "Failed to initialize global metrics: " << e.what() << std::endl;
             metrics_instance = nullptr;
@@ -174,7 +174,7 @@ void GlobalMetrics::shutdown()
     }
 }
 
-MetricsCollector* GlobalMetrics::instance()
+MetricsCollector *GlobalMetrics::instance()
 {
     return metrics_instance.get();
 }

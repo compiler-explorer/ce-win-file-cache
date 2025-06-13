@@ -1,7 +1,7 @@
 #include <ce-win-file-cache/hybrid_filesystem.hpp>
 #include <ce-win-file-cache/windows_compat.hpp>
-#include <iostream>
 #include <chrono>
+#include <iostream>
 
 #ifndef NO_WINFSP
 
@@ -25,7 +25,7 @@ HybridFileSystem::~HybridFileSystem()
 NTSTATUS HybridFileSystem::Initialize(const Config &config)
 {
     this->config = config;
-    
+
     // Initialize global metrics if enabled
     if (config.global.metrics.enabled)
     {
@@ -157,9 +157,9 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
 {
     auto start_time = std::chrono::high_resolution_clock::now();
     std::wstring virtual_path(FileName);
-    
+
     // Record filesystem operation
-    if (auto* metrics = GlobalMetrics::instance())
+    if (auto *metrics = GlobalMetrics::instance())
     {
         metrics->recordFilesystemOperation("open");
     }
@@ -267,9 +267,9 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     entry->last_write_time = file_info.ftLastWriteTime;
 
     updateAccessTime(entry);
-    
+
     // Record file open duration
-    if (auto* metrics = GlobalMetrics::instance())
+    if (auto *metrics = GlobalMetrics::instance())
     {
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration<double>(end_time - start_time).count();
@@ -288,9 +288,9 @@ VOID HybridFileSystem::Close(PVOID FileNode, PVOID FileDesc)
 NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UINT64 Offset, ULONG Length, PULONG PBytesTransferred)
 {
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
-    
+
     // Record filesystem operation
-    if (auto* metrics = GlobalMetrics::instance())
+    if (auto *metrics = GlobalMetrics::instance())
     {
         metrics->recordFilesystemOperation("read");
     }

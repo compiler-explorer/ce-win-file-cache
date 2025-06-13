@@ -14,15 +14,15 @@ namespace CeWinFileCache
 
 class MetricsCollector
 {
-public:
-    explicit MetricsCollector(const MetricsConfig& config);
+    public:
+    explicit MetricsCollector(const MetricsConfig &config);
     ~MetricsCollector() = default;
 
     // Disable copy/move for simplicity
-    MetricsCollector(const MetricsCollector&) = delete;
-    MetricsCollector& operator=(const MetricsCollector&) = delete;
-    MetricsCollector(MetricsCollector&&) = delete;
-    MetricsCollector& operator=(MetricsCollector&&) = delete;
+    MetricsCollector(const MetricsCollector &) = delete;
+    MetricsCollector &operator=(const MetricsCollector &) = delete;
+    MetricsCollector(MetricsCollector &&) = delete;
+    MetricsCollector &operator=(MetricsCollector &&) = delete;
 
     // Cache metrics
     void recordCacheHit(std::string_view operation = "read");
@@ -50,7 +50,7 @@ public:
     // Get metrics endpoint URL
     std::string getMetricsUrl() const;
 
-private:
+    private:
     std::unique_ptr<PrometheusMetricsImpl> implementation;
 };
 
@@ -58,9 +58,9 @@ private:
 class GlobalMetrics
 {
     public:
-    static void initialize(const MetricsConfig& config);
+    static void initialize(const MetricsConfig &config);
     static void shutdown();
-    static MetricsCollector* instance();
+    static MetricsCollector *instance();
 
     private:
     static std::unique_ptr<MetricsCollector> metrics_instance;
@@ -79,38 +79,80 @@ namespace CeWinFileCache
 class MetricsCollector
 {
     public:
-    explicit MetricsCollector(const MetricsConfig&) {}
+    explicit MetricsCollector(const MetricsConfig &)
+    {
+    }
     ~MetricsCollector() = default;
 
     // Stub methods - no-op when metrics disabled
-    void recordCacheHit(std::string_view = "read") {}
-    void recordCacheMiss(std::string_view = "read") {}
-    void updateCacheSize(size_t) {}
-    void updateCacheEntryCount(size_t) {}
-    void recordCacheEviction() {}
+    void recordCacheHit(std::string_view = "read")
+    {
+    }
+    void recordCacheMiss(std::string_view = "read")
+    {
+    }
+    void updateCacheSize(size_t)
+    {
+    }
+    void updateCacheEntryCount(size_t)
+    {
+    }
+    void recordCacheEviction()
+    {
+    }
 
-    void recordDownloadQueued() {}
-    void recordDownloadStarted() {}
-    void recordDownloadCompleted(double) {}
-    void recordDownloadFailed(std::string_view = "unknown") {}
-    void updateActiveDownloads(size_t) {}
-    void updatePendingDownloads(size_t) {}
+    void recordDownloadQueued()
+    {
+    }
+    void recordDownloadStarted()
+    {
+    }
+    void recordDownloadCompleted(double)
+    {
+    }
+    void recordDownloadFailed(std::string_view = "unknown")
+    {
+    }
+    void updateActiveDownloads(size_t)
+    {
+    }
+    void updatePendingDownloads(size_t)
+    {
+    }
 
-    void recordFilesystemOperation(std::string_view) {}
-    void recordFileOpenDuration(double) {}
+    void recordFilesystemOperation(std::string_view)
+    {
+    }
+    void recordFileOpenDuration(double)
+    {
+    }
 
-    void recordNetworkOperation(std::string_view, bool) {}
-    void recordNetworkLatency(double) {}
+    void recordNetworkOperation(std::string_view, bool)
+    {
+    }
+    void recordNetworkLatency(double)
+    {
+    }
 
-    std::string getMetricsUrl() const { return "metrics disabled"; }
+    std::string getMetricsUrl() const
+    {
+        return "metrics disabled";
+    }
 };
 
 class GlobalMetrics
 {
     public:
-    static void initialize(const MetricsConfig&) {}
-    static void shutdown() {}
-    static MetricsCollector* instance() { return nullptr; }
+    static void initialize(const MetricsConfig &)
+    {
+    }
+    static void shutdown()
+    {
+    }
+    static MetricsCollector *instance()
+    {
+        return nullptr;
+    }
 };
 
 } // namespace CeWinFileCache

@@ -18,7 +18,7 @@
 using namespace CeWinFileCache;
 
 // Helper function to load config file (JSON only)
-std::optional<Config> loadConfigFile(const std::wstring& config_file)
+std::optional<Config> loadConfigFile(const std::wstring &config_file)
 {
     return ConfigParser::parseJsonFile(config_file);
 }
