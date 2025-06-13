@@ -1,4 +1,5 @@
 #include <ce-win-file-cache/hybrid_filesystem.hpp>
+#include <ce-win-file-cache/glob_matcher.hpp>
 #include <ce-win-file-cache/windows_compat.hpp>
 #include <chrono>
 #include <iostream>
@@ -593,8 +594,7 @@ NTSTATUS HybridFileSystem::fetchFromNetwork(CacheEntry *entry)
 
 bool HybridFileSystem::matchesPattern(const std::wstring &path, const std::wstring &pattern)
 {
-    // Simple pattern matching - todo: implement proper glob matching
-    return path.find(pattern) != std::wstring::npos;
+    return GlobMatcher::matches(path, pattern);
 }
 
 CachePolicy HybridFileSystem::determineCachePolicy(const std::wstring &virtual_path)

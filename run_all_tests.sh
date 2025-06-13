@@ -180,6 +180,26 @@ run_test "config_async_test" ""
 run_test "single_thread_test" ""
 run_test "edge_cases_test" ""
 run_test "metrics_test" ""
+run_test "glob_test" ""
+run_test "glob_matcher_unit_test" ""
+
+# Run CTest unit tests if available
+echo -e "${BLUE}--- Running CTest unit tests ---${NC}"
+cd "$BUILD_DIR"
+if command -v ctest &> /dev/null; then
+    if ctest --test-dir . -V; then
+        echo -e "${GREEN}✓ CTest unit tests PASSED${NC}"
+        ((PASSED++))
+    else
+        echo -e "${RED}✗ CTest unit tests FAILED${NC}"
+        ((FAILED++))
+        FAILED_TESTS="$FAILED_TESTS\n  - CTest unit tests"
+    fi
+else
+    echo -e "${YELLOW}⚠ CTest not available, skipping unit tests${NC}"
+fi
+cd "$PROJECT_ROOT"
+echo
 
 # Step 5: Summary
 echo -e "${YELLOW}=== Test Summary ===${NC}"

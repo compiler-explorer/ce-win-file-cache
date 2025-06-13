@@ -1,5 +1,9 @@
 # Test programs CMakeLists.txt
 
+# Enable testing
+enable_testing()
+include(CTest)
+
 # Test program sources and targets
 set(TEST_PROGRAMS
     cache_test
@@ -13,6 +17,7 @@ set(TEST_PROGRAMS
     edge_cases_test
     metrics_test
     json_config_test
+    glob_test
 )
 
 # Define test program configurations
@@ -27,6 +32,7 @@ set(single_thread_test_SOURCES test_single_thread.cpp ../async_download_manager.
 set(edge_cases_test_SOURCES test_edge_cases.cpp ../async_download_manager.cpp ../memory_cache_manager.cpp ../config_parser.cpp)
 set(metrics_test_SOURCES test_metrics.cpp ../config_parser.cpp)
 set(json_config_test_SOURCES test_json_config.cpp ../config_parser.cpp)
+set(glob_test_SOURCES glob_test.cpp ../glob_matcher.cpp)
 
 # Create all test executables
 foreach(TEST_PROGRAM ${TEST_PROGRAMS})
@@ -72,5 +78,33 @@ foreach(TEST_PROGRAM ${TEST_PROGRAMS})
         target_compile_options(${TEST_PROGRAM} PRIVATE -Wall -Wextra)
     endif()
 endforeach()
+
+# Catch2 unit tests
+add_executable(glob_matcher_unit_test 
+    glob_matcher_test.cpp 
+    ../glob_matcher.cpp
+)
+
+target_compile_definitions(glob_matcher_unit_test PRIVATE NO_WINFSP)
+target_link_libraries(glob_matcher_unit_test PRIVATE Catch2::Catch2WithMain)
+target_include_directories(glob_matcher_unit_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include
+)
+
+set_target_properties(glob_matcher_unit_test PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+
+# Register the test with CTest
+add_test(NAME GlobMatcherTests COMMAND glob_matcher_unit_test)
+
+# Enable test discovery for better integration with IDEs
+if(TARGET Catch2)
+    list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
+    include(Catch)
+    catch_discover_tests(glob_matcher_unit_test)
+endif()
 
 message(STATUS "Test programs will be built in: ${CMAKE_BINARY_DIR}/bin")

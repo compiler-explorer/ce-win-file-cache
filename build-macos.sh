@@ -32,6 +32,7 @@ cmake .. \
     -DCMAKE_CXX_FLAGS="-DNO_WINFSP -std=c++20" \
     -DUSE_WINE_WINDOWS_API=OFF \
     -DBUILD_CACHE_TEST=ON \
+    -DENABLE_METRICS=ON \
     -G "Unix Makefiles"
 
 # Build
@@ -53,6 +54,14 @@ echo -e "${YELLOW}Binaries location: $BUILD_DIR/bin/${NC}"
 echo ""
 echo "Available binaries:"
 echo "  - cache_test: Memory cache manager test program"
+echo "  - glob_test: Glob pattern matching test program"
+echo "  - glob_matcher_unit_test: Catch2 unit tests for glob matcher"
+echo "  - Other test programs: async_test, directory_test, metrics_test, etc."
 echo ""
-echo "Run cache test with:"
+echo "Run tests with:"
 echo "  ./$BUILD_DIR/bin/cache_test --test-cache"
+echo "  ./$BUILD_DIR/bin/glob_matcher_unit_test"
+echo "  cd $BUILD_DIR && ctest -V"
+echo ""
+echo "Or run all tests with:"
+echo "  ./run_all_tests.sh"

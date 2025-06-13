@@ -145,12 +145,26 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
 )
 
+# Catch2 for unit testing
+FetchContent_Declare(
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG        v3.8.1
+    GIT_SHALLOW    TRUE
+)
+
 # Configure nlohmann/json options
 set(JSON_BuildTests OFF CACHE INTERNAL "")  # Don't build tests
 set(JSON_Install OFF CACHE INTERNAL "")  # Don't install (we're using FetchContent)
 
-FetchContent_MakeAvailable(nlohmann_json)
+# Configure Catch2 options
+set(CATCH_BUILD_TESTING OFF CACHE INTERNAL "")  # Don't build Catch2's own tests
+set(CATCH_INSTALL_DOCS OFF CACHE INTERNAL "")  # Don't install docs
+set(CATCH_INSTALL_EXTRAS OFF CACHE INTERNAL "")  # Don't install extras
+
+FetchContent_MakeAvailable(nlohmann_json Catch2)
 message(STATUS "nlohmann/json downloaded and configured successfully")
+message(STATUS "Catch2 downloaded and configured successfully")
 
 # Prometheus metrics support
 if(ENABLE_METRICS)
@@ -210,6 +224,7 @@ set(SOURCES
     src/network_client.cpp
     src/async_download_manager.cpp
     src/config_parser.cpp
+    src/glob_matcher.cpp
     src/main.cpp
 )
 
