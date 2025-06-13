@@ -264,7 +264,7 @@ After successful build, test the functionality:
 ```
 
 Available test modes:
-- `--test-config`: Test YAML configuration parsing
+- `--test-config`: Test JSON configuration parsing
 - `--test-paths`: Test virtual path to network path resolution  
 - `--test-network`: Test network path mapping validation
 - `--test`: Run all tests
@@ -297,7 +297,7 @@ rm -rf build-msvc && ./build-msvc.sh
 ## Current Implementation Status
 
 ### ✅ Completed (Fully Implemented & Tested)
-- **YAML Configuration Parsing**: Fixed regex issues, handles compiler names with hyphens correctly
+- **JSON Configuration Parsing**: Modern nlohmann/json library for clean, type-safe parsing
 - **Path Resolution (TODO #3)**: Virtual paths like `/msvc-14.40/bin/cl.exe` → network UNC paths
 - **Network Path Mapping (TODO #4)**: Complete validation of path mapping with test cases
 - **Build System**: Native Windows build with MSVC, WSL cross-compilation, environment setup, macOS test runner
@@ -321,10 +321,11 @@ rm -rf build-msvc && ./build-msvc.sh
 3. **Current setup**: `build-msvc.bat` for Windows, `build-msvc.sh` for WSL
 4. **Key insight**: Windows paths must be used consistently, no `/mnt/d` mixing
 
-### YAML Parsing Challenges
-- **Issue**: Regex patterns `^\s+` didn't handle specific whitespace (2 spaces for compilers, 4 for properties)
-- **Solution**: Use original line for regex matching, trimmed line for empty/comment detection
-- **Lesson**: Always test parsing with real data early in development
+### Configuration Format Migration (YAML → JSON)
+- **Issue**: Custom YAML parser was complex and error-prone (~200 lines of regex-based parsing)
+- **Solution**: Migrated to nlohmann/json with automatic format detection (JSON preferred, YAML legacy)
+- **Benefits**: Better type safety, faster parsing, smaller footprint, standard format
+- **Lesson**: Using well-maintained libraries reduces maintenance burden and improves reliability
 
 ### Metrics Implementation Evolution
 - **Initial approach**: Pimpl pattern to hide prometheus-cpp dependencies
@@ -362,7 +363,7 @@ These files can be safely removed as they represent outdated build approaches:
 
 ### File Organization Insights
 - **Current active files**: `build-msvc.bat`, `build-msvc.sh`, `msvc-toolchain.cmake`, `run_all_tests.sh`
-- **Config format**: YAML with escaped backslashes for Windows UNC paths
+- **Config format**: JSON with escaped backslashes for Windows UNC paths (YAML legacy support)
 - **Build outputs**: Always in `build-msvc/` directory with proper DLL/config copying
 - **Test infrastructure**: Comprehensive test suite with automated runner for macOS development
 
@@ -391,11 +392,56 @@ The test runner executes 10 comprehensive test programs:
 3. **directory_test** - Directory tree caching and navigation
 4. **async_test** - Async download manager with stress testing and metrics
 5. **filesystem_async_test** - Filesystem integration simulation
-6. **config_threads_test** - YAML configuration loading and validation
+6. **config_threads_test** - JSON configuration loading and validation
 7. **config_async_test** - Async manager configuration validation
 8. **single_thread_test** - Single-threaded operation edge cases
 9. **edge_cases_test** - Edge case handling (0 threads, large counts, rapid operations)
 10. **metrics_test** - Prometheus metrics collection with dynamic labels
+11. **json_config_test** - JSON configuration parser validation
+
+### JSON Configuration Format
+
+The project uses JSON as the primary configuration format (with legacy YAML support). Example `compilers.json`:
+
+```json
+{
+  "compilers": {
+    "msvc-14.40": {
+      "network_path": "\\\\127.0.0.1\\efs\\compilers\\msvc\\14.40.33807-14.40.33811.0",
+      "cache_size_mb": 2048,
+      "cache_always": [
+        "bin/Hostx64/x64/*.exe",
+        "bin/Hostx64/x64/*.dll",
+        "include/**/*.h",
+        "lib/x64/*.lib"
+      ],
+      "prefetch_patterns": [
+        "include/**/*.h",
+        "include/**/*.hpp"
+      ]
+    }
+  },
+  "global": {
+    "total_cache_size_mb": 8192,
+    "eviction_policy": "lru",
+    "cache_directory": "D:\\\\CompilerCache",
+    "download_threads": 6,
+    "metrics": {
+      "enabled": true,
+      "bind_address": "127.0.0.1",
+      "port": 8080,
+      "endpoint_path": "/metrics"
+    }
+  }
+}
+```
+
+**Key Features:**
+- **Auto-detection**: File extension determines format (`.json` vs `.yaml`)
+- **Type safety**: Native JSON types (numbers, booleans, arrays)
+- **Better error messages**: nlohmann/json provides detailed parse error locations
+- **Standards compliance**: JSON is widely supported across tools and platforms
+- **Legacy support**: YAML files still work for backward compatibility
 
 ### Key Testing Features
 

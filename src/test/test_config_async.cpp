@@ -10,11 +10,11 @@ int main()
 {
     std::cout << "=== Async Download Manager Configuration Test ===" << std::endl;
 
-    // Load config from YAML
-    auto config_opt = ConfigParser::parseYamlFile(L"compilers.yaml");
+    // Load config from JSON
+    auto config_opt = ConfigParser::parseJsonFile(L"compilers.json");
     if (!config_opt.has_value())
     {
-        std::cout << "Error loading config from compilers.yaml" << std::endl;
+        std::cout << "Error loading config from compilers.json" << std::endl;
         return 1;
     }
 
@@ -31,6 +31,6 @@ int main()
     std::cout << "Active downloads: " << download_manager.getActiveCount() << std::endl;
     std::cout << "Pending downloads: " << download_manager.getPendingCount() << std::endl;
 
-    std::cout << "\n✓ AsyncDownloadManager configured successfully with thread count from YAML!" << std::endl;
+    std::cout << "\n✓ AsyncDownloadManager configured successfully with thread count from JSON!" << std::endl;
     return 0;
 }

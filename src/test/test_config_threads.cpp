@@ -12,12 +12,12 @@ int main()
     Config default_config;
     std::cout << "Default download_threads: " << default_config.global.download_threads << std::endl;
 
-    // Test 2: Load from YAML and check if download_threads is parsed
-    auto config_opt = ConfigParser::parseYamlFile(L"compilers.yaml");
+    // Test 2: Load from JSON and check if download_threads is parsed
+    auto config_opt = ConfigParser::parseJsonFile(L"compilers.json");
     if (config_opt.has_value())
     {
         const Config &config = config_opt.value();
-        std::cout << "Loaded download_threads from compilers.yaml: " << config.global.download_threads << std::endl;
+        std::cout << "Loaded download_threads from compilers.json: " << config.global.download_threads << std::endl;
         std::cout << "Other global settings:" << std::endl;
         std::cout << "  total_cache_size_mb: " << config.global.total_cache_size_mb << std::endl;
         std::wcout << L"  eviction_policy: " << config.global.eviction_policy << std::endl;
@@ -25,37 +25,42 @@ int main()
     }
     else
     {
-        std::cout << "Error loading config from compilers.yaml" << std::endl;
+        std::cout << "Error loading config from compilers.json" << std::endl;
         return 1;
     }
 
     // Test 3: Create a test config with different thread count
     std::cout << "\nTesting custom thread count:" << std::endl;
-    std::ofstream test_file("test_threads.yaml");
-    test_file << "global:\n";
-    test_file << "  total_cache_size_mb: 1024\n";
-    test_file << "  eviction_policy: \"lru\"\n";
-    test_file << "  cache_directory: \"/tmp/cache\"\n";
-    test_file << "  download_threads: 8\n";
-    test_file << "\ncompilers:\n";
-    test_file << "  test-compiler:\n";
-    test_file << "    network_path: \"/test/path\"\n";
-    test_file << "    cache_size_mb: 100\n";
+    std::ofstream test_file("test_threads.json");
+    test_file << "{\n";
+    test_file << "  \"global\": {\n";
+    test_file << "    \"total_cache_size_mb\": 1024,\n";
+    test_file << "    \"eviction_policy\": \"lru\",\n";
+    test_file << "    \"cache_directory\": \"/tmp/cache\",\n";
+    test_file << "    \"download_threads\": 8\n";
+    test_file << "  },\n";
+    test_file << "  \"compilers\": {\n";
+    test_file << "    \"test-compiler\": {\n";
+    test_file << "      \"network_path\": \"/test/path\",\n";
+    test_file << "      \"cache_size_mb\": 100\n";
+    test_file << "    }\n";
+    test_file << "  }\n";
+    test_file << "}\n";
     test_file.close();
 
-    auto test_config_opt = ConfigParser::parseYamlFile(L"test_threads.yaml");
+    auto test_config_opt = ConfigParser::parseJsonFile(L"test_threads.json");
     if (test_config_opt.has_value())
     {
         const Config &test_config = test_config_opt.value();
         std::cout << "Custom config download_threads: " << test_config.global.download_threads << std::endl;
 
         // Cleanup
-        std::remove("test_threads.yaml");
+        std::remove("test_threads.json");
     }
     else
     {
-        std::cout << "Error loading test config from test_threads.yaml" << std::endl;
-        std::remove("test_threads.yaml");
+        std::cout << "Error loading test config from test_threads.json" << std::endl;
+        std::remove("test_threads.json");
         return 1;
     }
 

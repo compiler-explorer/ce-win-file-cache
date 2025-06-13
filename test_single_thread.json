@@ -1,0 +1,16 @@
+{
+  "global": {
+    "total_cache_size_mb": 1024,
+    "eviction_policy": "lru",
+    "cache_directory": "./cache",
+    "download_threads": 1
+  },
+  "compilers": {
+    "msvc-14.40": {
+      "network_path": "\\\\test-server\\msvc\\14.40",
+      "cache_size_mb": 512,
+      "cache_always": ["*.exe", "*.dll"],
+      "prefetch_patterns": ["*.h"]
+    }
+  }
+}

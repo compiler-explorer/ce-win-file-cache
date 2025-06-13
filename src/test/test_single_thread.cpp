@@ -41,7 +41,7 @@ int main()
     std::cout << "=== Single Thread Async Download Test ===" << std::endl;
 
     // Load config with single thread
-    auto config_opt = ConfigParser::parseYamlFile(L"test_single_thread.yaml");
+    auto config_opt = ConfigParser::parseJsonFile(L"test_single_thread.json");
     if (!config_opt.has_value())
     {
         std::cout << "Error loading config" << std::endl;

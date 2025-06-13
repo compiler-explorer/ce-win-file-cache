@@ -17,10 +17,39 @@
 
 using namespace CeWinFileCache;
 
+// Helper function to load config file (auto-detects JSON vs YAML)
+std::optional<Config> loadConfigFile(const std::wstring& config_file)
+{
+    // Convert to string for checking extension
+    std::string filename;
+    std::transform(config_file.begin(), config_file.end(), std::back_inserter(filename),
+                   [](wchar_t c) { return static_cast<char>(c); });
+    
+    // Check file extension to determine format
+    if (filename.ends_with(".json"))
+    {
+        return ConfigParser::parseJsonFile(config_file);
+    }
+    else if (filename.ends_with(".yaml") || filename.ends_with(".yml"))
+    {
+        return ConfigParser::parseYamlFile(config_file);
+    }
+    else
+    {
+        // Try JSON first (preferred format), then YAML as fallback
+        auto json_config = ConfigParser::parseJsonFile(config_file);
+        if (json_config.has_value())
+        {
+            return json_config;
+        }
+        return ConfigParser::parseYamlFile(config_file);
+    }
+}
+
 // Command line parsing structure
 struct ProgramOptions
 {
-    std::wstring config_file = L"compilers.yaml";
+    std::wstring config_file = L"compilers.json";
     std::wstring mount_point = L"M:";
     std::wstring volume_prefix;
     ULONG debug_flags = 0;
@@ -38,7 +67,7 @@ void printUsage()
     std::wcout << L"Usage: CeWinFileCacheFS [OPTIONS]\n"
                << L"\n"
                << L"Options:\n"
-               << L"  -c, --config FILE      Configuration file (default: compilers.yaml)\n"
+               << L"  -c, --config FILE      Configuration file (default: compilers.json)\n"
                << L"  -m, --mount POINT      Mount point (default: M:)\n"
                << L"  -u, --volume-prefix    Volume prefix for UNC paths\n"
                << L"  -d, --debug [LEVEL]    Enable debug logging\n"
@@ -50,7 +79,7 @@ void printUsage()
                << L"  -h, --help             Show this help message\n"
                << L"\n"
                << L"Examples:\n"
-               << L"  CeWinFileCacheFS --config compilers.yaml --mount M:\n"
+               << L"  CeWinFileCacheFS --config compilers.json --mount M:\n"
                << L"  CeWinFileCacheFS --mount C:\\compilers --debug\n"
                << L"  CeWinFileCacheFS --test --config test.yaml\n"
                << std::endl;
@@ -401,7 +430,7 @@ int runTestMode(const ProgramOptions &options)
 
     // Load configuration
     std::wcout << L"Loading config from: " << options.config_file << std::endl;
-    auto config_opt = ConfigParser::parseYamlFile(options.config_file);
+    auto config_opt = loadConfigFile(options.config_file);
     if (!config_opt)
     {
         std::wcerr << L"Failed to load configuration from: " << options.config_file << std::endl;
@@ -466,7 +495,7 @@ class CompilerCacheService : public Fsp::Service
     NTSTATUS OnStart(ULONG argc, PWSTR *argv) override
     {
         // Load configuration
-        auto config_opt = ConfigParser::parseYamlFile(options_.config_file);
+        auto config_opt = loadConfigFile(options_.config_file);
         if (!config_opt)
         {
             std::wcerr << L"Failed to load configuration from: " << options_.config_file << std::endl;

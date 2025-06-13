@@ -1,0 +1,50 @@
+{
+  "compilers": {
+    "msvc-14.40": {
+      "network_path": "\\\\127.0.0.1\\efs\\compilers\\msvc\\14.40.33807-14.40.33811.0",
+      "cache_size_mb": 2048,
+      "cache_always": [
+        "bin/Hostx64/x64/*.exe",
+        "bin/Hostx64/x64/*.dll",
+        "include/**/*.h",
+        "lib/x64/*.lib"
+      ],
+      "prefetch_patterns": [
+        "include/**/*.h",
+        "include/**/*.hpp"
+      ]
+    },
+    "windows-kits-10": {
+      "network_path": "\\\\127.0.0.1\\efs\\compilers\\windows-kits-10",
+      "cache_size_mb": 1024,
+      "cache_always": [
+        "Include/**/*.h",
+        "Lib/**/*.lib",
+        "bin/**/*.exe"
+      ],
+      "prefetch_patterns": [
+        "Include/**/*.h"
+      ]
+    },
+    "ninja": {
+      "network_path": "\\\\127.0.0.1\\efs\\compilers\\ninja",
+      "cache_size_mb": 64,
+      "cache_always": [
+        "*.exe"
+      ],
+      "prefetch_patterns": []
+    }
+  },
+  "global": {
+    "total_cache_size_mb": 8192,
+    "eviction_policy": "lru",
+    "cache_directory": "D:\\\\CompilerCache",
+    "download_threads": 6,
+    "metrics": {
+      "enabled": true,
+      "bind_address": "127.0.0.1",
+      "port": 8080,
+      "endpoint_path": "/metrics"
+    }
+  }
+}

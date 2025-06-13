@@ -134,6 +134,24 @@ if(WIN32 OR USE_WINE_WINDOWS_API)
     message(STATUS "WinFsp library: ${WINFSP_LIBRARY}")
 endif()
 
+# Setup FetchContent for dependencies
+include(FetchContent)
+
+# nlohmann/json for configuration parsing
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG        v3.11.3  # Use latest stable release
+    GIT_SHALLOW    TRUE
+)
+
+# Configure nlohmann/json options
+set(JSON_BuildTests OFF CACHE INTERNAL "")  # Don't build tests
+set(JSON_Install OFF CACHE INTERNAL "")  # Don't install (we're using FetchContent)
+
+FetchContent_MakeAvailable(nlohmann_json)
+message(STATUS "nlohmann/json downloaded and configured successfully")
+
 # Prometheus metrics support
 if(ENABLE_METRICS)
     # First try to find system-installed prometheus-cpp
@@ -143,8 +161,6 @@ if(ENABLE_METRICS)
         set(HAVE_PROMETHEUS TRUE)
     else()
         message(STATUS "System prometheus-cpp not found, downloading via FetchContent...")
-        
-        include(FetchContent)
         
         # Download and build prometheus-cpp
         FetchContent_Declare(
@@ -236,12 +252,14 @@ if((WIN32 OR USE_WINE_WINDOWS_API) AND TARGET ${PROJECT_NAME})
             target_link_libraries(${PROJECT_NAME} 
                 ${WINFSP_LIBRARY}
                 ${WINE_LIBRARIES}
+                nlohmann_json::nlohmann_json
             )
         else()
             # Use target_link_libraries for proper ordering instead of LINK_FLAGS
             target_link_libraries(${PROJECT_NAME} 
                 ${WINFSP_LIBRARY}
                 kernel32 user32 advapi32 netapi32 mpr shell32 shlwapi ole32 oleaut32
+                nlohmann_json::nlohmann_json
             )
         endif()
         
@@ -283,6 +301,7 @@ if((WIN32 OR USE_WINE_WINDOWS_API) AND TARGET ${PROJECT_NAME})
             shlwapi.lib
             ole32.lib
             oleaut32.lib
+            nlohmann_json::nlohmann_json
         )
         
         # Add Prometheus libraries for native Windows builds

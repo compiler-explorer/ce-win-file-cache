@@ -146,24 +146,26 @@ run_test() {
 
 # Ensure config files exist
 echo -e "${YELLOW}Creating required config files...${NC}"
-if [[ ! -f "test_single_thread.yaml" ]]; then
-    cat > test_single_thread.yaml << 'EOF'
-global_settings:
-  total_cache_size_mb: 1024
-  eviction_policy: lru
-  cache_directory: ./cache
-  download_threads: 1
-
-compilers:
-  msvc-14.40:
-    display_name: "Microsoft Visual C++ 2022 v14.40"
-    network_path: "\\\\test-server\\msvc\\14.40"
-    version: "14.40.33807"
-    properties:
-      include_path: "\\\\test-server\\msvc\\14.40\\include"
-      lib_path: "\\\\test-server\\msvc\\14.40\\lib\\x64"
+if [[ ! -f "test_single_thread.json" ]]; then
+    cat > test_single_thread.json << 'EOF'
+{
+  "global": {
+    "total_cache_size_mb": 1024,
+    "eviction_policy": "lru",
+    "cache_directory": "./cache",
+    "download_threads": 1
+  },
+  "compilers": {
+    "msvc-14.40": {
+      "network_path": "\\\\test-server\\msvc\\14.40",
+      "cache_size_mb": 512,
+      "cache_always": ["*.exe", "*.dll"],
+      "prefetch_patterns": ["*.h"]
+    }
+  }
+}
 EOF
-    echo "  ✓ Created test_single_thread.yaml"
+    echo "  ✓ Created test_single_thread.json"
 fi
 echo
 

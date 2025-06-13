@@ -12,6 +12,7 @@ set(TEST_PROGRAMS
     single_thread_test
     edge_cases_test
     metrics_test
+    json_config_test
 )
 
 # Define test program configurations
@@ -25,6 +26,7 @@ set(config_async_test_SOURCES test_config_async.cpp ../async_download_manager.cp
 set(single_thread_test_SOURCES test_single_thread.cpp ../async_download_manager.cpp ../memory_cache_manager.cpp ../config_parser.cpp)
 set(edge_cases_test_SOURCES test_edge_cases.cpp ../async_download_manager.cpp ../memory_cache_manager.cpp ../config_parser.cpp)
 set(metrics_test_SOURCES test_metrics.cpp ../config_parser.cpp)
+set(json_config_test_SOURCES test_json_config.cpp ../config_parser.cpp)
 
 # Create all test executables
 foreach(TEST_PROGRAM ${TEST_PROGRAMS})
@@ -38,6 +40,9 @@ foreach(TEST_PROGRAM ${TEST_PROGRAMS})
     
     # Define NO_WINFSP for test programs
     target_compile_definitions(${TEST_PROGRAM} PRIVATE NO_WINFSP)
+    
+    # Link nlohmann_json for all test programs (config_parser.cpp dependency)
+    target_link_libraries(${TEST_PROGRAM} nlohmann_json::nlohmann_json)
     
     # Add Prometheus definitions and libraries for metrics_test
     if(TEST_PROGRAM STREQUAL "metrics_test")
