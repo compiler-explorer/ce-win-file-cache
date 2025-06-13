@@ -1,0 +1,182 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test-linux:
+    name: Test on Linux
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          ninja-build \
+          pkg-config \
+          libssl-dev \
+          zlib1g-dev
+    
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build-linux \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_CACHE_TEST=ON \
+          -DENABLE_METRICS=ON \
+          -G Ninja
+    
+    - name: Build
+      run: cmake --build build-linux --parallel
+    
+    - name: Run comprehensive test suite
+      run: |
+        # Use our existing test runner script
+        chmod +x run_all_tests.sh
+        ./run_all_tests.sh
+    
+
+  test-ubuntu-versions:
+    name: Test on Ubuntu ${{ matrix.ubuntu-version }}
+    runs-on: ubuntu-${{ matrix.ubuntu-version }}
+    strategy:
+      matrix:
+        ubuntu-version: [20.04, 22.04]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          ninja-build \
+          pkg-config \
+          libssl-dev \
+          zlib1g-dev
+    
+    - name: Check compiler versions
+      run: |
+        echo "=== Compiler Information ==="
+        gcc --version
+        g++ --version
+        cmake --version
+        ninja --version
+    
+    - name: Configure and Build
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_CACHE_TEST=ON \
+          -DENABLE_METRICS=ON \
+          -G Ninja
+        cmake --build build --parallel
+    
+    - name: Run test suite
+      run: |
+        # Use our existing test runner script
+        chmod +x run_all_tests.sh
+        ./run_all_tests.sh --quick
+
+  test-compilers:
+    name: Test with ${{ matrix.compiler }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler:
+          - { cc: gcc-10, cxx: g++-10 }
+          - { cc: gcc-11, cxx: g++-11 }
+          - { cc: clang-12, cxx: clang++-12 }
+          - { cc: clang-14, cxx: clang++-14 }
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install compiler
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          ${{ matrix.compiler.cc }} \
+          ${{ matrix.compiler.cxx }} \
+          cmake \
+          ninja-build \
+          pkg-config \
+          libssl-dev \
+          zlib1g-dev
+    
+    - name: Configure CMake
+      env:
+        CC: ${{ matrix.compiler.cc }}
+        CXX: ${{ matrix.compiler.cxx }}
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_CACHE_TEST=ON \
+          -DENABLE_METRICS=ON \
+          -G Ninja
+    
+    - name: Build
+      run: cmake --build build --parallel
+    
+    - name: Run unit tests
+      run: |
+        # Just run unit tests for compiler compatibility
+        chmod +x run_all_tests.sh
+        ./run_all_tests.sh --quick
+
+  test-build-configurations:
+    name: Test ${{ matrix.build-type }} build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build-type: [Debug, Release, RelWithDebInfo]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          ninja-build \
+          pkg-config \
+          libssl-dev \
+          zlib1g-dev
+    
+    - name: Configure and Build
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
+          -DBUILD_CACHE_TEST=ON \
+          -DENABLE_METRICS=ON \
+          -G Ninja
+        cmake --build build --parallel
+    
+    - name: Run smoke tests
+      run: |
+        # Run quick smoke tests
+        chmod +x run_all_tests.sh
+        ./run_all_tests.sh --quick

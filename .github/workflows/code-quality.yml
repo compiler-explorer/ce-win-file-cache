@@ -1,0 +1,206 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build-warnings:
+    name: Check for warnings
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          ninja-build \
+          pkg-config \
+          libssl-dev \
+          zlib1g-dev
+    
+    - name: Build with strict warnings
+      run: |
+        cmake -S . -B build-warnings \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DBUILD_CACHE_TEST=ON \
+          -DENABLE_METRICS=ON \
+          -DCMAKE_CXX_FLAGS="-Wall -Wextra -Werror -Wno-unused-parameter" \
+          -G Ninja
+        cmake --build build-warnings --parallel 2>&1 | tee build_output.log
+    
+    - name: Check for warnings
+      run: |
+        echo "=== Build Output Analysis ==="
+        
+        # Count warnings (should be 0)
+        WARNING_COUNT=$(grep -i "warning:" build_output.log | wc -l || echo "0")
+        ERROR_COUNT=$(grep -i "error:" build_output.log | wc -l || echo "0")
+        
+        echo "Warnings found: $WARNING_COUNT"
+        echo "Errors found: $ERROR_COUNT"
+        
+        if [ "$ERROR_COUNT" -gt 0 ]; then
+          echo "❌ Build errors found:"
+          grep -i "error:" build_output.log || true
+          exit 1
+        fi
+        
+        if [ "$WARNING_COUNT" -gt 0 ]; then
+          echo "⚠️ Build warnings found:"
+          grep -i "warning:" build_output.log || true
+          echo "Build should be warning-free!"
+          exit 1
+        fi
+        
+        echo "✅ Build completed without warnings or errors"
+    
+
+  static-analysis:
+    name: Static analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          ninja-build \
+          pkg-config \
+          libssl-dev \
+          zlib1g-dev \
+          cppcheck \
+          clang-tools
+    
+    - name: Run cppcheck
+      run: |
+        echo "=== Running cppcheck static analysis ==="
+        cppcheck \
+          --enable=all \
+          --inconclusive \
+          --std=c++20 \
+          --suppress=missingIncludeSystem \
+          --suppress=unusedFunction \
+          --suppress=unmatchedSuppression \
+          --error-exitcode=1 \
+          --verbose \
+          src/ include/ 2>&1 | tee cppcheck_results.txt
+        
+        echo "✅ cppcheck analysis completed"
+    
+    - name: Check include guards and formatting
+      run: |
+        echo "=== Checking header include guards ==="
+        
+        # Check that all .hpp files have #pragma once
+        MISSING_PRAGMA=$(find include/ -name "*.hpp" -exec grep -L "#pragma once" {} \; || true)
+        
+        if [ -n "$MISSING_PRAGMA" ]; then
+          echo "❌ Headers missing '#pragma once':"
+          echo "$MISSING_PRAGMA"
+          exit 1
+        fi
+        
+        echo "✅ All headers have proper include guards"
+        
+        echo "=== Checking for TODO comments ==="
+        TODO_COUNT=$(find src/ include/ -name "*.cpp" -o -name "*.hpp" | xargs grep -i "todo:" | wc -l || echo "0")
+        echo "TODO comments found: $TODO_COUNT"
+        
+        if [ "$TODO_COUNT" -gt 0 ]; then
+          echo "📝 TODO comments:"
+          find src/ include/ -name "*.cpp" -o -name "*.hpp" | xargs grep -n -i "todo:" || true
+        fi
+    
+
+  documentation-check:
+    name: Documentation validation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Check documentation completeness
+      run: |
+        echo "=== Documentation Validation ==="
+        
+        # Check that all .md files are valid
+        MARKDOWN_FILES=$(find . -name "*.md" -not -path "./.git/*" -not -path "./build*/*")
+        echo "Markdown files found:"
+        echo "$MARKDOWN_FILES"
+        
+        # Check for broken relative links (basic check)
+        echo "=== Checking for potential broken links ==="
+        for file in $MARKDOWN_FILES; do
+          echo "Checking $file..."
+          
+          # Look for [text](file.ext) patterns and check if files exist
+          LINKS=$(grep -oE '\[[^\]]*\]\([^)]*\)' "$file" | grep -oE '\([^)]*\)' | tr -d '()' | grep -E '\.(md|cpp|hpp|txt|json|yaml)$' || true)
+          
+          for link in $LINKS; do
+            # Skip URLs (http/https)
+            if [[ $link == http* ]]; then
+              continue
+            fi
+            
+            # Convert relative path to absolute
+            DIR=$(dirname "$file")
+            if [[ $link == /* ]]; then
+              FULL_PATH=".$link"
+            else
+              FULL_PATH="$DIR/$link"
+            fi
+            
+            if [ ! -f "$FULL_PATH" ]; then
+              echo "⚠️ Potential broken link in $file: $link -> $FULL_PATH"
+            fi
+          done
+        done
+        
+        echo "✅ Documentation validation completed"
+    
+    - name: Check configuration examples
+      run: |
+        echo "=== Validating JSON configuration examples ==="
+        
+        # Find JSON examples in documentation
+        JSON_EXAMPLES=$(grep -l "```json" *.md || true)
+        
+        for file in $JSON_EXAMPLES; do
+          echo "Checking JSON examples in $file..."
+          
+          # Extract JSON blocks and validate syntax
+          awk '/```json/,/```/ {if (!/```/) print}' "$file" > temp_config.json
+          
+          if [ -s temp_config.json ]; then
+            if python3 -m json.tool temp_config.json > /dev/null 2>&1; then
+              echo "✅ JSON syntax valid in $file"
+            else
+              echo "❌ Invalid JSON syntax in $file"
+              cat temp_config.json
+              rm -f temp_config.json
+              exit 1
+            fi
+          fi
+          
+          rm -f temp_config.json
+        done
+        
+        echo "✅ All JSON examples are valid"

@@ -1,5 +1,8 @@
 # CompilerCacheFS
 
+[![Tests](https://github.com/compiler-explorer/ce-win-file-cache/actions/workflows/test.yml/badge.svg)](https://github.com/compiler-explorer/ce-win-file-cache/actions/workflows/test.yml)
+[![Code Quality](https://github.com/compiler-explorer/ce-win-file-cache/actions/workflows/code-quality.yml/badge.svg)](https://github.com/compiler-explorer/ce-win-file-cache/actions/workflows/code-quality.yml)
+
 A WinFsp-based hybrid cache filesystem for Compiler Explorer, designed to efficiently serve multiple MSVC compiler versions by caching frequently-used files locally while falling back to network shares for less-critical files.
 
 ## Features
@@ -297,6 +300,15 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 3. Make your changes
 4. Add tests if applicable
 5. Submit a pull request
+
+### Continuous Integration
+
+The project includes comprehensive CI/CD workflows:
+
+- **Tests**: Runs comprehensive test suite on every push/PR with multiple Ubuntu versions and compilers
+- **Code Quality**: Static analysis, warning checks, and documentation validation
+
+All tests run on Linux without WinFsp or Wine dependencies, using the cross-platform test infrastructure.
 
 ## Monitoring and Metrics
 
