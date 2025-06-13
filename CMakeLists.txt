@@ -364,7 +364,9 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/cache)
 # ========================================
 option(BUILD_CACHE_TEST "Build the cache test program" OFF)
 
+# Enable testing support - must be done before add_subdirectory
 if(BUILD_CACHE_TEST OR APPLE)
+    enable_testing()
     message(STATUS "Building test programs")
     add_subdirectory(src/test)
 endif()
