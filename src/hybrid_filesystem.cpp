@@ -307,7 +307,7 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
 
             // Calculate actual bytes to transfer
             ULONG bytes_available = static_cast<ULONG>(content.size() - Offset);
-            ULONG bytes_to_read = min(Length, bytes_available);
+            ULONG bytes_to_read = std::min(Length, bytes_available);
 
             // Copy data directly from memory
             memcpy(Buffer, content.data() + Offset, bytes_to_read);
@@ -681,22 +681,20 @@ void HybridFileSystem::fillDirInfo(DirInfo *dir_info, DirectoryNode *node)
         return;
     }
 
-    // Copy filename (WinFsp expects wide char)
-    wcscpy_s(dir_info->FileName, sizeof(dir_info->FileName) / sizeof(WCHAR), node->name.c_str());
-
-    // Set file attributes
-    dir_info->FileAttributes = node->file_attributes;
-
-    // Set file size and allocation size
-    // Note: Member names may vary between WinFsp versions
-    // Try different possible member names for compatibility
-    if (node->isFile())
-    {
-        // Try to set file size using available members
-        // This is a compatibility workaround for different WinFsp versions
-        memset(((char*)dir_info) + sizeof(dir_info->FileAttributes), 0, 
-               sizeof(*dir_info) - sizeof(dir_info->FileAttributes) - sizeof(dir_info->FileName));
-    }
+    // Use WinFsp's FspFileSystemAddDirInfo function for compatibility
+    // This handles the different structure layouts between WinFsp versions
+    FileInfo file_info = {};
+    file_info.FileAttributes = node->file_attributes;
+    file_info.ReparseTag = 0;
+    file_info.FileSize = static_cast<UINT64>(node->file_size);
+    file_info.AllocationSize = (static_cast<UINT64>(node->file_size) + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
+    file_info.CreationTime = ((PLARGE_INTEGER)&node->creation_time)->QuadPart;
+    file_info.LastAccessTime = ((PLARGE_INTEGER)&node->last_access_time)->QuadPart;
+    file_info.LastWriteTime = ((PLARGE_INTEGER)&node->last_write_time)->QuadPart;
+    file_info.ChangeTime = ((PLARGE_INTEGER)&node->last_write_time)->QuadPart;
+    file_info.IndexNumber = 0;
+    
+    FspFileSystemAddDirInfo(dir_info, node->name.c_str(), &file_info);
 }
 
 NTSTATUS HybridFileSystem::evictIfNeeded()
