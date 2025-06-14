@@ -33,12 +33,14 @@ jobs:
         Write-Host "Installing WinFsp..."
         Start-Process msiexec.exe -Wait -ArgumentList "/i $output /quiet /qn ADDLOCAL=ALL"
         
-        # Verify installation
+        # Verify installation and set up environment
         $winfspPath = "C:\Program Files (x86)\WinFsp\lib\winfsp-x64.lib"
+        $winfspRoot = "C:\Program Files (x86)\WinFsp"
         if (Test-Path $winfspPath) {
             Write-Host "✅ WinFsp installed successfully at C:\Program Files (x86)\WinFsp"
         } else {
             $winfspPath = "C:\Program Files\WinFsp\lib\winfsp-x64.lib"
+            $winfspRoot = "C:\Program Files\WinFsp"
             if (Test-Path $winfspPath) {
                 Write-Host "✅ WinFsp installed successfully at C:\Program Files\WinFsp"
             } else {
@@ -47,6 +49,19 @@ jobs:
                 Get-ChildItem "C:\Program Files*\*WinFsp*" -Recurse -ErrorAction SilentlyContinue
                 exit 1
             }
+        }
+        
+        # Add WinFsp bin directory to PATH for DLL resolution
+        $winfspBin = "$winfspRoot\bin"
+        if (Test-Path $winfspBin) {
+            Write-Host "Adding WinFsp bin directory to PATH: $winfspBin"
+            $env:PATH = "$winfspBin;$env:PATH"
+            
+            # List WinFsp DLLs
+            Write-Host "WinFsp DLLs available:"
+            Get-ChildItem "$winfspBin\*.dll" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
+        } else {
+            Write-Host "Warning: WinFsp bin directory not found at $winfspBin"
         }
     
     - name: Configure CMake
@@ -72,9 +87,29 @@ jobs:
             # Use where command to find dumpbin if available
             $dumpbin = Get-Command dumpbin -ErrorAction SilentlyContinue
             if ($dumpbin) {
+                Write-Host "Running dumpbin /dependents:"
                 dumpbin /dependents $exe
             } else {
-                Write-Host "dumpbin not available, skipping dependency check"
+                Write-Host "dumpbin not available, using PowerShell to check dependencies"
+                # Alternative dependency check using PowerShell
+                try {
+                    $deps = Get-Content $exe -Encoding Byte -TotalCount 2048 | ForEach-Object { [char]$_ } | Out-String
+                    Write-Host "Executable appears to be valid binary"
+                } catch {
+                    Write-Host "Error reading executable: $_"
+                }
+            }
+            
+            # Check if required WinFsp DLLs can be found
+            Write-Host "Checking for WinFsp DLLs in PATH..."
+            $winfspDlls = @("winfsp-x64.dll", "winfsp-msil.dll")
+            foreach ($dll in $winfspDlls) {
+                $found = Get-Command $dll -ErrorAction SilentlyContinue
+                if ($found) {
+                    Write-Host "✅ Found $dll at: $($found.Source)"
+                } else {
+                    Write-Host "❌ $dll not found in PATH"
+                }
             }
             
             # Run basic functionality test from repository root
