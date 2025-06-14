@@ -3,6 +3,8 @@
 // Alphabetically-friendly Windows header that ensures windows.h comes first
 // This header solves clang-format alphabetization breaking Windows include order
 
+#ifdef _WIN32
+
 // Prevent Windows min/max macro conflicts with C++ STL
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -13,3 +15,5 @@
 
 // Include windows.h first to establish base Windows definitions
 #include <windows.h>
+
+#endif // _WIN32

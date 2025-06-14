@@ -34,6 +34,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release \
           -DBUILD_CACHE_TEST=ON \
           -DENABLE_METRICS=ON \
+          -DNO_WINFSP=ON \
           -G Ninja
     
     - name: Build

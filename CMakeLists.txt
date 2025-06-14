@@ -241,11 +241,11 @@ if(USE_WINE_WINDOWS_API)
 endif()
 
 # Only build main executable on Windows or with Wine
-if(NOT APPLE OR USE_WINE_WINDOWS_API)
+if((WIN32 OR USE_WINE_WINDOWS_API) AND NOT NO_WINFSP)
     # Create executable
     add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 else()
-    message(STATUS "Skipping main CeWinFileCacheFS target on macOS (use cache_test instead)")
+    message(STATUS "Skipping main CeWinFileCacheFS target on non-Windows platforms (use cache_test instead)")
 endif()
 
 # Windows-specific settings (native Windows or Wine)
