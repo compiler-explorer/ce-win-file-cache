@@ -239,6 +239,7 @@ set(SOURCES
     src/network_client.cpp
     src/async_download_manager.cpp
     src/config_parser.cpp
+    src/file_access_tracker.cpp
     src/glob_matcher.cpp
     src/string_utils.cpp
     src/main.cpp

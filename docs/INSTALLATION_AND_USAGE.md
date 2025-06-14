@@ -344,6 +344,78 @@ cache_miss_total{operation="file_read"} 456
 cache_size_bytes{compiler="msvc-14.40"} 2147483648
 ```
 
+## File Access Tracking and Reports
+
+CE Win File Cache can generate detailed reports about file access patterns to help optimize your configuration.
+
+### Configuring File Tracking
+
+Add the `file_tracking` section to your configuration:
+
+```json
+"global": {
+  "file_tracking": {
+    "enabled": true,
+    "report_directory": "D:\\CompilerCache\\reports",
+    "report_interval_minutes": 5,
+    "top_files_count": 100
+  }
+}
+```
+
+### Report Types
+
+CE Win File Cache generates two types of reports:
+
+#### 1. Detailed CSV Report (`file_access_YYYYMMDD_HHMMSS.csv`)
+
+Contains complete information about every tracked file:
+- Virtual and network paths
+- File size
+- Access count
+- Cache hit/miss statistics
+- Current cache state
+- Average access time
+- First and last access timestamps
+
+#### 2. Summary Report (`access_summary_YYYYMMDD_HHMMSS.txt`)
+
+Human-readable summary including:
+- Overall cache statistics
+- Top 100 most accessed files
+- Largest cached files
+- Files with slowest access times
+
+### Using Reports to Optimize
+
+Review the reports to:
+
+1. **Identify hot files**: Add frequently accessed files to `cache_always` patterns
+2. **Find large rarely-used files**: Consider excluding from cache
+3. **Detect slow access patterns**: May indicate network issues
+4. **Optimize cache size**: Based on actual usage patterns
+
+### Example Report Analysis
+
+```
+Top 10 Most Accessed Files
+--------------------------
+  1. /msvc-14.40/bin/Hostx64/x64/cl.exe (15,234 accesses)
+  2. /msvc-14.40/bin/Hostx64/x64/c1xx.dll (15,230 accesses)
+  3. /msvc-14.40/include/string (8,456 accesses)
+  4. /msvc-14.40/include/vector (7,892 accesses)
+```
+
+Based on this, you might update your configuration:
+```json
+"cache_always": [
+  "bin/Hostx64/x64/cl.exe",
+  "bin/Hostx64/x64/c1xx.dll",
+  "include/string",
+  "include/vector"
+]
+```
+
 ## Troubleshooting
 
 ### Common Issues

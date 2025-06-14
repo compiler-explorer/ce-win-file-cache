@@ -4,6 +4,7 @@
 #include "../types/config.hpp"
 #include "async_download_manager.hpp"
 #include "directory_cache.hpp"
+#include "file_access_tracker.hpp"
 #include "memory_cache_manager.hpp"
 #include "metrics_collector.hpp"
 #include "windows_compat.hpp"
@@ -69,6 +70,9 @@ class HybridFileSystem : public Fsp::FileSystemBase
 
     // Async download manager for non-blocking file fetching
     std::unique_ptr<AsyncDownloadManager> download_manager;
+
+    // File access tracking for usage reports
+    std::unique_ptr<FileAccessTracker> access_tracker;
 };
 
 struct FileDescriptor

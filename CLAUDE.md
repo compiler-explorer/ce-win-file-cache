@@ -49,6 +49,7 @@ if (condition)
 - Use inheritance for polymorphism (e.g., interface base classes)
 - Keep utility functions in `utils/`
 - Don't use "pimpl" as a technique to hide implementation, always add a properly named headers, sources and classes
+- **Do not use private structs inside classes, keep them outside of the class, and preferable in separate headers**
 
 ## Error Handling
 
@@ -234,4 +235,5 @@ public:
 ## Testing
 
 - Prefer writing unit tests for every new function unless there are good reasons not to
+```
 ```

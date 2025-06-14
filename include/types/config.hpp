@@ -29,6 +29,14 @@ struct MetricsConfig
     std::string endpoint_path = "/metrics";
 };
 
+struct FileTrackingConfig
+{
+    bool enabled = true;
+    std::wstring report_directory = L"./reports";
+    uint32_t report_interval_minutes = 5;
+    uint32_t top_files_count = 100;
+};
+
 struct GlobalConfig
 {
     size_t total_cache_size_mb;
@@ -36,6 +44,7 @@ struct GlobalConfig
     std::wstring cache_directory;
     size_t download_threads = 4; // Default to 4 threads
     MetricsConfig metrics; // Metrics configuration
+    FileTrackingConfig file_tracking; // File access tracking configuration
 };
 
 struct Config

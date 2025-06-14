@@ -10,6 +10,7 @@ int main()
 
     // Test 1: Default value
     Config default_config;
+    default_config.global.download_threads = 4; // Initialize with default value
     std::cout << "Default download_threads: " << default_config.global.download_threads << std::endl;
 
     // Test 2: Load from JSON and check if download_threads is parsed

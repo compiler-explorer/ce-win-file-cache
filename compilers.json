@@ -45,6 +45,12 @@
       "bind_address": "127.0.0.1",
       "port": 8080,
       "endpoint_path": "/metrics"
+    },
+    "file_tracking": {
+      "enabled": true,
+      "report_directory": "D:\\\\CompilerCache\\\\reports",
+      "report_interval_minutes": 5,
+      "top_files_count": 100
     }
   }
 }

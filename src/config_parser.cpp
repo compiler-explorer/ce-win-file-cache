@@ -158,6 +158,33 @@ std::optional<Config> ConfigParser::parseJsonString(std::string_view json_conten
                     config.global.metrics.endpoint_path = metrics["endpoint_path"];
                 }
             }
+            
+            // Parse file tracking configuration
+            if (global.contains("file_tracking") && global["file_tracking"].is_object())
+            {
+                const auto &tracking = global["file_tracking"];
+
+                if (tracking.contains("enabled") && tracking["enabled"].is_boolean())
+                {
+                    config.global.file_tracking.enabled = tracking["enabled"];
+                }
+
+                if (tracking.contains("report_directory") && tracking["report_directory"].is_string())
+                {
+                    std::string report_dir = tracking["report_directory"];
+                    config.global.file_tracking.report_directory = std::wstring(report_dir.begin(), report_dir.end());
+                }
+
+                if (tracking.contains("report_interval_minutes") && tracking["report_interval_minutes"].is_number())
+                {
+                    config.global.file_tracking.report_interval_minutes = tracking["report_interval_minutes"];
+                }
+
+                if (tracking.contains("top_files_count") && tracking["top_files_count"].is_number())
+                {
+                    config.global.file_tracking.top_files_count = tracking["top_files_count"];
+                }
+            }
         }
 
         // Set defaults if not specified

@@ -18,6 +18,7 @@ set(TEST_PROGRAMS
     metrics_test
     json_config_test
     glob_test
+    file_access_tracker_test
 )
 
 # Define test program configurations
@@ -33,6 +34,7 @@ set(edge_cases_test_SOURCES test_edge_cases.cpp ../async_download_manager.cpp ..
 set(metrics_test_SOURCES test_metrics.cpp ../config_parser.cpp ../metrics_collector.cpp ../prometheus_metrics_impl.cpp)
 set(json_config_test_SOURCES test_json_config.cpp ../config_parser.cpp)
 set(glob_test_SOURCES glob_test.cpp ../glob_matcher.cpp)
+set(file_access_tracker_test_SOURCES test_file_access_tracker.cpp ../file_access_tracker.cpp)
 
 # Create all test executables
 foreach(TEST_PROGRAM ${TEST_PROGRAMS})
