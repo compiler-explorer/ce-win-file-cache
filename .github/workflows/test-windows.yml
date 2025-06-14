@@ -57,11 +57,17 @@ jobs:
             Write-Host "Adding WinFsp bin directory to PATH: $winfspBin"
             $env:PATH = "$winfspBin;$env:PATH"
             
+            # Make PATH change persistent for the workflow
+            Write-Host "##vso[task.setvariable variable=PATH]$env:PATH"
+            echo "$winfspBin" >> $env:GITHUB_PATH
+            
             # List WinFsp DLLs
             Write-Host "WinFsp DLLs available:"
             Get-ChildItem "$winfspBin\*.dll" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
         } else {
             Write-Host "Warning: WinFsp bin directory not found at $winfspBin"
+            Write-Host "Contents of WinFsp root directory:"
+            Get-ChildItem "$winfspRoot" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
         }
     
     - name: Configure CMake
@@ -127,6 +133,21 @@ jobs:
             # Copy config file to executable directory
             Write-Host "Copying config file to executable directory..."
             Copy-Item "compilers.json" "build-windows\bin\Release\" -Force
+            
+            # Copy WinFsp DLLs to executable directory as fallback
+            Write-Host "Copying WinFsp DLLs to executable directory..."
+            $winfspInstall = if (Test-Path "C:\Program Files (x86)\WinFsp") { "C:\Program Files (x86)\WinFsp" } else { "C:\Program Files\WinFsp" }
+            $winfspBinDir = "$winfspInstall\bin"
+            if (Test-Path $winfspBinDir) {
+                Write-Host "Copying DLLs from: $winfspBinDir"
+                Copy-Item "$winfspBinDir\*.dll" "build-windows\bin\Release\" -Force -ErrorAction SilentlyContinue
+                
+                # List what was copied
+                Write-Host "DLLs in executable directory:"
+                Get-ChildItem "build-windows\bin\Release\*.dll" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
+            } else {
+                Write-Host "WinFsp bin directory not found at: $winfspBinDir"
+            }
             
             Write-Host "Running test with explicit config path..."
             try {
