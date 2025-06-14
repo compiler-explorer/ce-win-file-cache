@@ -187,7 +187,7 @@ jobs:
           echo "Checking JSON examples in $file..."
           
           # Extract JSON blocks and validate syntax
-          awk '/```json/,/```/ {if (!/```/) print}' "$file" > temp_config.json
+          sed -n '/```json/,/```/p' "$file" | sed '1d;$d' > temp_config.json
           
           if [ -s temp_config.json ]; then
             if python3 -m json.tool temp_config.json > /dev/null 2>&1; then
