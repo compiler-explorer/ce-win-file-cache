@@ -103,5 +103,14 @@ After each fix:
 
 ---
 
-**Status**: 7/12 issues fixed ✅  
-**Next**: Priority 4 - Consider refactoring static functions (optional)
+## ✅ Architectural Improvements Completed
+
+### GlobalMetrics Reference-Based Design ✅
+- [x] **Converted GlobalMetrics from pointer to reference** - Eliminated all null pointer checks
+  - ✅ **Fixed**: Modified GlobalMetrics::instance() to return reference with auto-initialization
+  - ✅ **Fixed**: Updated all 23 calling sites to use direct method calls instead of null checks
+  - ✅ **Benefits**: Cleaner code, better performance, eliminated cppcheck dead code warnings
+  - ✅ **Architecture**: Auto-initialization on first access with no-op fallback for failed initialization
+
+**Status**: 8/12 issues fixed ✅ (Major architectural improvement completed)  
+**Next**: Priority 4 - Consider refactoring static functions (optional - low priority)

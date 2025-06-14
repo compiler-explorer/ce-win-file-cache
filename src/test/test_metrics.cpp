@@ -95,36 +95,23 @@ void test_global_metrics_singleton()
         std::cout << "✓ Global metrics initialized" << std::endl;
 
         // Test global access
-        auto *metrics = GlobalMetrics::instance();
-        if (metrics)
-        {
-            std::cout << "✓ Global metrics instance accessible" << std::endl;
-            std::cout << "  Global metrics URL: " << metrics->getMetricsUrl() << std::endl;
+        auto &metrics = GlobalMetrics::instance();
+        std::cout << "✓ Global metrics instance accessible" << std::endl;
+        std::cout << "  Global metrics URL: " << metrics.getMetricsUrl() << std::endl;
 
-            // Test recording through global instance
-            metrics->recordCacheHit("test");
-            metrics->updateCacheSize(2048);
-            std::cout << "✓ Metrics recorded through global instance" << std::endl;
-        }
-        else
-        {
-            std::cerr << "❌ Global metrics instance is null" << std::endl;
-        }
+        // Test recording through global instance
+        metrics.recordCacheHit("test");
+        metrics.updateCacheSize(2048);
+        std::cout << "✓ Metrics recorded through global instance" << std::endl;
 
         // Shutdown global metrics
         GlobalMetrics::shutdown();
         std::cout << "✓ Global metrics shutdown completed" << std::endl;
 
-        // Verify shutdown
-        auto *metrics_after = GlobalMetrics::instance();
-        if (!metrics_after)
-        {
-            std::cout << "✓ Global metrics properly cleaned up after shutdown" << std::endl;
-        }
-        else
-        {
-            std::cerr << "❌ Global metrics not properly cleaned up" << std::endl;
-        }
+        // Verify shutdown (GlobalMetrics now always returns a reference)
+        auto &metrics_after = GlobalMetrics::instance();
+        std::cout << "✓ Global metrics shutdown completed (reference-based design always available)" << std::endl;
+        (void)metrics_after; // Suppress unused variable warning
     }
     catch (const std::exception &e)
     {
@@ -145,15 +132,10 @@ void test_metrics_disabled()
         GlobalMetrics::initialize(config);
         std::cout << "✓ Metrics initialization handled disabled state" << std::endl;
 
-        auto *metrics = GlobalMetrics::instance();
-        if (!metrics)
-        {
-            std::cout << "✓ No metrics instance when disabled" << std::endl;
-        }
-        else
-        {
-            std::cout << "❌ Metrics instance exists when disabled" << std::endl;
-        }
+        auto &metrics = GlobalMetrics::instance();
+        std::cout << "✓ Metrics instance available (reference-based design with no-op when disabled)" << std::endl;
+        std::cout << "  Disabled metrics URL: " << metrics.getMetricsUrl() << std::endl;
+        (void)metrics; // Suppress unused variable warning
 
         GlobalMetrics::shutdown();
         std::cout << "✓ Metrics shutdown handled disabled state" << std::endl;

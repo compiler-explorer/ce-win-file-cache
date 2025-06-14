@@ -275,14 +275,7 @@ int main(int /*argc*/, char ** /*argv*/)
     std::cout << "Initializing metrics on port " << metrics_config.port << "..." << std::endl;
     GlobalMetrics::initialize(metrics_config);
 
-    if (auto *metrics = GlobalMetrics::instance())
-    {
-        std::cout << "Metrics server started at: " << metrics->getMetricsUrl() << std::endl;
-    }
-    else
-    {
-        std::cout << "Warning: Metrics server failed to initialize" << std::endl;
-    }
+    std::cout << "Metrics server started at: " << GlobalMetrics::instance().getMetricsUrl() << std::endl;
 
     // Wait for metrics server to start
     std::cout << "Waiting 3 seconds for metrics server to start..." << std::endl;

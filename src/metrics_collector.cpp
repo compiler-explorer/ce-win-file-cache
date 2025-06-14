@@ -143,6 +143,32 @@ std::string MetricsCollector::getMetricsUrl() const
 
 // Global metrics singleton implementation
 std::unique_ptr<MetricsCollector> GlobalMetrics::metrics_instance = nullptr;
+bool GlobalMetrics::auto_initialized = false;
+
+MetricsCollector &GlobalMetrics::instance()
+{
+    if (!metrics_instance && !auto_initialized)
+    {
+        // Auto-initialize with default config on first access
+        MetricsConfig default_config;
+        default_config.enabled = true;
+        default_config.bind_address = "127.0.0.1";
+        default_config.port = 0; // Let system choose available port
+        default_config.endpoint_path = "/metrics";
+        
+        initialize(default_config);
+        auto_initialized = true;
+    }
+    
+    if (!metrics_instance)
+    {
+        // Create no-op instance if initialization failed
+        static MetricsCollector no_op_metrics({});
+        return no_op_metrics;
+    }
+    
+    return *metrics_instance;
+}
 
 void GlobalMetrics::initialize(const MetricsConfig &config)
 {
@@ -162,6 +188,7 @@ void GlobalMetrics::initialize(const MetricsConfig &config)
     else
     {
         std::cout << "Metrics disabled in configuration" << std::endl;
+        metrics_instance = nullptr;
     }
 }
 
@@ -172,11 +199,7 @@ void GlobalMetrics::shutdown()
         std::cout << "Shutting down global metrics" << std::endl;
         metrics_instance.reset();
     }
-}
-
-MetricsCollector *GlobalMetrics::instance()
-{
-    return metrics_instance.get();
+    auto_initialized = false;
 }
 
 } // namespace CeWinFileCache

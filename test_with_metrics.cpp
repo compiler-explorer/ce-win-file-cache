@@ -100,32 +100,25 @@ int main()
 
     GlobalMetrics::initialize(metrics_config);
 
-    if (auto *metrics = GlobalMetrics::instance())
-    {
-        std::cout << "Metrics available at: " << metrics->getMetricsUrl() << std::endl;
-        std::cout << "You can fetch metrics with: curl " << metrics->getMetricsUrl() << std::endl;
-        std::cout << std::endl;
+    std::cout << "Metrics available at: " << GlobalMetrics::instance().getMetricsUrl() << std::endl;
+    std::cout << "You can fetch metrics with: curl " << GlobalMetrics::instance().getMetricsUrl() << std::endl;
+    std::cout << std::endl;
 
-        std::cout << "Sleeping for 2 seconds to allow initial metrics fetch..." << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+    std::cout << "Sleeping for 2 seconds to allow initial metrics fetch..." << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(2));
 
-        simulateCacheOperations();
+    simulateCacheOperations();
 
-        std::cout << std::endl;
-        std::cout << "--- Metrics after cache operations available ---" << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+    std::cout << std::endl;
+    std::cout << "--- Metrics after cache operations available ---" << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(2));
 
-        simulateAsyncDownloads();
+    simulateAsyncDownloads();
 
-        std::cout << std::endl;
-        std::cout << "--- Final metrics available ---" << std::endl;
-        std::cout << "Keeping server running for 10 seconds for final metrics collection..." << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(10));
-    }
-    else
-    {
-        std::cout << "Metrics not available" << std::endl;
-    }
+    std::cout << std::endl;
+    std::cout << "--- Final metrics available ---" << std::endl;
+    std::cout << "Keeping server running for 10 seconds for final metrics collection..." << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(10));
 
     GlobalMetrics::shutdown();
     std::cout << "Test completed." << std::endl;

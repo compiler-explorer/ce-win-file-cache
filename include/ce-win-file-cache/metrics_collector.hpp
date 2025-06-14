@@ -60,10 +60,11 @@ class GlobalMetrics
     public:
     static void initialize(const MetricsConfig &config);
     static void shutdown();
-    static MetricsCollector *instance();
+    static MetricsCollector &instance();
 
     private:
     static std::unique_ptr<MetricsCollector> metrics_instance;
+    static bool auto_initialized;
 };
 
 } // namespace CeWinFileCache
@@ -149,9 +150,10 @@ class GlobalMetrics
     static void shutdown()
     {
     }
-    static MetricsCollector *instance()
+    static MetricsCollector &instance()
     {
-        return nullptr;
+        static MetricsCollector stub_metrics({});
+        return stub_metrics;
     }
 };
 

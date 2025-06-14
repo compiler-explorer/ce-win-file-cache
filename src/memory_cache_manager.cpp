@@ -17,10 +17,7 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
     try
     {
         // Record network operation attempt
-        if (auto *metrics = GlobalMetrics::instance())
-        {
-            metrics->recordNetworkOperation("file_read", false); // Mark as attempt initially
-        }
+        GlobalMetrics::instance().recordNetworkOperation("file_read", false); // Mark as attempt initially
 
 #ifdef _WIN32
         std::ifstream file(network_path, std::ios::binary | std::ios::ate);
@@ -33,12 +30,9 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
         {
             std::wcerr << L"Failed to open network file: " << network_path << std::endl;
             // Record failed network operation
-            if (auto *metrics = GlobalMetrics::instance())
-            {
-                auto end_time = std::chrono::high_resolution_clock::now();
-                auto duration = std::chrono::duration<double>(end_time - start_time).count();
-                metrics->recordNetworkLatency(duration);
-            }
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration<double>(end_time - start_time).count();
+            GlobalMetrics::instance().recordNetworkLatency(duration);
             return content;
         }
 
@@ -54,10 +48,7 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
         else
         {
             // Record successful network operation
-            if (auto *metrics = GlobalMetrics::instance())
-            {
-                metrics->recordNetworkOperation("file_read", true);
-            }
+            GlobalMetrics::instance().recordNetworkOperation("file_read", true);
         }
     }
     catch (const std::exception &e)
@@ -67,12 +58,9 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
     }
 
     // Record network latency
-    if (auto *metrics = GlobalMetrics::instance())
-    {
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration<double>(end_time - start_time).count();
-        metrics->recordNetworkLatency(duration);
-    }
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration<double>(end_time - start_time).count();
+    GlobalMetrics::instance().recordNetworkLatency(duration);
 
     return content;
 }
@@ -91,18 +79,12 @@ std::optional<std::vector<uint8_t>> MemoryCacheManager::getMemoryCachedFile(cons
     if (it != memory_cache.end())
     {
         // Record cache hit
-        if (auto *metrics = GlobalMetrics::instance())
-        {
-            metrics->recordCacheHit("read");
-        }
+        GlobalMetrics::instance().recordCacheHit("read");
         return it->second;
     }
 
     // Record cache miss
-    if (auto *metrics = GlobalMetrics::instance())
-    {
-        metrics->recordCacheMiss("read");
-    }
+    GlobalMetrics::instance().recordCacheMiss("read");
     return std::nullopt;
 }
 
@@ -112,17 +94,14 @@ void MemoryCacheManager::addFileToMemoryCache(const std::wstring &virtual_path, 
     memory_cache[virtual_path] = content;
 
     // Update cache metrics
-    if (auto *metrics = GlobalMetrics::instance())
+    // Update cache size and entry count
+    size_t total_size = 0;
+    for (const auto &[path, file_content] : memory_cache)
     {
-        // Update cache size and entry count
-        size_t total_size = 0;
-        for (const auto &[path, file_content] : memory_cache)
-        {
-            total_size += file_content.size();
-        }
-        metrics->updateCacheSize(total_size);
-        metrics->updateCacheEntryCount(memory_cache.size());
+        total_size += file_content.size();
     }
+    GlobalMetrics::instance().updateCacheSize(total_size);
+    GlobalMetrics::instance().updateCacheEntryCount(memory_cache.size());
 }
 
 std::vector<uint8_t> MemoryCacheManager::getFileContent(const std::wstring &virtual_path, const Config &config)
@@ -156,15 +135,12 @@ void MemoryCacheManager::clearCache()
     memory_cache.clear();
 
     // Update cache metrics after clearing
-    if (auto *metrics = GlobalMetrics::instance())
+    GlobalMetrics::instance().updateCacheSize(0);
+    GlobalMetrics::instance().updateCacheEntryCount(0);
+    // Record evictions (clearing counts as multiple evictions)
+    for (size_t i = 0; i < cleared_entries; ++i)
     {
-        metrics->updateCacheSize(0);
-        metrics->updateCacheEntryCount(0);
-        // Record evictions (clearing counts as multiple evictions)
-        for (size_t i = 0; i < cleared_entries; ++i)
-        {
-            metrics->recordCacheEviction();
-        }
+        GlobalMetrics::instance().recordCacheEviction();
     }
 }
 

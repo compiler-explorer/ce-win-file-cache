@@ -160,10 +160,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     std::wstring virtual_path(FileName);
 
     // Record filesystem operation
-    if (auto *metrics = GlobalMetrics::instance())
-    {
-        metrics->recordFilesystemOperation("open");
-    }
+    GlobalMetrics::instance().recordFilesystemOperation("open");
 
     // Get or create cache entry
     CacheEntry *entry = getCacheEntry(virtual_path);
@@ -270,12 +267,9 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     updateAccessTime(entry);
 
     // Record file open duration
-    if (auto *metrics = GlobalMetrics::instance())
-    {
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration<double>(end_time - start_time).count();
-        metrics->recordFileOpenDuration(duration);
-    }
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration<double>(end_time - start_time).count();
+    GlobalMetrics::instance().recordFileOpenDuration(duration);
 
     return STATUS_SUCCESS;
 }
@@ -291,10 +285,7 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
 
     // Record filesystem operation
-    if (auto *metrics = GlobalMetrics::instance())
-    {
-        metrics->recordFilesystemOperation("read");
-    }
+    GlobalMetrics::instance().recordFilesystemOperation("read");
 
     // Try to serve from memory cache first for maximum performance
     if (file_desc->entry && file_desc->entry->state == FileState::CACHED && file_desc->entry->local_path.empty())

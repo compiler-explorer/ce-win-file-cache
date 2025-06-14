@@ -53,12 +53,9 @@ NTSTATUS AsyncDownloadManager::queueDownload(const std::wstring &virtual_path,
     pending_count++;
 
     // Record download queued metric
-    if (auto *metrics = GlobalMetrics::instance())
-    {
-        metrics->recordDownloadQueued();
-        metrics->updatePendingDownloads(pending_count.load());
-        metrics->updateActiveDownloads(active_count.load());
-    }
+    GlobalMetrics::instance().recordDownloadQueued();
+    GlobalMetrics::instance().updatePendingDownloads(pending_count.load());
+    GlobalMetrics::instance().updateActiveDownloads(active_count.load());
 
     queue_condition.notify_one();
 
@@ -139,12 +136,9 @@ void AsyncDownloadManager::workerThread()
                 active_count++;
 
                 // Update download metrics
-                if (auto *metrics = GlobalMetrics::instance())
-                {
-                    metrics->recordDownloadStarted();
-                    metrics->updatePendingDownloads(pending_count.load());
-                    metrics->updateActiveDownloads(active_count.load());
-                }
+                GlobalMetrics::instance().recordDownloadStarted();
+                GlobalMetrics::instance().updatePendingDownloads(pending_count.load());
+                GlobalMetrics::instance().updateActiveDownloads(active_count.load());
             }
         }
 
@@ -154,10 +148,7 @@ void AsyncDownloadManager::workerThread()
             active_count--;
 
             // Update active downloads metric
-            if (auto *metrics = GlobalMetrics::instance())
-            {
-                metrics->updateActiveDownloads(active_count.load());
-            }
+            GlobalMetrics::instance().updateActiveDownloads(active_count.load());
 
             {
                 std::lock_guard<std::mutex> lock(queue_mutex);
@@ -218,21 +209,18 @@ void AsyncDownloadManager::processDownload(std::shared_ptr<DownloadTask> task)
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double>(end_time - start_time).count();
 
-    if (auto *metrics = GlobalMetrics::instance())
+    if (success)
     {
-        if (success)
+        GlobalMetrics::instance().recordDownloadCompleted(duration);
+    }
+    else
+    {
+        std::string reason = "unknown";
+        if (!error_message.empty())
         {
-            metrics->recordDownloadCompleted(duration);
+            reason = std::string(error_message.begin(), error_message.end());
         }
-        else
-        {
-            std::string reason = "unknown";
-            if (!error_message.empty())
-            {
-                reason = std::string(error_message.begin(), error_message.end());
-            }
-            metrics->recordDownloadFailed(reason);
-        }
+        GlobalMetrics::instance().recordDownloadFailed(reason);
     }
 
     if (task->callback)
@@ -248,10 +236,7 @@ bool AsyncDownloadManager::downloadFile(const std::wstring &network_path, const 
     try
     {
         // Record filesystem operation
-        if (auto *metrics = GlobalMetrics::instance())
-        {
-            metrics->recordFilesystemOperation("download");
-        }
+        GlobalMetrics::instance().recordFilesystemOperation("download");
 
         std::string narrow_path(network_path.begin(), network_path.end());
         std::ifstream file(narrow_path, std::ios::binary);
@@ -259,22 +244,16 @@ bool AsyncDownloadManager::downloadFile(const std::wstring &network_path, const 
         if (!file.is_open())
         {
             // Record file open duration even for failed opens
-            if (auto *metrics = GlobalMetrics::instance())
-            {
-                auto end_time = std::chrono::high_resolution_clock::now();
-                auto duration = std::chrono::duration<double>(end_time - start_time).count();
-                metrics->recordFileOpenDuration(duration);
-            }
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration<double>(end_time - start_time).count();
+            GlobalMetrics::instance().recordFileOpenDuration(duration);
             return false;
         }
 
         // Record successful file open duration
-        if (auto *metrics = GlobalMetrics::instance())
-        {
-            auto open_time = std::chrono::high_resolution_clock::now();
-            auto open_duration = std::chrono::duration<double>(open_time - start_time).count();
-            metrics->recordFileOpenDuration(open_duration);
-        }
+        auto open_time = std::chrono::high_resolution_clock::now();
+        auto open_duration = std::chrono::duration<double>(open_time - start_time).count();
+        GlobalMetrics::instance().recordFileOpenDuration(open_duration);
 
         file.seekg(0, std::ios::end);
         size_t file_size = file.tellg();
