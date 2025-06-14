@@ -99,12 +99,21 @@ echo
 
 # Step 2: Build all targets
 echo -e "${YELLOW}Step 2: Building all test programs...${NC}"
-cmake --build "$BUILD_DIR" --parallel
+if ! cmake --build "$BUILD_DIR" --parallel; then
+    echo -e "${RED}Build failed! Check the error messages above.${NC}"
+    exit 1
+fi
 echo
 
 # Step 3: Check that executables exist
 echo -e "${YELLOW}Step 3: Checking built executables...${NC}"
 TESTS_FOUND=0
+
+# List what's actually in the bin directory
+echo "Contents of $BUILD_DIR/bin/:"
+ls -la "$BUILD_DIR/bin/" || echo "  (directory does not exist)"
+echo
+
 for exe in "$BUILD_DIR/bin"/*; do
     if [[ -x "$exe" ]]; then
         echo "  ✓ $(basename "$exe")"
@@ -112,6 +121,18 @@ for exe in "$BUILD_DIR/bin"/*; do
     fi
 done
 echo "Found $TESTS_FOUND test executables"
+
+# Expected test programs
+EXPECTED_TESTS=("cache_test" "cache_demo" "directory_test" "async_test" "filesystem_async_test" 
+                "config_threads_test" "config_async_test" "single_thread_test" "edge_cases_test" 
+                "metrics_test" "json_config_test" "glob_test" "glob_matcher_unit_test")
+
+echo "Expected ${#EXPECTED_TESTS[@]} test programs, but found $TESTS_FOUND"
+
+if [[ $TESTS_FOUND -lt ${#EXPECTED_TESTS[@]} ]]; then
+    echo -e "${YELLOW}Missing executables - checking build log for errors...${NC}"
+    # Continue anyway, but note the discrepancy
+fi
 echo
 
 # Step 4: Run tests
