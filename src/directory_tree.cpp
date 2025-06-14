@@ -1,5 +1,6 @@
 #include "../include/types/directory_tree.hpp"
 #include <algorithm>
+#include <functional>
 #include <sstream>
 
 namespace CeWinFileCache
