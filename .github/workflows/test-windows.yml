@@ -214,28 +214,6 @@ jobs:
         # Copy configuration example
         Copy-Item "compilers.json" "$releaseDir/compilers.example.json"
         
-        # Create README for the release
-        $version = "${{ github.ref_name }}"
-        $readmeContent = @"
-CE Win File Cache $version
-========================================
-
-This is a Windows x64 release of CE Win File Cache.
-
-Prerequisites:
-- Windows 10/11 or Windows Server 2016+
-- WinFsp installed (https://github.com/winfsp/winfsp/releases)
-
-Quick Start:
-1. Install WinFsp if not already installed
-2. Copy compilers.example.json to compilers.json and edit for your environment
-3. Run: CeWinFileCacheFS.exe --config compilers.json --mount M:
-
-For more information, see: https://github.com/compiler-explorer/ce-win-file-cache
-
-"@
-        $readmeContent | Out-File -FilePath "$releaseDir/README.txt" -Encoding UTF8
-        
         # Create zip archive
         Write-Host "Creating release archive..."
         Compress-Archive -Path $releaseDir -DestinationPath "$releaseDir.zip" -Force
