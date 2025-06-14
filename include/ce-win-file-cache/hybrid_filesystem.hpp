@@ -43,12 +43,16 @@ class HybridFileSystem : public Fsp::FileSystemBase
     // Internal methods
     std::wstring resolveVirtualPath(const std::wstring &virtual_path);
     CacheEntry *getCacheEntry(const std::wstring &virtual_path);
+    CacheEntry *createDynamicCacheEntry(DirectoryNode *node);
     NTSTATUS ensureFileAvailable(CacheEntry *entry);
     NTSTATUS fetchFromNetwork(CacheEntry *entry);
     bool matchesPattern(const std::wstring &path, const std::wstring &pattern);
     CachePolicy determineCachePolicy(const std::wstring &virtual_path);
     std::wstring createTemporaryFileForMemoryCached(CacheEntry *entry);
 
+    // Path normalization for Windows (handle both / and \ as separators)
+    std::wstring normalizePath(const std::wstring &path);
+    
     // Directory tree management
     void fillDirInfo(DirInfo *dir_info, DirectoryNode *node);
 

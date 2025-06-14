@@ -594,58 +594,30 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
         std::wcout << L"[FS] ReadDirectoryEntry() - starting enumeration" << std::endl;
         
         // Handle root directory specially - return compiler directories
-        if (file_desc->entry->virtual_path == L"\\" || file_desc->entry->virtual_path == L"")
+        // Normalize path for comparison (both \ and / should be treated as root)
+        std::wstring normalized_path = normalizePath(file_desc->entry->virtual_path);
+        if (normalized_path == L"/")
         {
             std::wcout << L"[FS] ReadDirectoryEntry() - enumerating root directory" << std::endl;
             
-            // Create directory enumeration context
-            struct DirEnumContext {
-                std::vector<std::wstring> entries;
-                size_t next_index;
-            };
+            // Use DirectoryCache to get all contents in root directory
+            std::vector<DirectoryNode *> root_contents = directory_cache.getDirectoryContents(L"/");
             
-            auto *context = new DirEnumContext();
-            context->next_index = 0;
-            
-            std::lock_guard<std::mutex> lock(cache_mutex);
-            for (const auto& [path, entry] : cache_entries)
+            if (root_contents.empty())
             {
-                // Skip the root entry and only include top-level directories
-                if (path != L"\\" && path.find(L'\\', 1) == std::wstring::npos && !path.empty() && 
-                    (entry->file_attributes & FILE_ATTRIBUTE_DIRECTORY))
-                {
-                    std::wstring dir_name = path.substr(1); // Remove leading backslash
-                    context->entries.push_back(dir_name);
-                    std::wcout << L"[FS] ReadDirectoryEntry() - adding directory: '" << dir_name << L"'" << std::endl;
-                }
-            }
-            
-            if (context->entries.empty())
-            {
-                std::wcout << L"[FS] ReadDirectoryEntry() - no directories found" << std::endl;
-                delete context;
+                std::wcout << L"[FS] ReadDirectoryEntry() - no contents from DirectoryCache for root" << std::endl;
                 return STATUS_NO_MORE_FILES;
             }
             
+            // Store the contents vector as context for enumeration
+            auto *context = new std::vector<DirectoryNode *>(std::move(root_contents));
             *PContext = context;
             
-            // Return first directory
-            const std::wstring &dir_name = context->entries[0];
-            DirInfo->Size = (UINT16)(sizeof(FSP_FSCTL_DIR_INFO) + dir_name.length() * sizeof(WCHAR));
-            DirInfo->FileInfo.FileAttributes = FILE_ATTRIBUTE_DIRECTORY;
-            DirInfo->FileInfo.ReparseTag = 0;
-            DirInfo->FileInfo.FileSize = 0;
-            DirInfo->FileInfo.AllocationSize = ALLOCATION_UNIT;
-            DirInfo->FileInfo.CreationTime = creation_time;
-            DirInfo->FileInfo.LastAccessTime = creation_time;
-            DirInfo->FileInfo.LastWriteTime = creation_time;
-            DirInfo->FileInfo.ChangeTime = creation_time;
-            DirInfo->FileInfo.IndexNumber = 0;
-            DirInfo->FileInfo.HardLinks = 0;
-            memcpy(DirInfo->FileNameBuf, dir_name.c_str(), dir_name.length() * sizeof(WCHAR));
+            // Return first entry
+            auto *first_entry = (*context)[0];
+            fillDirInfo(DirInfo, first_entry);
             
-            context->next_index = 1;
-            std::wcout << L"[FS] ReadDirectoryEntry() - returning first dir: '" << dir_name << L"'" << std::endl;
+            std::wcout << L"[FS] ReadDirectoryEntry() - returning first root entry: '" << first_entry->full_virtual_path << L"'" << std::endl;
             return STATUS_SUCCESS;
         }
         else
@@ -675,41 +647,46 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
         std::wcout << L"[FS] ReadDirectoryEntry() - continuing enumeration" << std::endl;
         
         // Handle root directory continuation
-        if (file_desc->entry->virtual_path == L"\\" || file_desc->entry->virtual_path == L"")
+        // Normalize path for comparison (both \ and / should be treated as root)
+        std::wstring normalized_path = normalizePath(file_desc->entry->virtual_path);
+        if (normalized_path == L"/")
         {
-            struct DirEnumContext {
-                std::vector<std::wstring> entries;
-                size_t next_index;
-            };
-            
-            auto *context = static_cast<DirEnumContext *>(*PContext);
-            
-            // Get the next entry from our stored index
-            if (context->next_index >= context->entries.size())
+            // Continue enumeration for root directory using DirectoryNode context
+            auto *context_data = static_cast<std::vector<DirectoryNode *> *>(*PContext);
+
+            // Find current position
+            size_t current_index = 0;
+            if (Marker && wcslen(Marker) > 0)
             {
-                std::wcout << L"[FS] ReadDirectoryEntry() - end of enumeration" << std::endl;
-                delete context;
+                // Find marker in the list
+                for (size_t i = 0; i < context_data->size(); i++)
+                {
+                    if ((*context_data)[i]->name == Marker)
+                    {
+                        current_index = i + 1;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                current_index = 1; // Next after first
+            }
+
+            if (current_index >= context_data->size())
+            {
+                // End of enumeration
+                std::wcout << L"[FS] ReadDirectoryEntry() - end of root enumeration" << std::endl;
+                delete context_data;
                 *PContext = nullptr;
                 return STATUS_NO_MORE_FILES;
             }
+
+            // Return next entry
+            auto *next_entry = (*context_data)[current_index];
+            fillDirInfo(DirInfo, next_entry);
             
-            // Return next directory
-            const std::wstring &dir_name = context->entries[context->next_index];
-            DirInfo->Size = (UINT16)(sizeof(FSP_FSCTL_DIR_INFO) + dir_name.length() * sizeof(WCHAR));
-            DirInfo->FileInfo.FileAttributes = FILE_ATTRIBUTE_DIRECTORY;
-            DirInfo->FileInfo.ReparseTag = 0;
-            DirInfo->FileInfo.FileSize = 0;
-            DirInfo->FileInfo.AllocationSize = ALLOCATION_UNIT;
-            DirInfo->FileInfo.CreationTime = creation_time;
-            DirInfo->FileInfo.LastAccessTime = creation_time;
-            DirInfo->FileInfo.LastWriteTime = creation_time;
-            DirInfo->FileInfo.ChangeTime = creation_time;
-            DirInfo->FileInfo.IndexNumber = 0;
-            DirInfo->FileInfo.HardLinks = 0;
-            memcpy(DirInfo->FileNameBuf, dir_name.c_str(), dir_name.length() * sizeof(WCHAR));
-            
-            std::wcout << L"[FS] ReadDirectoryEntry() - returning dir: '" << dir_name << L"' (index " << context->next_index << L")" << std::endl;
-            context->next_index++;
+            std::wcout << L"[FS] ReadDirectoryEntry() - returning next root entry: '" << next_entry->full_virtual_path << L"' (index " << current_index << L")" << std::endl;
             return STATUS_SUCCESS;
         }
         else
@@ -766,6 +743,7 @@ CacheEntry *HybridFileSystem::getCacheEntry(const std::wstring &virtual_path)
     std::wcout << L"[FS] getCacheEntry() called for: '" << virtual_path << L"'" << std::endl;
     std::lock_guard<std::mutex> lock(cache_mutex);
 
+    // 1. Check existing cache_entries first (fast path)
     auto it = cache_entries.find(virtual_path);
     if (it != cache_entries.end())
     {
@@ -775,7 +753,17 @@ CacheEntry *HybridFileSystem::getCacheEntry(const std::wstring &virtual_path)
         return it->second.get();
     }
 
-    std::wcout << L"[FS] getCacheEntry() - creating new virtual entry for: '" << virtual_path << L"'" << std::endl;
+    // 2. Check DirectoryCache for path existence
+    std::wcout << L"[FS] getCacheEntry() - checking DirectoryCache for: '" << virtual_path << L"'" << std::endl;
+    DirectoryNode *node = directory_cache.findNode(virtual_path);
+    if (node)
+    {
+        std::wcout << L"[FS] getCacheEntry() - found node in DirectoryCache, creating dynamic entry" << std::endl;
+        // 3. Create dynamic cache entry from DirectoryNode
+        return createDynamicCacheEntry(node);
+    }
+
+    std::wcout << L"[FS] getCacheEntry() - path not found in DirectoryCache, creating virtual entry for: '" << virtual_path << L"'" << std::endl;
     // Create virtual entry for files that don't exist yet
     // In practice, this would check if the file exists on the network
     auto entry = std::make_unique<CacheEntry>();
@@ -800,6 +788,45 @@ CacheEntry *HybridFileSystem::getCacheEntry(const std::wstring &virtual_path)
     CacheEntry *result = entry.get();
     cache_entries[virtual_path] = std::move(entry);
     std::wcout << L"[FS] getCacheEntry() - created entry with attributes: 0x" << std::hex << result->file_attributes << std::endl;
+    return result;
+}
+
+CacheEntry *HybridFileSystem::createDynamicCacheEntry(DirectoryNode *node)
+{
+    std::wcout << L"[FS] createDynamicCacheEntry() called for: '" << node->full_virtual_path << L"'" << std::endl;
+    
+    // Create cache entry from DirectoryNode
+    auto entry = std::make_unique<CacheEntry>();
+    entry->virtual_path = node->full_virtual_path;
+    entry->network_path = node->network_path;
+    entry->file_attributes = node->isDirectory() ? FILE_ATTRIBUTE_DIRECTORY : FILE_ATTRIBUTE_NORMAL;
+    entry->file_size = node->file_size;
+    entry->creation_time = node->creation_time;
+    entry->last_access_time = node->last_access_time;
+    entry->last_write_time = node->last_write_time;
+    
+    // Determine caching policy based on the file path
+    entry->policy = determineCachePolicy(node->full_virtual_path);
+    
+    // Set initial state based on policy
+    if (entry->policy == CachePolicy::NEVER_CACHE)
+    {
+        entry->state = FileState::NETWORK_ONLY;
+        entry->local_path = entry->network_path;
+    }
+    else
+    {
+        // For files that should be cached, start as VIRTUAL and let ensureFileAvailable handle caching
+        entry->state = FileState::VIRTUAL;
+    }
+    
+    std::wcout << L"[FS] createDynamicCacheEntry() - created entry for: '" << entry->virtual_path 
+               << L"' -> '" << entry->network_path << L"', policy: " << static_cast<int>(entry->policy) << std::endl;
+    
+    // Store in cache_entries for future fast access
+    CacheEntry *result = entry.get();
+    cache_entries[node->full_virtual_path] = std::move(entry);
+    
     return result;
 }
 
@@ -1006,6 +1033,44 @@ std::wstring HybridFileSystem::createTemporaryFileForMemoryCached(CacheEntry *en
     return std::wstring(temp_path);
 }
 
+std::wstring HybridFileSystem::normalizePath(const std::wstring &path)
+{
+    if (path.empty())
+    {
+        return L"/";
+    }
+    
+    std::wstring normalized = path;
+    
+    // Convert backslashes to forward slashes for consistent storage
+    for (auto &ch : normalized)
+    {
+        if (ch == L'\\')
+        {
+            ch = L'/';
+        }
+    }
+    
+    // Ensure path starts with /
+    if (normalized[0] != L'/')
+    {
+        normalized = L"/" + normalized;
+    }
+    
+    // Handle root path specially
+    if (normalized == L"/")
+    {
+        return L"/";
+    }
+    
+    // Remove trailing slash (except for root)
+    if (normalized.length() > 1 && normalized.back() == L'/')
+    {
+        normalized.pop_back();
+    }
+    
+    return normalized;
+}
 
 void HybridFileSystem::fillDirInfo(DirInfo *dir_info, DirectoryNode *node)
 {

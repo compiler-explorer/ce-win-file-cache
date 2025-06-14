@@ -27,11 +27,15 @@ std::vector<DirectoryNode *> DirectoryCache::getDirectoryContents(const std::wst
 
 DirectoryNode *DirectoryCache::findNode(const std::wstring &virtual_path)
 {
-    return directory_tree.findNode(virtual_path);
+    std::wstring normalized_path = normalizePath(virtual_path);
+    return directory_tree.findNode(normalized_path);
 }
 
 NTSTATUS DirectoryCache::buildDirectoryTreeFromConfig(const Config &config)
 {
+    // Add root directory entry to handle requests for "\" or "/"
+    directory_tree.addDirectory(L"/", L"");
+    
     // Build directory tree from all configured compilers
     for (const auto &[compiler_name, compiler_config] : config.compilers)
     {
@@ -212,6 +216,45 @@ void DirectoryCache::addTestDirectory(const std::wstring &virtual_path, const st
 void DirectoryCache::clearTree()
 {
     directory_tree.reset();
+}
+
+std::wstring DirectoryCache::normalizePath(const std::wstring &path)
+{
+    if (path.empty())
+    {
+        return L"/";
+    }
+    
+    std::wstring normalized = path;
+    
+    // Convert backslashes to forward slashes for consistent storage
+    for (auto &ch : normalized)
+    {
+        if (ch == L'\\')
+        {
+            ch = L'/';
+        }
+    }
+    
+    // Ensure path starts with /
+    if (normalized[0] != L'/')
+    {
+        normalized = L"/" + normalized;
+    }
+    
+    // Handle root path specially
+    if (normalized == L"/" || normalized == L"\\")
+    {
+        return L"/";
+    }
+    
+    // Remove trailing slash (except for root)
+    if (normalized.length() > 1 && normalized.back() == L'/')
+    {
+        normalized.pop_back();
+    }
+    
+    return normalized;
 }
 
 } // namespace CeWinFileCache

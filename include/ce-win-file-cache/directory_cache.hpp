@@ -40,6 +40,9 @@ class DirectoryCache
     private:
     DirectoryTree directory_tree;
 
+    // Path normalization for Windows
+    std::wstring normalizePath(const std::wstring &path);
+
     // Platform-specific network enumeration
     NTSTATUS enumerateNetworkDirectoryWindows(const std::wstring &network_path, const std::wstring &virtual_path);
     NTSTATUS enumerateNetworkDirectoryMock(const std::wstring &network_path, const std::wstring &virtual_path);
