@@ -181,13 +181,13 @@ jobs:
         echo "=== Validating JSON configuration examples ==="
         
         # Find JSON examples in documentation
-        JSON_EXAMPLES=$(grep -l "```json" *.md || true)
+        JSON_EXAMPLES=$(grep -l "\`\`\`json" *.md || true)
         
         for file in $JSON_EXAMPLES; do
           echo "Checking JSON examples in $file..."
           
           # Extract JSON blocks and validate syntax
-          sed -n '/```json/,/```/p' "$file" | sed '1d;$d' > temp_config.json
+          sed -n '/\`\`\`json/,/\`\`\`/p' "$file" | sed '1d;$d' > temp_config.json
           
           if [ -s temp_config.json ]; then
             if python3 -m json.tool temp_config.json > /dev/null 2>&1; then
