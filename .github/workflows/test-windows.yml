@@ -3,6 +3,8 @@ name: Windows Build with WinFsp
 on:
   push:
     branches: [ main, develop ]
+    tags:
+      - 'v*'  # Push events to matching v*, i.e. v1.0, v20.15.10
   pull_request:
     branches: [ main, develop ]
 
@@ -192,3 +194,78 @@ jobs:
           build-windows/bin/Release/*.dll
           compilers.json
         retention-days: 7
+    
+    - name: Prepare release package
+      if: startsWith(github.ref, 'refs/tags/')
+      shell: powershell
+      run: |
+        # Create release directory
+        $releaseDir = "ce-win-file-cache-${{ github.ref_name }}-windows-x64"
+        New-Item -ItemType Directory -Force -Path $releaseDir
+        
+        # Copy binaries
+        Copy-Item "build-windows/bin/Release/CeWinFileCacheFS.exe" $releaseDir/
+        Copy-Item "build-windows/bin/Release/*.dll" $releaseDir/ -ErrorAction SilentlyContinue
+        
+        # Copy WinFsp DLLs
+        Copy-Item "build-windows/bin/Release/winfsp-x64.dll" $releaseDir/
+        Copy-Item "build-windows/bin/Release/winfsp-msil.dll" $releaseDir/
+        
+        # Copy configuration example
+        Copy-Item "compilers.json" "$releaseDir/compilers.example.json"
+        
+        # Create README for the release
+        @"
+CE Win File Cache ${{ github.ref_name }}
+========================================
+
+This is a Windows x64 release of CE Win File Cache.
+
+Prerequisites:
+- Windows 10/11 or Windows Server 2016+
+- WinFsp installed (https://github.com/winfsp/winfsp/releases)
+
+Quick Start:
+1. Install WinFsp if not already installed
+2. Copy compilers.example.json to compilers.json and edit for your environment
+3. Run: CeWinFileCacheFS.exe --config compilers.json --mount M:
+
+For more information, see: https://github.com/compiler-explorer/ce-win-file-cache
+
+"@ | Out-File -FilePath "$releaseDir/README.txt" -Encoding UTF8
+        
+        # Create zip archive
+        Write-Host "Creating release archive..."
+        Compress-Archive -Path $releaseDir -DestinationPath "$releaseDir.zip" -Force
+        
+        Write-Host "Release package created: $releaseDir.zip"
+    
+    - name: Upload release assets
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          ce-win-file-cache-${{ github.ref_name }}-windows-x64.zip
+        body: |
+          ## CE Win File Cache ${{ github.ref_name }}
+          
+          ### Windows x64 Release
+          
+          This release includes:
+          - `CeWinFileCacheFS.exe` - Main executable
+          - Required WinFsp DLLs
+          - Example configuration file
+          - README with quick start instructions
+          
+          ### Prerequisites
+          - Windows 10/11 or Windows Server 2016+
+          - [WinFsp](https://github.com/winfsp/winfsp/releases) must be installed
+          
+          ### Installation
+          1. Download and extract the release archive
+          2. Install WinFsp if not already installed
+          3. Copy `compilers.example.json` to `compilers.json`
+          4. Edit the configuration for your environment
+          5. Run `CeWinFileCacheFS.exe --config compilers.json --mount M:`
+          
+          See the [documentation](https://github.com/compiler-explorer/ce-win-file-cache/tree/${{ github.ref_name }}/docs) for detailed configuration and usage information.
