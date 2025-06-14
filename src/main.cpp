@@ -124,6 +124,7 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
             {
                 options.debug_flags = static_cast<ULONG>(-1); // Enable all debug
             }
+            std::wcout << L"[MAIN] Debug mode enabled with flags: 0x" << std::hex << options.debug_flags << std::endl;
         }
         else if (arg == L"-t" || arg == L"--test")
         {
@@ -487,58 +488,75 @@ class CompilerCacheService : public Fsp::Service
     protected:
     NTSTATUS OnStart(ULONG argc, PWSTR *argv) override
     {
+        std::wcout << L"[SERVICE] OnStart() called with " << argc << L" arguments" << std::endl;
+        for (ULONG i = 0; i < argc; i++)
+        {
+            std::wcout << L"[SERVICE] Arg[" << i << L"]: " << (argv[i] ? argv[i] : L"<null>") << std::endl;
+        }
+
         // Load configuration
+        std::wcout << L"[SERVICE] Loading configuration from: " << options_.config_file << std::endl;
         auto config_opt = loadConfigFile(options_.config_file);
         if (!config_opt)
         {
-            std::wcerr << L"Failed to load configuration from: " << options_.config_file << std::endl;
+            std::wcerr << L"[SERVICE] ERROR: Failed to load configuration from: " << options_.config_file << std::endl;
             return STATUS_UNSUCCESSFUL;
         }
+        std::wcout << L"[SERVICE] Configuration loaded successfully" << std::endl;
 
         Config config = *config_opt;
 
         // Initialize filesystem
+        std::wcout << L"[SERVICE] Initializing filesystem..." << std::endl;
         NTSTATUS result = filesystem.Initialize(config);
         if (!NT_SUCCESS(result))
         {
-            std::wcerr << L"Failed to initialize filesystem. Status: 0x" << std::hex << result << std::endl;
+            std::wcerr << L"[SERVICE] ERROR: Failed to initialize filesystem. Status: 0x" << std::hex << result << std::endl;
             return result;
         }
+        std::wcout << L"[SERVICE] Filesystem initialized successfully" << std::endl;
 
         // Set up compiler paths (for now, just use the network paths directly)
+        std::wcout << L"[SERVICE] Setting up compiler paths..." << std::endl;
         std::unordered_map<std::wstring, std::wstring> compiler_paths;
         for (const auto &[name, compiler_config] : config.compilers)
         {
+            std::wcout << L"[SERVICE] Adding compiler: " << name << L" -> " << compiler_config.network_path << std::endl;
             compiler_paths[name] = compiler_config.network_path;
         }
 
         result = filesystem.SetCompilerPaths(compiler_paths);
         if (!NT_SUCCESS(result))
         {
-            std::wcerr << L"Failed to set compiler paths. Status: 0x" << std::hex << result << std::endl;
+            std::wcerr << L"[SERVICE] ERROR: Failed to set compiler paths. Status: 0x" << std::hex << result << std::endl;
             return result;
         }
+        std::wcout << L"[SERVICE] Compiler paths set successfully" << std::endl;
 
         // Configure host
         if (!options_.volume_prefix.empty())
         {
+            std::wcout << L"[SERVICE] Setting volume prefix: " << options_.volume_prefix << std::endl;
             std::wstring volume_prefix_copy = options_.volume_prefix;
             host.SetPrefix(volume_prefix_copy.data());
         }
 
         // Mount filesystem
+        std::wcout << L"[SERVICE] Mounting filesystem at: " << options_.mount_point << std::endl;
+        std::wcout << L"[SERVICE] Debug flags: 0x" << std::hex << options_.debug_flags << std::endl;
         std::wstring mount_point_copy = options_.mount_point;
         result = host.Mount(mount_point_copy.data(), nullptr, FALSE, options_.debug_flags);
         if (!NT_SUCCESS(result))
         {
-            std::wcerr << L"Failed to mount filesystem at " << options_.mount_point << L". Status: 0x" << std::hex
+            std::wcerr << L"[SERVICE] ERROR: Failed to mount filesystem at " << options_.mount_point << L". Status: 0x" << std::hex
                        << result << std::endl;
             return result;
         }
 
-        std::wcout << L"CompilerCacheFS mounted at " << host.MountPoint() << std::endl;
-        std::wcout << L"Cache directory: " << config.global.cache_directory << std::endl;
-        std::wcout << L"Total cache size: " << config.global.total_cache_size_mb << L" MB" << std::endl;
+        std::wcout << L"[SERVICE] SUCCESS: CompilerCacheFS mounted at " << host.MountPoint() << std::endl;
+        std::wcout << L"[SERVICE] Cache directory: " << config.global.cache_directory << std::endl;
+        std::wcout << L"[SERVICE] Total cache size: " << config.global.total_cache_size_mb << L" MB" << std::endl;
+        std::wcout << L"[SERVICE] Filesystem is now ready for access" << std::endl;
 
         return STATUS_SUCCESS;
     }

@@ -53,6 +53,6 @@ echo Copying WinFsp DLL to executable directory...
 copy "C:\PROGRA~2\WinFsp\bin\winfsp-x64.dll" "build-msvc\bin\"
 
 echo Copying config file to executable directory...
-copy "compilers.yaml" "build-msvc\bin\"
+copy "compilers.json" "build-msvc\bin\"
 
 echo Setup complete!
