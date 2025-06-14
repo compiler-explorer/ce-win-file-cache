@@ -42,9 +42,9 @@ jobs:
     
     - name: Run comprehensive test suite
       run: |
-        # Use our existing test runner script
-        chmod +x run_all_tests.sh
-        ./run_all_tests.sh
+        # Use our Linux test runner script
+        chmod +x run_all_tests_linux.sh
+        ./run_all_tests_linux.sh
     
 
 
