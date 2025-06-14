@@ -79,7 +79,26 @@ jobs:
             
             # Run basic functionality test from repository root
             Write-Host "Running basic functionality test..."
-            & $exe --config compilers.json --test-config
+            Write-Host "Current directory: $(Get-Location)"
+            Write-Host "Checking for config file..."
+            if (Test-Path "compilers.json") {
+                Write-Host "✅ Found compilers.json"
+            } else {
+                Write-Host "❌ compilers.json not found in current directory"
+                Write-Host "Contents of current directory:"
+                Get-ChildItem . -Name
+            }
+            
+            # Copy config file to executable directory
+            Write-Host "Copying config file to executable directory..."
+            Copy-Item "compilers.json" "build-windows\bin\Release\" -Force
+            
+            Write-Host "Running test with explicit config path..."
+            & $exe --config "compilers.json" --test-config
+            
+            # Also try running without explicit config path (should use default)
+            Write-Host "Running test with default config path..."
+            & $exe --test-config
         } else {
             Write-Error "❌ Executable not found"
             Write-Host "Contents of build-windows\bin\Release:"

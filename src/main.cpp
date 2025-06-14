@@ -168,22 +168,25 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
 // Test function for config parsing only
 int testConfigOnly(const Config &config)
 {
-    std::wcout << L"=== Config Parsing Test ===" << std::endl;
-    std::wcout << L"Configuration loaded successfully:" << std::endl;
-    std::wcout << L"  Cache directory: " << config.global.cache_directory << std::endl;
-    std::wcout << L"  Total cache size: " << config.global.total_cache_size_mb << L" MB" << std::endl;
-    std::wcout << L"  Eviction policy: " << config.global.eviction_policy << std::endl;
-    std::wcout << L"  Number of compilers: " << config.compilers.size() << std::endl;
+    std::wcout << L"[CONFIG TEST] === Config Parsing Test ===" << std::endl;
+    std::wcout << L"[CONFIG TEST] Configuration loaded successfully:" << std::endl;
+    std::wcout << L"[CONFIG TEST]   Cache directory: " << config.global.cache_directory << std::endl;
+    std::wcout << L"[CONFIG TEST]   Total cache size: " << config.global.total_cache_size_mb << L" MB" << std::endl;
+    std::wcout << L"[CONFIG TEST]   Eviction policy: " << config.global.eviction_policy << std::endl;
+    std::wcout << L"[CONFIG TEST]   Number of compilers: " << config.compilers.size() << std::endl;
 
     for (const auto &[name, compiler_config] : config.compilers)
     {
-        std::wcout << L"    - " << name << L": " << compiler_config.network_path << std::endl;
-        std::wcout << L"      Cache size: " << compiler_config.cache_size_mb << L" MB" << std::endl;
-        std::wcout << L"      Cache patterns: " << compiler_config.cache_always_patterns.size() << L" patterns" << std::endl;
-        std::wcout << L"      Prefetch patterns: " << compiler_config.prefetch_patterns.size() << L" patterns" << std::endl;
+        std::wcout << L"[CONFIG TEST]     - " << name << L": " << compiler_config.network_path << std::endl;
+        std::wcout << L"[CONFIG TEST]       Cache size: " << compiler_config.cache_size_mb << L" MB" << std::endl;
+        std::wcout << L"[CONFIG TEST]       Cache patterns: " << compiler_config.cache_always_patterns.size()
+                   << L" patterns" << std::endl;
+        std::wcout << L"[CONFIG TEST]       Prefetch patterns: " << compiler_config.prefetch_patterns.size()
+                   << L" patterns" << std::endl;
     }
 
-    std::wcout << L"Config test completed successfully!" << std::endl;
+    std::wcout << L"[CONFIG TEST] Config test completed successfully!" << std::endl;
+    std::wcout << L"[CONFIG TEST] Returning exit code 0" << std::endl;
     return 0;
 }
 
@@ -407,23 +410,32 @@ int testCacheOperations(const Config &config)
 // Test mode function - runs without WinFsp
 int runTestMode(const ProgramOptions &options)
 {
-    std::wcout << L"Running in test mode (no WinFsp mounting)" << std::endl;
+    std::wcout << L"[TEST] Running in test mode (no WinFsp mounting)" << std::endl;
+    std::wcout << L"[TEST] Test config only: " << (options.test_config_only ? L"YES" : L"NO") << std::endl;
+    std::wcout << L"[TEST] Test path resolution: " << (options.test_path_resolution ? L"YES" : L"NO") << std::endl;
+    std::wcout << L"[TEST] Test network mapping: " << (options.test_network_mapping ? L"YES" : L"NO") << std::endl;
+    std::wcout << L"[TEST] Test cache operations: " << (options.test_cache_operations ? L"YES" : L"NO") << std::endl;
 
     // Load configuration
-    std::wcout << L"Loading config from: " << options.config_file << std::endl;
+    std::wcout << L"[TEST] Loading config from: " << options.config_file << std::endl;
     auto config_opt = loadConfigFile(options.config_file);
     if (!config_opt)
     {
-        std::wcerr << L"Failed to load configuration from: " << options.config_file << std::endl;
+        std::wcerr << L"[TEST ERROR] Failed to load configuration from: " << options.config_file << std::endl;
+        std::wcerr << L"[TEST ERROR] Exiting with code 1" << std::endl;
         return 1;
     }
 
+    std::wcout << L"[TEST] Configuration loaded successfully!" << std::endl;
     Config config = *config_opt;
 
     // Run specific tests based on options
     if (options.test_config_only)
     {
-        return testConfigOnly(config);
+        std::wcout << L"[TEST] Running config-only test..." << std::endl;
+        int result = testConfigOnly(config);
+        std::wcout << L"[TEST] Config test completed with result: " << result << std::endl;
+        return result;
     }
     else if (options.test_path_resolution)
     {

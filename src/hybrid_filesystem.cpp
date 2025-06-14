@@ -1,7 +1,7 @@
+#include <algorithm>
 #include <ce-win-file-cache/glob_matcher.hpp>
 #include <ce-win-file-cache/hybrid_filesystem.hpp>
 #include <ce-win-file-cache/windows_compat.hpp>
-#include <algorithm>
 #include <chrono>
 #include <iostream>
 
@@ -684,7 +684,7 @@ void HybridFileSystem::fillDirInfo(DirInfo *dir_info, DirectoryNode *node)
     // TODO: Implement proper DirInfo filling once WinFsp structure compatibility is resolved
     // For now, just zero-initialize to get the build working
     memset(dir_info, 0, sizeof(*dir_info));
-    
+
     // Directory listing functionality will be implemented once structure layout is fixed
     // This allows the main caching functionality to work while directory enumeration is pending
 }
