@@ -2,6 +2,7 @@
 
 #include "../types/cache_entry.hpp"
 #include "../types/config.hpp"
+#include "async_download_manager.hpp"
 #include "directory_cache.hpp"
 #include "memory_cache_manager.hpp"
 #include "metrics_collector.hpp"
@@ -22,7 +23,7 @@ class HybridFileSystem : public Fsp::FileSystemBase
     HybridFileSystem();
     ~HybridFileSystem();
 
-    NTSTATUS Initialize(const Config &config);
+    NTSTATUS Initialize(const Config &new_config);
     NTSTATUS SetCompilerPaths(const std::unordered_map<std::wstring, std::wstring> &compiler_paths);
 
     protected:

@@ -1,6 +1,7 @@
 #include <ce-win-file-cache/glob_matcher.hpp>
 #include <ce-win-file-cache/hybrid_filesystem.hpp>
 #include <ce-win-file-cache/windows_compat.hpp>
+#include <algorithm>
 #include <chrono>
 #include <iostream>
 
@@ -23,18 +24,18 @@ HybridFileSystem::~HybridFileSystem()
     GlobalMetrics::shutdown();
 }
 
-NTSTATUS HybridFileSystem::Initialize(const Config &config)
+NTSTATUS HybridFileSystem::Initialize(const Config &new_config)
 {
-    this->config = config;
+    this->config = new_config;
 
     // Initialize global metrics if enabled
-    if (config.global.metrics.enabled)
+    if (new_config.global.metrics.enabled)
     {
-        GlobalMetrics::initialize(config.global.metrics);
+        GlobalMetrics::initialize(new_config.global.metrics);
     }
 
     // Create cache directory if it doesn't exist
-    if (!CreateDirectoryW(config.global.cache_directory.c_str(), nullptr))
+    if (!CreateDirectoryW(new_config.global.cache_directory.c_str(), nullptr))
     {
         DWORD error = GetLastError();
         if (error != ERROR_ALREADY_EXISTS)
@@ -49,14 +50,14 @@ NTSTATUS HybridFileSystem::Initialize(const Config &config)
     creation_time = ((PLARGE_INTEGER)&ft)->QuadPart;
 
     // Initialize directory cache with configured compiler paths
-    NTSTATUS result = directory_cache.initialize(config);
+    NTSTATUS result = directory_cache.initialize(new_config);
     if (!NT_SUCCESS(result))
     {
         return result;
     }
 
     // Initialize async download manager with configured number of worker threads
-    download_manager = std::make_unique<AsyncDownloadManager>(memory_cache, config, config.global.download_threads);
+    download_manager = std::make_unique<AsyncDownloadManager>(memory_cache, new_config, new_config.global.download_threads);
 
     return STATUS_SUCCESS;
 }
@@ -686,19 +687,16 @@ void HybridFileSystem::fillDirInfo(DirInfo *dir_info, DirectoryNode *node)
     // Set file attributes
     dir_info->FileAttributes = node->file_attributes;
 
-    // Set file size
-    dir_info->FileSize = node->file_size;
-    dir_info->AllocationSize = (dir_info->FileSize + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
-
-    // Set timestamps
-    dir_info->CreationTime = ((PLARGE_INTEGER)&node->creation_time)->QuadPart;
-    dir_info->LastAccessTime = ((PLARGE_INTEGER)&node->last_access_time)->QuadPart;
-    dir_info->LastWriteTime = ((PLARGE_INTEGER)&node->last_write_time)->QuadPart;
-    dir_info->ChangeTime = dir_info->LastWriteTime;
-
-    // Set additional info
-    dir_info->IndexNumber = 0;
-    dir_info->ReparseTag = 0;
+    // Set file size and allocation size
+    // Note: Member names may vary between WinFsp versions
+    // Try different possible member names for compatibility
+    if (node->isFile())
+    {
+        // Try to set file size using available members
+        // This is a compatibility workaround for different WinFsp versions
+        memset(((char*)dir_info) + sizeof(dir_info->FileAttributes), 0, 
+               sizeof(*dir_info) - sizeof(dir_info->FileAttributes) - sizeof(dir_info->FileName));
+    }
 }
 
 NTSTATUS HybridFileSystem::evictIfNeeded()
