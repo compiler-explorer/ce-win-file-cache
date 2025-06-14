@@ -2,6 +2,7 @@
 #include "../../include/ce-win-file-cache/config_parser.hpp"
 #include <chrono>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <thread>
