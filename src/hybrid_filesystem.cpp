@@ -681,9 +681,9 @@ void HybridFileSystem::fillDirInfo(DirInfo *dir_info, DirectoryNode *node)
         return;
     }
 
-    // Use WinFsp's FspFileSystemAddDirInfo function for compatibility
-    // This handles the different structure layouts between WinFsp versions
-    FileInfo file_info = {};
+    // Use FileSystemBase::SetDirInfo for compatibility with WinFsp C++ wrapper
+    // This avoids structure layout issues between different WinFsp versions
+    FileInfo file_info;
     file_info.FileAttributes = node->file_attributes;
     file_info.ReparseTag = 0;
     file_info.FileSize = static_cast<UINT64>(node->file_size);
@@ -694,7 +694,7 @@ void HybridFileSystem::fillDirInfo(DirInfo *dir_info, DirectoryNode *node)
     file_info.ChangeTime = ((PLARGE_INTEGER)&node->last_write_time)->QuadPart;
     file_info.IndexNumber = 0;
     
-    FspFileSystemAddDirInfo(dir_info, node->name.c_str(), &file_info);
+    SetDirInfo(dir_info, &file_info, node->name.c_str());
 }
 
 NTSTATUS HybridFileSystem::evictIfNeeded()
