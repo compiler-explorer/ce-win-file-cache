@@ -94,11 +94,31 @@ jobs:
             Copy-Item "compilers.json" "build-windows\bin\Release\" -Force
             
             Write-Host "Running test with explicit config path..."
-            & $exe --config "compilers.json" --test-config
+            try {
+                $output1 = & $exe --config "compilers.json" --test-config 2>&1
+                Write-Host "Exit code: $LASTEXITCODE"
+                Write-Host "Output:"
+                Write-Host $output1
+            } catch {
+                Write-Host "Exception occurred: $_"
+            }
             
-            # Also try running without explicit config path (should use default)
+            Write-Host "`n--- Second test ---"
             Write-Host "Running test with default config path..."
-            & $exe --test-config
+            try {
+                $output2 = & $exe --test-config 2>&1
+                Write-Host "Exit code: $LASTEXITCODE"
+                Write-Host "Output:"
+                Write-Host $output2
+            } catch {
+                Write-Host "Exception occurred: $_"
+            }
+            
+            # Check if either test failed
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "Test failed with exit code $LASTEXITCODE"
+                exit 1
+            }
         } else {
             Write-Error "❌ Executable not found"
             Write-Host "Contents of build-windows\bin\Release:"
