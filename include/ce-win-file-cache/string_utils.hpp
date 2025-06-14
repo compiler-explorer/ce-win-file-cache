@@ -26,6 +26,22 @@ public:
      */
     static std::wstring utf8ToWide(const std::string &utf8_str);
 
+    /**
+     * Parse command-line argument as unsigned long
+     * @param arg Single command-line argument string
+     * @return Parsed unsigned long value
+     */
+    static unsigned long parseULong(wchar_t* arg);
+
+    /**
+     * Get next command-line argument safely
+     * @param argv Command-line arguments array
+     * @param index Current argument index (will be incremented)
+     * @param argc Total argument count
+     * @return Next argument as wide string, or nullptr if no more arguments
+     */
+    static const wchar_t* getNextArg(wchar_t* argv[], int& index, int argc);
+
 private:
     /**
      * Fallback ASCII-only conversion for testing/development

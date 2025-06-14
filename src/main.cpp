@@ -2,6 +2,7 @@
 #include <ce-win-file-cache/config_parser.hpp>
 #include <ce-win-file-cache/hybrid_filesystem.hpp>
 #include <ce-win-file-cache/memory_cache_manager.hpp>
+#include <ce-win-file-cache/string_utils.hpp>
 #include <chrono>
 #include <iostream>
 #include <shellapi.h>
@@ -73,9 +74,10 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
 
         if (arg == L"-c" || arg == L"--config")
         {
-            if (i + 1 < argc)
+            const wchar_t* config_path = StringUtils::getNextArg(argv, i, argc);
+            if (config_path)
             {
-                options.config_file = argv[++i];
+                options.config_file = config_path;
             }
             else
             {
@@ -86,9 +88,10 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
         }
         else if (arg == L"-m" || arg == L"--mount")
         {
-            if (i + 1 < argc)
+            const wchar_t* mount_point = StringUtils::getNextArg(argv, i, argc);
+            if (mount_point)
             {
-                options.mount_point = argv[++i];
+                options.mount_point = mount_point;
             }
             else
             {
@@ -99,9 +102,10 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
         }
         else if (arg == L"-u" || arg == L"--volume-prefix")
         {
-            if (i + 1 < argc)
+            const wchar_t* volume_prefix = StringUtils::getNextArg(argv, i, argc);
+            if (volume_prefix)
             {
-                options.volume_prefix = argv[++i];
+                options.volume_prefix = volume_prefix;
             }
             else
             {
@@ -114,7 +118,7 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
         {
             if (i + 1 < argc && argv[i + 1][0] != L'-')
             {
-                options.debug_flags = wcstoul(static_cast<wchar_t*>(argv[++i]), nullptr, 0);
+                options.debug_flags = StringUtils::parseULong(argv[++i]);
             }
             else
             {

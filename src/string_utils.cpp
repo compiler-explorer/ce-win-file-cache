@@ -189,4 +189,18 @@ std::wstring StringUtils::asciiToWideFallback(const std::string &ascii_str)
     return result;
 }
 
+unsigned long StringUtils::parseULong(wchar_t* arg)
+{
+    return wcstoul(static_cast<wchar_t*>(arg), nullptr, 0);
+}
+
+const wchar_t* StringUtils::getNextArg(wchar_t* argv[], int& index, int argc)
+{
+    if (index + 1 < argc)
+    {
+        return argv[++index];
+    }
+    return nullptr;
+}
+
 } // namespace CeWinFileCache
