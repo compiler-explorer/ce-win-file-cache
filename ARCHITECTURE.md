@@ -118,12 +118,12 @@ graph TB
     NS --> NINJA
 
     %% Styling
-    classDef userApp fill:#e1f5fe
-    classDef vfs fill:#f3e5f5
-    classDef cache fill:#e8f5e8
-    classDef network fill:#fff3e0
-    classDef storage fill:#fce4ec
-    classDef config fill:#f1f8e9
+    classDef userApp fill:#0d47a1,stroke:#000,stroke-width:2px,color:#ffffff
+    classDef vfs fill:#4a148c,stroke:#000,stroke-width:2px,color:#ffffff
+    classDef cache fill:#1b5e20,stroke:#000,stroke-width:2px,color:#ffffff
+    classDef network fill:#e65100,stroke:#000,stroke-width:2px,color:#ffffff
+    classDef storage fill:#880e4f,stroke:#000,stroke-width:2px,color:#ffffff
+    classDef config fill:#33691e,stroke:#000,stroke-width:2px,color:#ffffff
 
     class VS,CL,BUILD userApp
     class VFS,WINFSP vfs
@@ -209,9 +209,9 @@ flowchart TD
     SERVE_MEMORY --> END([Response Ready])
     SERVE_NETWORK --> END
     
-    classDef fast fill:#c8e6c9
-    classDef slow fill:#ffcdd2
-    classDef process fill:#e1f5fe
+    classDef fast fill:#1b5e20,stroke:#000,stroke-width:2px,color:#ffffff
+    classDef slow fill:#d32f2f,stroke:#000,stroke-width:2px,color:#ffffff
+    classDef process fill:#0d47a1,stroke:#000,stroke-width:2px,color:#ffffff
     
     class SERVE_MEMORY fast
     class SERVE_NETWORK slow
