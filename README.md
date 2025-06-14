@@ -184,14 +184,28 @@ Create a `compilers.json` file (see included example):
 }
 ```
 
-## Usage
+## Quick Start
+
+For detailed installation and configuration instructions, see the **[Installation & Usage Guide](docs/INSTALLATION_AND_USAGE.md)**.
 
 ### Basic Usage
 
-Mount the filesystem:
-```cmd
-CompilerCacheFS.exe --config compilers.json --mount M:
-```
+1. **Install WinFsp** from [GitHub Releases](https://github.com/winfsp/winfsp/releases)
+2. **Configure** your compilers in `compilers.json` (see example below)
+3. **Mount** the filesystem:
+   ```cmd
+   CeWinFileCacheFS.exe --config compilers.json --mount M:
+   ```
+4. **Access** your compilers through the cached mount point (e.g., `M:\msvc-14.40\bin\cl.exe`)
+
+### Example: Network Share to Cached Path
+
+| Network Location | Cached Path |
+|-----------------|-------------|
+| `Z:\compilers\msvc\14.40\bin\cl.exe` | `M:\msvc-14.40\bin\cl.exe` |
+| `\\server\tools\ninja.exe` | `M:\tools\ninja.exe` |
+
+Files accessed through the cached paths are automatically cached for faster subsequent access.
 
 ### Command Line Options
 
@@ -315,6 +329,7 @@ All tests run on their target platforms - Linux tests cover core logic without W
 
 Comprehensive documentation is available in the [`docs/`](docs/) directory:
 
+- **[Installation & Usage Guide](docs/INSTALLATION_AND_USAGE.md)** - Complete setup and configuration guide
 - **[Architecture Overview](docs/ARCHITECTURE.md)** - System design, components, and visual diagrams
 - **[Windows CI Pipeline](docs/WINDOWS_CI_PLAN.md)** - Complete CI/CD implementation details
 - **[Testing Guide](docs/TESTING.md)** - Test framework and validation procedures
