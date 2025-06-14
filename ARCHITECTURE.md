@@ -152,7 +152,7 @@ sequenceDiagram
     alt File in Memory Cache
         HFS->>MC: Check cache
         MC-->>HFS: Return cached file
-        HFS-->>VFS: Fast response (1-5ms)
+        HFS-->>VFS: Fast response
     else File not cached
         HFS->>DC: Get directory info
         DC-->>HFS: Directory structure
@@ -167,12 +167,12 @@ sequenceDiagram
         NC-->>ADM: Download complete
         ADM->>MC: Store in cache
         MC-->>HFS: File ready
-        HFS-->>VFS: Response (200-500ms first time)
+        HFS-->>VFS: Response (first time)
     end
     
     VFS-->>App: File handle ready
     
-    Note over App,NS: Subsequent access to same file<br/>serves from memory cache (1-5ms)
+    Note over App,NS: Subsequent access to same file<br/>serves from memory cache
 ```
 
 ### Cache Policy Flow
@@ -185,8 +185,8 @@ flowchart TD
     CHECK_PATTERN{Matches Cache<br/>Pattern?}
     CHECK_SIZE{Within Size<br/>Limits?}
     
-    SERVE_MEMORY[Serve from Memory<br/>⚡ 1-5ms]
-    SERVE_NETWORK[Serve from Network<br/>🌐 200-500ms]
+    SERVE_MEMORY[Serve from Memory<br/>⚡ Fast]
+    SERVE_NETWORK[Serve from Network<br/>🌐 Slower]
     QUEUE_DOWNLOAD[Queue Background<br/>Download]
     STORE_CACHE[Store in Cache]
     EVICT_LRU[Evict LRU Items]
@@ -287,18 +287,13 @@ flowchart TD
 
 ## Performance Benefits
 
-```
-Typical Performance Improvements:
-┌─────────────────────┬──────────────┬──────────────┐
-│ Operation           │ Network      │ Cached       │
-├─────────────────────┼──────────────┼──────────────┤
-│ Open cl.exe         │ 200-500ms    │ 1-5ms        │
-│ Read stdio.h        │ 50-200ms     │ <1ms         │
-│ Directory listing   │ 100-300ms    │ <1ms         │
-│ Build (clean)       │ 5-15 min     │ 2-5 min      │
-│ Build (incremental) │ 30-120s      │ 10-30s       │
-└─────────────────────┴──────────────┴──────────────┘
-```
+The caching system provides significant performance improvements by:
+
+- **Memory cache hits**: Serve frequently accessed files directly from RAM
+- **Directory structure caching**: Eliminate network round-trips for directory listings
+- **Background downloads**: Async fetching doesn't block file access
+- **Pattern-based caching**: Focus cache space on high-impact files (executables, libraries)
+- **LRU eviction**: Keep most-used files readily available
 
 ## Technical Highlights
 
