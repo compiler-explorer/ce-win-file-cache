@@ -153,19 +153,23 @@ run_test() {
         echo -e "${BLUE}--- Running $test_name $test_args ---${NC}"
         
         # Run test and capture exit code
-        if "$test_exe" $test_args; then
-            echo -e "${GREEN}✓ $test_name PASSED${NC}"
-            ((PASSED++))
+        set +e  # Temporarily disable exit on error for this test
+        "$test_exe" $test_args
+        local exit_code=$?
+        set -e  # Re-enable exit on error
+        
+        if [[ $exit_code -eq 0 ]]; then
+            echo -e "${GREEN}✓ $test_name PASSED (exit code: $exit_code)${NC}"
+            PASSED=$((PASSED + 1))
         else
-            exit_code=$?
             echo -e "${RED}✗ $test_name FAILED (exit code: $exit_code)${NC}"
-            ((FAILED++))
-            FAILED_TESTS="$FAILED_TESTS\n  - $test_name"
+            FAILED=$((FAILED + 1))
+            FAILED_TESTS="$FAILED_TESTS\n  - $test_name (exit code: $exit_code)"
         fi
         echo
     else
         echo -e "${RED}✗ $test_name executable not found${NC}"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
         FAILED_TESTS="$FAILED_TESTS\n  - $test_name (not built)"
         echo
     fi
@@ -214,13 +218,18 @@ run_test "glob_matcher_unit_test" ""
 echo -e "${BLUE}--- Running CTest unit tests ---${NC}"
 cd "$BUILD_DIR"
 if command -v ctest &> /dev/null; then
-    if ctest --test-dir . -V; then
-        echo -e "${GREEN}✓ CTest unit tests PASSED${NC}"
-        ((PASSED++))
+    set +e  # Temporarily disable exit on error
+    ctest --test-dir . -V
+    local ctest_exit_code=$?
+    set -e  # Re-enable exit on error
+    
+    if [[ $ctest_exit_code -eq 0 ]]; then
+        echo -e "${GREEN}✓ CTest unit tests PASSED (exit code: $ctest_exit_code)${NC}"
+        PASSED=$((PASSED + 1))
     else
-        echo -e "${RED}✗ CTest unit tests FAILED${NC}"
-        ((FAILED++))
-        FAILED_TESTS="$FAILED_TESTS\n  - CTest unit tests"
+        echo -e "${RED}✗ CTest unit tests FAILED (exit code: $ctest_exit_code)${NC}"
+        FAILED=$((FAILED + 1))
+        FAILED_TESTS="$FAILED_TESTS\n  - CTest unit tests (exit code: $ctest_exit_code)"
     fi
 else
     echo -e "${YELLOW}⚠ CTest not available, skipping unit tests${NC}"
