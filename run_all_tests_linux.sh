@@ -220,7 +220,7 @@ cd "$BUILD_DIR"
 if command -v ctest &> /dev/null; then
     set +e  # Temporarily disable exit on error
     ctest --test-dir . -V
-    local ctest_exit_code=$?
+    ctest_exit_code=$?
     set -e  # Re-enable exit on error
     
     if [[ $ctest_exit_code -eq 0 ]]; then
