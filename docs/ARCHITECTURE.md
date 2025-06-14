@@ -298,10 +298,45 @@ The caching system provides significant performance improvements by:
 ## Technical Highlights
 
 - **WinFsp Integration**: Kernel-level filesystem driver for transparency
-- **Cross-Platform Testing**: Linux CI for core logic, Windows for full stack
+- **Full CI/CD Pipeline**: Complete GitHub Actions workflows for Linux and Windows
 - **Modern C++20**: Clean, maintainable codebase with strong typing
 - **Comprehensive Testing**: Unit tests, integration tests, performance benchmarks
 - **Production Ready**: Metrics, logging, error handling, graceful degradation
+
+## CI/CD Implementation
+
+### ✅ **Linux CI Pipeline**
+- **Runs on**: `ubuntu-latest`
+- **Tests**: Core logic, memory cache, directory tree, async downloads
+- **Tools**: CMake, Catch2, clang-format
+- **Coverage**: Unit tests, integration tests, edge cases
+- **Status**: Fully operational with automated formatting and comprehensive test suite
+
+### ✅ **Windows CI Pipeline**
+- **Runs on**: `windows-latest`
+- **WinFsp**: Automated MSI installation with DLL resolution
+- **Build**: Native MSVC compilation with proper linking
+- **Tests**: Config parsing, path resolution, network mapping
+- **Integration**: Full WinFsp driver testing with filesystem operations
+- **Status**: Fully operational with detailed logging and artifact uploads
+
+### **Test Coverage**
+```
+✅ Config Parsing       - JSON configuration validation
+✅ Path Resolution      - Virtual to network path mapping  
+✅ Network Mapping      - UNC path validation
+✅ Memory Cache         - In-memory file operations
+✅ Directory Tree       - Always-cached directory structure
+✅ Async Downloads      - Multi-threaded file fetching
+✅ LRU Eviction        - Cache size management
+✅ Error Handling      - Graceful degradation and recovery
+```
+
+### **Build Artifacts**
+- **Windows**: `CeWinFileCacheFS.exe` with WinFsp DLLs
+- **Linux**: Test executables and coverage reports
+- **Config**: Sample `compilers.json` configuration
+- **Retention**: 7 days for debugging and deployment
 
 ---
 

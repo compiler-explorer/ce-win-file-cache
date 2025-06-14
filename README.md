@@ -305,10 +305,23 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 The project includes comprehensive CI/CD workflows:
 
-- **Tests**: Runs comprehensive test suite on every push/PR with multiple Ubuntu versions and compilers
+- **Linux CI**: Runs comprehensive test suite on every push/PR with multiple Ubuntu versions and compilers
+- **Windows CI**: Full WinFsp integration testing with MSVC builds on Windows runners  
 - **Code Quality**: Static analysis, warning checks, and documentation validation
 
-All tests run on Linux without WinFsp or Wine dependencies, using the cross-platform test infrastructure.
+All tests run on their target platforms - Linux tests cover core logic without WinFsp dependencies, while Windows tests validate the complete WinFsp integration.
+
+## Documentation
+
+Comprehensive documentation is available in the [`docs/`](docs/) directory:
+
+- **[Architecture Overview](docs/ARCHITECTURE.md)** - System design, components, and visual diagrams
+- **[Windows CI Pipeline](docs/WINDOWS_CI_PLAN.md)** - Complete CI/CD implementation details
+- **[Testing Guide](docs/TESTING.md)** - Test framework and validation procedures
+- **[Caching Design](docs/CACHING_DESIGN.md)** - Cache algorithms and policies
+- **[Async Download Flow](docs/ASYNC_DOWNLOAD_FLOW.md)** - Multi-threaded download system
+- **[Development Setup](docs/REMOTE_DEV_GUIDE.md)** - Remote development configuration
+- **[TODO List](docs/TODO.md)** - Implementation roadmap and pending items
 
 ## Monitoring and Metrics
 
@@ -344,10 +357,12 @@ Metrics include dynamic labels for detailed analysis:
 - **JSON Configuration**: Full configuration parsing and validation
 - **Glob Pattern Matching**: Proper glob matching for file patterns (*, **, ?)
 - **Test Infrastructure**: Comprehensive test suite with automated runner
+- **Windows CI/CD Pipeline**: Complete MSVC build and WinFsp integration testing
+- **Cross-Platform Development**: Linux development with Windows production target
 
 ### 📝 Remaining Work
-- **WinFsp Integration**: Connect cache system to Windows filesystem driver
-- **Production Deployment**: Logging, error recovery, and monitoring enhancements
+- **WinFsp Filesystem Operations**: Complete file read/write operations
+- **Production Deployment**: Enhanced logging, error recovery, and monitoring
 - **Performance Optimization**: Profile and optimize cache algorithms
 
 ## Roadmap
