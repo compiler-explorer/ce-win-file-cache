@@ -169,7 +169,7 @@ int testDirectoryCache()
 
     for (const auto &path : test_paths)
     {
-        auto *node = cache.findNode(path);
+        const auto *node = cache.findNode(path);
         std::wcout << L"  " << path << L": ";
         if (node)
         {
@@ -257,7 +257,7 @@ int testRealFilesystem()
 
     for (const auto &path : test_paths)
     {
-        auto *node = cache.findNode(path);
+        const auto *node = cache.findNode(path);
         std::wcout << L"  " << path << L": ";
         if (node)
         {

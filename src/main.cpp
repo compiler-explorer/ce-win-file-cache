@@ -114,7 +114,7 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
         {
             if (i + 1 < argc && argv[i + 1][0] != L'-')
             {
-                options.debug_flags = wcstoul((wchar_t *)argv[++i], nullptr, 0);
+                options.debug_flags = wcstoul(static_cast<wchar_t*>(argv[++i]), nullptr, 0);
             }
             else
             {

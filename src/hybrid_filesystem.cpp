@@ -377,13 +377,10 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
         return STATUS_INVALID_PARAMETER;
     }
 
-    // Get directory contents from in-memory tree
-    std::vector<DirectoryNode *> contents;
-
     if (*PContext == nullptr)
     {
         // Start enumeration - get all directory contents
-        contents = directory_cache.getDirectoryContents(file_desc->entry->virtual_path);
+        std::vector<DirectoryNode *> contents = directory_cache.getDirectoryContents(file_desc->entry->virtual_path);
 
         if (contents.empty())
         {

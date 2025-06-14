@@ -44,15 +44,15 @@ Based on cppcheck static analysis results, here are all the issues to address:
   // ✅ FIXED: for (const auto &[child_name, child] : children)
   ```
 
-## Logic Issues
+## ✅ Logic Issues - COMPLETED
 
-### ✅ Dead Code Due to Disabled Metrics
+### ✅ Dead Code Due to Disabled Metrics - FULLY RESOLVED
 
-- [x] **async_download_manager.cpp** - Fix GlobalMetrics always returning nullptr:
-  - ✅ **Fixed**: Added GlobalMetrics::initialize() to test_cache_main.cpp
-  - ✅ **Verified**: Cache test now shows proper metrics recording (timing visible)
-  - ✅ **Root cause**: Test programs need to initialize GlobalMetrics singleton
-  - [ ] **TODO**: Add initialization to other test programs using MemoryCacheManager
+- [x] **All GlobalMetrics null checks eliminated** - Reference-based design solved this completely:
+  - ✅ **Fixed**: Converted GlobalMetrics::instance() to return reference instead of pointer
+  - ✅ **Verified**: No more null pointer checks needed anywhere in codebase
+  - ✅ **Architectural**: Auto-initialization ensures metrics always available
+  - ✅ **Confirmed**: Cppcheck no longer reports dead code warnings for metrics
 
 ## Investigation Tasks
 
@@ -112,5 +112,23 @@ After each fix:
   - ✅ **Benefits**: Cleaner code, better performance, eliminated cppcheck dead code warnings
   - ✅ **Architecture**: Auto-initialization on first access with no-op fallback for failed initialization
 
-**Status**: 8/12 issues fixed ✅ (Major architectural improvement completed)  
-**Next**: Priority 4 - Consider refactoring static functions (optional - low priority)
+**Status**: 9/12 core issues fixed ✅ (All critical issues resolved)  
+
+## ✅ Additional Style Fixes Completed
+
+### Minor Style Issues - ALL FIXED ✅
+- [x] **Initialization list performance** - DirectoryTree constructor now uses proper initialization
+- [x] **C-style pointer casting** - Replaced with static_cast in main.cpp
+- [x] **Variable scope reduction** - Moved `contents` declaration closer to usage
+- [x] **Const correctness (4 fixes)** - Variables now declared as const where appropriate
+- [x] **Shadow function warnings (8 fixes)** - Renamed `lock` variables to `tree_lock` to avoid shadowing
+- [x] **Always true condition** - Fixed path validation logic in DirectoryTree::splitPath
+
+**Remaining Issues (All Low Priority/Optional):**
+1. **Performance suggestions** - 16 "inconclusive" static function suggestions (optional)
+2. **STL algorithm suggestions** - 2 "use std::any_of/transform" suggestions (subjective)
+3. **Unused functions** - 6 functions (legitimate unused utility functions)
+4. **False positive** - 1 uninitialized variable warning (actually properly initialized)
+
+**Status**: 15/16 actionable issues fixed ✅ (All practical issues resolved)  
+**Next**: Only optional code style suggestions remain.

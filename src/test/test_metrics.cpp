@@ -109,7 +109,7 @@ void test_global_metrics_singleton()
         std::cout << "✓ Global metrics shutdown completed" << std::endl;
 
         // Verify shutdown (GlobalMetrics now always returns a reference)
-        auto &metrics_after = GlobalMetrics::instance();
+        const auto &metrics_after = GlobalMetrics::instance();
         std::cout << "✓ Global metrics shutdown completed (reference-based design always available)" << std::endl;
         (void)metrics_after; // Suppress unused variable warning
     }
@@ -132,7 +132,7 @@ void test_metrics_disabled()
         GlobalMetrics::initialize(config);
         std::cout << "✓ Metrics initialization handled disabled state" << std::endl;
 
-        auto &metrics = GlobalMetrics::instance();
+        const auto &metrics = GlobalMetrics::instance();
         std::cout << "✓ Metrics instance available (reference-based design with no-op when disabled)" << std::endl;
         std::cout << "  Disabled metrics URL: " << metrics.getMetricsUrl() << std::endl;
         (void)metrics; // Suppress unused variable warning

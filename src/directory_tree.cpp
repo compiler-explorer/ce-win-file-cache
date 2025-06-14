@@ -6,26 +6,26 @@ namespace CeWinFileCache
 {
 
 DirectoryTree::DirectoryTree()
+: root(std::make_unique<DirectoryNode>(L"", NodeType::DIRECTORY))
 {
-    root = std::make_unique<DirectoryNode>(L"", NodeType::DIRECTORY);
     root->full_virtual_path = L"/";
 }
 
 DirectoryNode *DirectoryTree::findNode(const std::wstring &virtual_path)
 {
-    std::lock_guard<std::mutex> lock(tree_mutex);
+    std::lock_guard<std::mutex> tree_lock(tree_mutex);
     return findOrCreatePath(virtual_path, false);
 }
 
 DirectoryNode *DirectoryTree::createPath(const std::wstring &virtual_path, NodeType /*type*/)
 {
-    std::lock_guard<std::mutex> lock(tree_mutex);
+    std::lock_guard<std::mutex> tree_lock(tree_mutex);
     return findOrCreatePath(virtual_path, true);
 }
 
 bool DirectoryTree::addFile(const std::wstring &virtual_path, const std::wstring &network_path, UINT64 size, const FILETIME *creation_time)
 {
-    std::lock_guard<std::mutex> lock(tree_mutex);
+    std::lock_guard<std::mutex> tree_lock(tree_mutex);
 
     DirectoryNode *node = findOrCreatePath(virtual_path, true);
     if (!node)
@@ -41,7 +41,7 @@ bool DirectoryTree::addFile(const std::wstring &virtual_path, const std::wstring
 
 bool DirectoryTree::addDirectory(const std::wstring &virtual_path, const std::wstring &network_path)
 {
-    std::lock_guard<std::mutex> lock(tree_mutex);
+    std::lock_guard<std::mutex> tree_lock(tree_mutex);
 
     DirectoryNode *node = findOrCreatePath(virtual_path, true);
     if (!node)
@@ -58,7 +58,7 @@ bool DirectoryTree::addDirectory(const std::wstring &virtual_path, const std::ws
 
 std::vector<DirectoryNode *> DirectoryTree::getDirectoryContents(const std::wstring &virtual_path)
 {
-    std::lock_guard<std::mutex> lock(tree_mutex);
+    std::lock_guard<std::mutex> tree_lock(tree_mutex);
 
     DirectoryNode *dir_node = findOrCreatePath(virtual_path, false);
     if (!dir_node || !dir_node->isDirectory())
@@ -92,7 +92,7 @@ size_t DirectoryTree::getTotalNodes() const
 
 size_t DirectoryTree::getTotalDirectories() const
 {
-    std::lock_guard<std::mutex> lock(tree_mutex);
+    std::lock_guard<std::mutex> tree_lock(tree_mutex);
 
     size_t count = 0;
     std::function<void(const DirectoryNode *)> countDirs = [&](const DirectoryNode *node)
@@ -111,7 +111,7 @@ size_t DirectoryTree::getTotalDirectories() const
 
 size_t DirectoryTree::getTotalFiles() const
 {
-    std::lock_guard<std::mutex> lock(tree_mutex);
+    std::lock_guard<std::mutex> tree_lock(tree_mutex);
 
     size_t count = 0;
     std::function<void(const DirectoryNode *)> countFiles = [&](const DirectoryNode *node)
@@ -130,7 +130,7 @@ size_t DirectoryTree::getTotalFiles() const
 
 void DirectoryTree::reset()
 {
-    std::lock_guard<std::mutex> lock(tree_mutex);
+    std::lock_guard<std::mutex> tree_lock(tree_mutex);
     root = std::make_unique<DirectoryNode>(L"", NodeType::DIRECTORY);
     root->full_virtual_path = L"/";
 }
@@ -146,8 +146,8 @@ std::vector<std::wstring> DirectoryTree::splitPath(const std::wstring &path)
 
     std::wstring normalized_path = path;
 
-    // Remove leading slash
-    if (!normalized_path.empty() && normalized_path[0] == L'/')
+    // Remove leading slash (path is guaranteed non-empty here)
+    if (normalized_path[0] == L'/')
     {
         normalized_path = normalized_path.substr(1);
     }
