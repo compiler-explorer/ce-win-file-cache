@@ -21,7 +21,7 @@
 #   ./run_all_tests_linux.sh --clean      # Clean build and test run
 #   ./run_all_tests_linux.sh --quick      # Skip configuration, just build and test
 
-set -e  # Exit on any error
+# set -e  # Exit on any error - temporarily disabled for debugging
 
 # Parse command line arguments
 CLEAN_BUILD=false
@@ -115,9 +115,12 @@ ls -la "$BUILD_DIR/bin/" || echo "  (directory does not exist)"
 echo
 
 for exe in "$BUILD_DIR/bin"/*; do
+    echo "Checking: $exe"
     if [[ -x "$exe" ]]; then
         echo "  ✓ $(basename "$exe")"
-        ((TESTS_FOUND++))
+        TESTS_FOUND=$((TESTS_FOUND + 1))
+    else
+        echo "  ✗ $(basename "$exe") (not executable)"
     fi
 done
 echo "Found $TESTS_FOUND test executables"
