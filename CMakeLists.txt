@@ -86,48 +86,62 @@ if(WIN32 OR USE_WINE_WINDOWS_API)
         set(WINFSP_ARCH "x86") 
     endif()
     
-    # First try to find system WinFsp installation using Windows paths without spaces
-    if(EXISTS "C:/PROGRA~2/WinFsp/lib/winfsp-${WINFSP_ARCH}.lib")
-        # Set Windows paths directly for MSVC compiler (using short paths to avoid parentheses)
-        set(WINFSP_LIBRARY "C:/PROGRA~2/WinFsp/lib/winfsp-${WINFSP_ARCH}.lib")
-        set(WINFSP_INCLUDE_DIR "C:/PROGRA~2/WinFsp/inc")
-        # Use submodule for C++ headers since system installation only has C headers
-        set(WINFSP_CPP_INCLUDE_DIR "D:/opt/ce-win-file-cache/external/winfsp/inc")
-        set(WINFSP_FOUND TRUE)
-        message(STATUS "Found system WinFsp at C:/PROGRA~2/WinFsp")
-        message(STATUS "Using C++ headers from submodule: ${WINFSP_CPP_INCLUDE_DIR}")
-    elseif(EXISTS "C:/PROGRA~1/WinFsp/lib/winfsp-${WINFSP_ARCH}.lib")
-        # Set Windows paths directly for MSVC compiler (using short paths to avoid parentheses)
-        set(WINFSP_LIBRARY "C:/PROGRA~1/WinFsp/lib/winfsp-${WINFSP_ARCH}.lib")
-        set(WINFSP_INCLUDE_DIR "C:/PROGRA~1/WinFsp/inc")
-        # Use submodule for C++ headers since system installation only has C headers
-        set(WINFSP_CPP_INCLUDE_DIR "D:/opt/ce-win-file-cache/external/winfsp/inc")
-        set(WINFSP_FOUND TRUE)
-        message(STATUS "Found system WinFsp at C:/PROGRA~1/WinFsp")
-        message(STATUS "Using C++ headers from submodule: ${WINFSP_CPP_INCLUDE_DIR}")
+    # GitHub Actions environment detection and path configuration
+    if(DEFINED ENV{GITHUB_ACTIONS})
+        message(STATUS "Detected GitHub Actions environment")
+        set(WINFSP_ROOT "${CMAKE_SOURCE_DIR}/external/winfsp")
+        set(WINFSP_CPP_INCLUDE_DIR "${WINFSP_ROOT}/inc")
+        
+        # Try standard GitHub Actions WinFsp installation paths
+        set(WINFSP_SYSTEM_PATHS
+            "C:/Program Files (x86)/WinFsp"
+            "C:/Program Files/WinFsp"
+            "C:/PROGRA~2/WinFsp"
+            "C:/PROGRA~1/WinFsp"
+        )
     else()
-        set(WINFSP_FOUND FALSE)
+        # Local development paths (current behavior)
+        set(WINFSP_SYSTEM_PATHS
+            "C:/PROGRA~2/WinFsp"
+            "C:/PROGRA~1/WinFsp"
+        )
+        set(WINFSP_ROOT "D:/opt/ce-win-file-cache/external/winfsp")
+        set(WINFSP_CPP_INCLUDE_DIR "${WINFSP_ROOT}/inc")
     endif()
     
-    # If system installation not found, fall back to submodule
+    # Try to find system WinFsp installation
+    set(WINFSP_FOUND FALSE)
+    foreach(WINFSP_PATH ${WINFSP_SYSTEM_PATHS})
+        if(EXISTS "${WINFSP_PATH}/lib/winfsp-${WINFSP_ARCH}.lib")
+            set(WINFSP_LIBRARY "${WINFSP_PATH}/lib/winfsp-${WINFSP_ARCH}.lib")
+            set(WINFSP_INCLUDE_DIR "${WINFSP_PATH}/inc")
+            set(WINFSP_FOUND TRUE)
+            message(STATUS "Found system WinFsp at ${WINFSP_PATH}")
+            break()
+        endif()
+    endforeach()
+    
+    # Fallback to submodule if system installation not found
     if(NOT WINFSP_FOUND)
-        message(STATUS "System WinFsp not found, trying submodule...")
-        set(WINFSP_ROOT "D:/opt/ce-win-file-cache/external/winfsp")
+        message(STATUS "System WinFsp not found, trying submodule at ${WINFSP_ROOT}")
         set(WINFSP_INCLUDE_DIR "${WINFSP_ROOT}/inc")
-        set(WINFSP_CPP_INCLUDE_DIR "${WINFSP_ROOT}/inc")
         set(WINFSP_LIBRARY "${WINFSP_ROOT}/opt/fsext/lib/winfsp-${WINFSP_ARCH}.lib")
         
-        if(NOT EXISTS "D:/opt/ce-win-file-cache/external/winfsp/inc/winfsp/winfsp.h")
+        if(NOT EXISTS "${WINFSP_ROOT}/inc/winfsp/winfsp.h")
             message(FATAL_ERROR "WinFsp not found. Please install WinFsp or run: git submodule update --init --recursive")
         endif()
         
-        if(NOT EXISTS "D:/opt/ce-win-file-cache/external/winfsp/opt/fsext/lib/winfsp-${WINFSP_ARCH}.lib")
-            message(FATAL_ERROR "WinFsp library not found")
+        if(NOT EXISTS "${WINFSP_LIBRARY}")
+            message(FATAL_ERROR "WinFsp library not found at ${WINFSP_LIBRARY}")
         endif()
         
         message(STATUS "Using WinFsp from submodule: ${WINFSP_ROOT}")
     else()
         message(STATUS "Using system WinFsp installation")
+        # For system installation, use submodule for C++ headers if available
+        if(EXISTS "${WINFSP_CPP_INCLUDE_DIR}")
+            message(STATUS "Using C++ headers from submodule: ${WINFSP_CPP_INCLUDE_DIR}")
+        endif()
     endif()
     
     message(STATUS "WinFsp include dir: ${WINFSP_INCLUDE_DIR}")

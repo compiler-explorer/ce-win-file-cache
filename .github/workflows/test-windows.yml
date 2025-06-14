@@ -1,0 +1,99 @@
+name: Windows Build with WinFsp
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test-windows:
+    name: Build on Windows with WinFsp
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup MSVC environment
+      uses: microsoft/setup-msbuild@v2
+    
+    - name: Install WinFsp
+      shell: powershell
+      run: |
+        # Download latest WinFsp installer
+        $url = "https://github.com/winfsp/winfsp/releases/download/v2.0/winfsp-2.0.23075.msi"
+        $output = "$env:TEMP\winfsp.msi"
+        Write-Host "Downloading WinFsp from $url"
+        Invoke-WebRequest -Uri $url -OutFile $output
+        
+        # Install silently with full feature set
+        Write-Host "Installing WinFsp..."
+        Start-Process msiexec.exe -Wait -ArgumentList "/i $output /quiet /qn ADDLOCAL=ALL"
+        
+        # Verify installation
+        $winfspPath = "C:\Program Files (x86)\WinFsp\lib\winfsp-x64.lib"
+        if (Test-Path $winfspPath) {
+            Write-Host "✅ WinFsp installed successfully at C:\Program Files (x86)\WinFsp"
+        } else {
+            $winfspPath = "C:\Program Files\WinFsp\lib\winfsp-x64.lib"
+            if (Test-Path $winfspPath) {
+                Write-Host "✅ WinFsp installed successfully at C:\Program Files\WinFsp"
+            } else {
+                Write-Error "❌ WinFsp installation failed"
+                Write-Host "Searching for WinFsp installation..."
+                Get-ChildItem "C:\Program Files*\*WinFsp*" -Recurse -ErrorAction SilentlyContinue
+                exit 1
+            }
+        }
+    
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build-windows `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DENABLE_METRICS=ON `
+          -DBUILD_SHARED_LIBS=OFF `
+          -A x64
+    
+    - name: Build
+      run: cmake --build build-windows --config Release --parallel
+    
+    - name: Test WinFsp linking
+      shell: powershell
+      run: |
+        $exe = "build-windows\bin\Release\CeWinFileCacheFS.exe"
+        if (Test-Path $exe) {
+            Write-Host "✅ Executable built successfully"
+            
+            # Check if WinFsp DLLs are properly linked
+            Write-Host "Checking dependencies..."
+            # Use where command to find dumpbin if available
+            $dumpbin = Get-Command dumpbin -ErrorAction SilentlyContinue
+            if ($dumpbin) {
+                dumpbin /dependents $exe
+            } else {
+                Write-Host "dumpbin not available, skipping dependency check"
+            }
+            
+            # Run basic functionality test
+            Write-Host "Running basic functionality test..."
+            & $exe --test-config
+        } else {
+            Write-Error "❌ Executable not found"
+            Write-Host "Contents of build-windows\bin\Release:"
+            Get-ChildItem "build-windows\bin\Release" -ErrorAction SilentlyContinue
+            exit 1
+        }
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: windows-build
+        path: |
+          build-windows/bin/Release/CeWinFileCacheFS.exe
+          build-windows/bin/Release/*.dll
+          compilers.json
+        retention-days: 7
