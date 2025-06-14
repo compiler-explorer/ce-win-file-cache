@@ -77,9 +77,9 @@ jobs:
                 Write-Host "dumpbin not available, skipping dependency check"
             }
             
-            # Run basic functionality test
+            # Run basic functionality test from repository root
             Write-Host "Running basic functionality test..."
-            & $exe --test-config
+            & $exe --config compilers.json --test-config
         } else {
             Write-Error "❌ Executable not found"
             Write-Host "Contents of build-windows\bin\Release:"
