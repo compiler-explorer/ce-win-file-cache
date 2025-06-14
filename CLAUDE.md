@@ -230,3 +230,8 @@ public:
 
 - **Memory Handling Techniques**:
   - Any time you encounter "No such file or directory": execute PWD to determine the current directory and fix the problem with that information
+
+## Testing
+
+- Prefer writing unit tests for every new function unless there are good reasons not to
+```
