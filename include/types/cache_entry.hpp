@@ -29,9 +29,8 @@ struct CacheEntry
     bool is_dirty;
 
     CacheEntry()
-    : state(FileState::VIRTUAL), policy(CachePolicy::ON_DEMAND), file_attributes(0), file_size(0), 
-      creation_time{}, last_access_time{}, last_write_time{}, 
-      last_used(std::chrono::steady_clock::now()), access_count(0), is_dirty(false)
+    : state(FileState::VIRTUAL), policy(CachePolicy::ON_DEMAND), file_attributes(0), file_size(0), creation_time{},
+      last_access_time{}, last_write_time{}, last_used(std::chrono::steady_clock::now()), access_count(0), is_dirty(false)
     {
     }
 };

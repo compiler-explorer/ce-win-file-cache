@@ -4,11 +4,11 @@
 #ifdef _WIN32
 #include <windows.h>
 #else
-#include <locale>
 #include <clocale>
-#include <cwchar>
 #include <cstdlib>
 #include <cstring>
+#include <cwchar>
+#include <locale>
 #endif
 
 namespace CeWinFileCache
@@ -23,8 +23,8 @@ std::string StringUtils::wideToUtf8(const std::wstring &wide_str)
 
 #ifdef _WIN32
     // Windows: Use WideCharToMultiByte
-    int size_needed = WideCharToMultiByte(CP_UTF8, 0, wide_str.c_str(), static_cast<int>(wide_str.size()), 
-                                         nullptr, 0, nullptr, nullptr);
+    int size_needed =
+    WideCharToMultiByte(CP_UTF8, 0, wide_str.c_str(), static_cast<int>(wide_str.size()), nullptr, 0, nullptr, nullptr);
     if (size_needed <= 0)
     {
         // Fallback to ASCII conversion
@@ -32,8 +32,8 @@ std::string StringUtils::wideToUtf8(const std::wstring &wide_str)
     }
 
     std::string result(size_needed, 0);
-    int result_size = WideCharToMultiByte(CP_UTF8, 0, wide_str.c_str(), static_cast<int>(wide_str.size()), 
-                                         &result[0], size_needed, nullptr, nullptr);
+    int result_size = WideCharToMultiByte(CP_UTF8, 0, wide_str.c_str(), static_cast<int>(wide_str.size()), &result[0],
+                                          size_needed, nullptr, nullptr);
     if (result_size <= 0)
     {
         // Fallback to ASCII conversion
@@ -44,14 +44,13 @@ std::string StringUtils::wideToUtf8(const std::wstring &wide_str)
 
 #else
     // Unix/Linux: Use wcstombs with UTF-8 locale
-    
+
     // Set locale to UTF-8 if not already set
-    const char* current_locale = setlocale(LC_CTYPE, nullptr);
+    const char *current_locale = setlocale(LC_CTYPE, nullptr);
     bool locale_set = false;
     if (current_locale == nullptr || strstr(current_locale, "UTF-8") == nullptr)
     {
-        if (setlocale(LC_CTYPE, "C.UTF-8") != nullptr || 
-            setlocale(LC_CTYPE, "en_US.UTF-8") != nullptr ||
+        if (setlocale(LC_CTYPE, "C.UTF-8") != nullptr || setlocale(LC_CTYPE, "en_US.UTF-8") != nullptr ||
             setlocale(LC_CTYPE, "C.utf8") != nullptr)
         {
             locale_set = true;
@@ -94,8 +93,7 @@ std::wstring StringUtils::utf8ToWide(const std::string &utf8_str)
 
 #ifdef _WIN32
     // Windows: Use MultiByteToWideChar
-    int size_needed = MultiByteToWideChar(CP_UTF8, 0, utf8_str.c_str(), static_cast<int>(utf8_str.size()), 
-                                         nullptr, 0);
+    int size_needed = MultiByteToWideChar(CP_UTF8, 0, utf8_str.c_str(), static_cast<int>(utf8_str.size()), nullptr, 0);
     if (size_needed <= 0)
     {
         // Fallback to ASCII conversion
@@ -103,8 +101,7 @@ std::wstring StringUtils::utf8ToWide(const std::string &utf8_str)
     }
 
     std::wstring result(size_needed, 0);
-    int result_size = MultiByteToWideChar(CP_UTF8, 0, utf8_str.c_str(), static_cast<int>(utf8_str.size()), 
-                                         &result[0], size_needed);
+    int result_size = MultiByteToWideChar(CP_UTF8, 0, utf8_str.c_str(), static_cast<int>(utf8_str.size()), &result[0], size_needed);
     if (result_size <= 0)
     {
         // Fallback to ASCII conversion
@@ -115,14 +112,13 @@ std::wstring StringUtils::utf8ToWide(const std::string &utf8_str)
 
 #else
     // Unix/Linux: Use mbstowcs with UTF-8 locale
-    
+
     // Set locale to UTF-8 if not already set
-    const char* current_locale = setlocale(LC_CTYPE, nullptr);
+    const char *current_locale = setlocale(LC_CTYPE, nullptr);
     bool locale_set = false;
     if (current_locale == nullptr || strstr(current_locale, "UTF-8") == nullptr)
     {
-        if (setlocale(LC_CTYPE, "C.UTF-8") != nullptr || 
-            setlocale(LC_CTYPE, "en_US.UTF-8") != nullptr ||
+        if (setlocale(LC_CTYPE, "C.UTF-8") != nullptr || setlocale(LC_CTYPE, "en_US.UTF-8") != nullptr ||
             setlocale(LC_CTYPE, "C.utf8") != nullptr)
         {
             locale_set = true;
@@ -160,19 +156,19 @@ std::string StringUtils::wideToAsciiFallback(const std::wstring &wide_str)
 {
     std::string result;
     result.reserve(wide_str.size());
-    
+
     for (wchar_t wc : wide_str)
     {
-        if (wc <= 127)  // ASCII range
+        if (wc <= 127) // ASCII range
         {
             result += static_cast<char>(wc);
         }
         else
         {
-            result += '?';  // Replace non-ASCII with placeholder
+            result += '?'; // Replace non-ASCII with placeholder
         }
     }
-    
+
     return result;
 }
 
@@ -180,21 +176,21 @@ std::wstring StringUtils::asciiToWideFallback(const std::string &ascii_str)
 {
     std::wstring result;
     result.reserve(ascii_str.size());
-    
+
     for (char c : ascii_str)
     {
         result += static_cast<wchar_t>(static_cast<unsigned char>(c));
     }
-    
+
     return result;
 }
 
-unsigned long StringUtils::parseULong(wchar_t* arg)
+unsigned long StringUtils::parseULong(wchar_t *arg)
 {
-    return wcstoul(static_cast<wchar_t*>(arg), nullptr, 0);
+    return wcstoul(static_cast<wchar_t *>(arg), nullptr, 0);
 }
 
-const wchar_t* StringUtils::getNextArg(wchar_t* argv[], int& index, int argc)
+const wchar_t *StringUtils::getNextArg(wchar_t *argv[], int &index, int argc)
 {
     if (index + 1 < argc)
     {

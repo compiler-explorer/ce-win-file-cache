@@ -1,5 +1,5 @@
-#include <ce-win-file-cache/hybrid_filesystem.hpp>
 #include <ce-win-file-cache/glob_matcher.hpp>
+#include <ce-win-file-cache/hybrid_filesystem.hpp>
 #include <ce-win-file-cache/windows_compat.hpp>
 #include <chrono>
 #include <iostream>

@@ -1,6 +1,6 @@
-#include <ce-win-file-cache/glob_matcher.hpp>
 #include <algorithm>
 #include <cctype>
+#include <ce-win-file-cache/glob_matcher.hpp>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -14,7 +14,7 @@ bool GlobMatcher::matches(std::wstring_view path, std::wstring_view pattern)
     // Normalize paths for cross-platform matching
     std::wstring normalized_path = normalizePath(path);
     std::wstring normalized_pattern = normalizePath(pattern);
-    
+
     return matchesRecursive(normalized_path, normalized_pattern);
 }
 
@@ -34,11 +34,11 @@ bool GlobMatcher::matchesRecursive(std::wstring_view path, std::wstring_view pat
 {
     size_t path_pos = 0;
     size_t pattern_pos = 0;
-    
+
     while (pattern_pos < pattern.length())
     {
         wchar_t pattern_char = pattern[pattern_pos];
-        
+
         if (pattern_char == L'*')
         {
             // Check for ** (recursive wildcard)
@@ -46,19 +46,19 @@ bool GlobMatcher::matchesRecursive(std::wstring_view path, std::wstring_view pat
             {
                 // Handle ** pattern (matches zero or more directories)
                 pattern_pos += 2;
-                
+
                 // Skip optional path separator after **
                 if (pattern_pos < pattern.length() && isPathSeparator(pattern[pattern_pos]))
                 {
                     pattern_pos++;
                 }
-                
+
                 // If ** is at the end, it matches everything remaining
                 if (pattern_pos >= pattern.length())
                 {
                     return true;
                 }
-                
+
                 // Try matching the rest of the pattern at every possible position
                 for (size_t i = path_pos; i <= path.length(); i++)
                 {
@@ -66,27 +66,27 @@ bool GlobMatcher::matchesRecursive(std::wstring_view path, std::wstring_view pat
                     {
                         return true;
                     }
-                    
+
                     // Advance to next directory boundary for ** matching
                     if (i < path.length() && isPathSeparator(path[i]))
                     {
                         continue;
                     }
-                    
+
                     // Find next path separator
                     while (i < path.length() && !isPathSeparator(path[i]))
                     {
                         i++;
                     }
                 }
-                
+
                 return false;
             }
             else
             {
                 // Handle single * pattern (matches zero or more chars, not crossing directories)
                 pattern_pos++;
-                
+
                 // If * is at the end, match everything until path separator or end
                 if (pattern_pos >= pattern.length())
                 {
@@ -100,7 +100,7 @@ bool GlobMatcher::matchesRecursive(std::wstring_view path, std::wstring_view pat
                     }
                     return true;
                 }
-                
+
                 // Try matching the rest of the pattern at every possible position
                 wchar_t next_pattern_char = pattern[pattern_pos];
                 for (size_t i = path_pos; i <= path.length(); i++)
@@ -110,7 +110,7 @@ bool GlobMatcher::matchesRecursive(std::wstring_view path, std::wstring_view pat
                     {
                         break;
                     }
-                    
+
                     if (i < path.length() && charsEqual(path[i], next_pattern_char))
                     {
                         if (matchesRecursive(path.substr(i), pattern.substr(pattern_pos)))
@@ -126,7 +126,7 @@ bool GlobMatcher::matchesRecursive(std::wstring_view path, std::wstring_view pat
                         }
                     }
                 }
-                
+
                 return false;
             }
         }
@@ -151,7 +151,7 @@ bool GlobMatcher::matchesRecursive(std::wstring_view path, std::wstring_view pat
             pattern_pos++;
         }
     }
-    
+
     // Pattern consumed, check if path is also consumed
     return path_pos == path.length();
 }
@@ -165,7 +165,7 @@ std::wstring GlobMatcher::normalizePath(std::wstring_view path)
 {
     std::wstring result;
     result.reserve(path.length());
-    
+
     for (wchar_t c : path)
     {
         if (c == L'\\')
@@ -177,7 +177,7 @@ std::wstring GlobMatcher::normalizePath(std::wstring_view path)
             result += c;
         }
     }
-    
+
     return result;
 }
 

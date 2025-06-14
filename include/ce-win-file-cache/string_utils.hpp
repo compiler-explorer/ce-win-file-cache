@@ -11,7 +11,7 @@ namespace CeWinFileCache
  */
 class StringUtils
 {
-public:
+    public:
     /**
      * Convert wide string to UTF-8 string
      * @param wide_str The wide string to convert
@@ -31,7 +31,7 @@ public:
      * @param arg Single command-line argument string
      * @return Parsed unsigned long value
      */
-    static unsigned long parseULong(wchar_t* arg);
+    static unsigned long parseULong(wchar_t *arg);
 
     /**
      * Get next command-line argument safely
@@ -40,9 +40,9 @@ public:
      * @param argc Total argument count
      * @return Next argument as wide string, or nullptr if no more arguments
      */
-    static const wchar_t* getNextArg(wchar_t* argv[], int& index, int argc);
+    static const wchar_t *getNextArg(wchar_t *argv[], int &index, int argc);
 
-private:
+    private:
     /**
      * Fallback ASCII-only conversion for testing/development
      */

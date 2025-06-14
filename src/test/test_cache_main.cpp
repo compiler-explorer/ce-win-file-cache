@@ -3,8 +3,8 @@
 
 #include "../../include/ce-win-file-cache/config_parser.hpp"
 #include "../../include/ce-win-file-cache/memory_cache_manager.hpp"
-#include "../../include/ce-win-file-cache/string_utils.hpp"
 #include "../../include/ce-win-file-cache/metrics_collector.hpp"
+#include "../../include/ce-win-file-cache/string_utils.hpp"
 #include <chrono>
 #include <iostream>
 
@@ -128,7 +128,7 @@ int main(int argc, char **argv)
     metrics_config.bind_address = "127.0.0.1";
     metrics_config.port = 8081; // Use different port to avoid conflicts
     metrics_config.endpoint_path = "/metrics";
-    
+
     GlobalMetrics::initialize(metrics_config);
     std::cout << "Metrics initialized for cache test" << std::endl;
 
@@ -144,9 +144,9 @@ int main(int argc, char **argv)
     config.compilers[L"ninja"] = ninja_config;
 
     int result = testCacheOperations(config);
-    
+
     // Shutdown metrics
     GlobalMetrics::shutdown();
-    
+
     return result;
 }

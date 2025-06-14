@@ -6,8 +6,7 @@
 namespace CeWinFileCache
 {
 
-DirectoryTree::DirectoryTree()
-: root(std::make_unique<DirectoryNode>(L"", NodeType::DIRECTORY))
+DirectoryTree::DirectoryTree() : root(std::make_unique<DirectoryNode>(L"", NodeType::DIRECTORY))
 {
     root->full_virtual_path = L"/";
 }

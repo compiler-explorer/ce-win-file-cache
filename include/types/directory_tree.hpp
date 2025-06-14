@@ -35,8 +35,8 @@ struct DirectoryNode
     DirectoryNode *parent;
 
     DirectoryNode(const std::wstring &node_name, NodeType node_type, DirectoryNode *parent_node = nullptr)
-    : name(node_name), type(node_type), file_size(0), 
-      creation_time{}, last_access_time{}, last_write_time{}, file_attributes(0), parent(parent_node)
+    : name(node_name), type(node_type), file_size(0), creation_time{}, last_access_time{}, last_write_time{},
+      file_attributes(0), parent(parent_node)
     {
     }
 

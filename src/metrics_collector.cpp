@@ -155,18 +155,18 @@ MetricsCollector &GlobalMetrics::instance()
         default_config.bind_address = "127.0.0.1";
         default_config.port = 0; // Let system choose available port
         default_config.endpoint_path = "/metrics";
-        
+
         initialize(default_config);
         auto_initialized = true;
     }
-    
+
     if (!metrics_instance)
     {
         // Create no-op instance if initialization failed
         static MetricsCollector no_op_metrics({});
         return no_op_metrics;
     }
-    
+
     return *metrics_instance;
 }
 

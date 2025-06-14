@@ -74,7 +74,7 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
 
         if (arg == L"-c" || arg == L"--config")
         {
-            const wchar_t* config_path = StringUtils::getNextArg(argv, i, argc);
+            const wchar_t *config_path = StringUtils::getNextArg(argv, i, argc);
             if (config_path)
             {
                 options.config_file = config_path;
@@ -88,7 +88,7 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
         }
         else if (arg == L"-m" || arg == L"--mount")
         {
-            const wchar_t* mount_point = StringUtils::getNextArg(argv, i, argc);
+            const wchar_t *mount_point = StringUtils::getNextArg(argv, i, argc);
             if (mount_point)
             {
                 options.mount_point = mount_point;
@@ -102,7 +102,7 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
         }
         else if (arg == L"-u" || arg == L"--volume-prefix")
         {
-            const wchar_t* volume_prefix = StringUtils::getNextArg(argv, i, argc);
+            const wchar_t *volume_prefix = StringUtils::getNextArg(argv, i, argc);
             if (volume_prefix)
             {
                 options.volume_prefix = volume_prefix;
