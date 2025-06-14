@@ -2,6 +2,7 @@
 #include <ce-win-file-cache/file_access_tracker.hpp>
 #include <chrono>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
