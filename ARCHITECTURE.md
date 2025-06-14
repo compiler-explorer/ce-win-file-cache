@@ -74,7 +74,7 @@ graph TB
         %% Configuration & Monitoring
         subgraph "Config & Monitoring"
             direction LR
-            CP[Config Parser<br/>YAML]
+            CP[Config Parser<br/>JSON]
             METRICS[Metrics Collector<br/>Prometheus]
             UTILS[String Utils]
         end
@@ -242,26 +242,30 @@ flowchart TD
 
 ## Configuration Example
 
-```yaml
-global:
-  total_cache_size_mb: 4096
-  eviction_policy: "lru"
-  cache_directory: "./cache"
-  download_threads: 8
-
-compilers:
-  msvc-14.40:
-    network_path: "\\\\build-server\\msvc\\14.40"
-    cache_size_mb: 2048
-    cache_always: ["*.exe", "*.dll", "*.lib"]
-    cache_never: ["*.pdb", "*.ilk"]
-    prefetch_patterns: ["bin/**/*.exe", "include/**/*.h"]
-
-  windows-kits-10:
-    network_path: "\\\\build-server\\kits\\10"
-    cache_size_mb: 1024
-    cache_always: ["*.lib", "*.h"]
-    prefetch_patterns: ["Include/**/*.h", "Lib/**/*.lib"]
+```json
+{
+  "global": {
+    "total_cache_size_mb": 4096,
+    "eviction_policy": "lru",
+    "cache_directory": "./cache",
+    "download_threads": 8
+  },
+  "compilers": {
+    "msvc-14.40": {
+      "network_path": "\\\\build-server\\msvc\\14.40",
+      "cache_size_mb": 2048,
+      "cache_always": ["*.exe", "*.dll", "*.lib"],
+      "cache_never": ["*.pdb", "*.ilk"],
+      "prefetch_patterns": ["bin/**/*.exe", "include/**/*.h"]
+    },
+    "windows-kits-10": {
+      "network_path": "\\\\build-server\\kits\\10",
+      "cache_size_mb": 1024,
+      "cache_always": ["*.lib", "*.h"],
+      "prefetch_patterns": ["Include/**/*.h", "Lib/**/*.lib"]
+    }
+  }
+}
 ```
 
 ## Use Cases
