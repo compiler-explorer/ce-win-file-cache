@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <ce-win-file-cache/string_utils.hpp>
 
 namespace CeWinFileCache
 {
@@ -56,14 +57,18 @@ std::optional<Config> ConfigParser::parseJsonString(std::string_view json_conten
         {
             for (const auto &[compiler_name, compiler_config] : j["compilers"].items())
             {
-                std::wstring wide_name(compiler_name.begin(), compiler_name.end());
+                std::wstring wide_name = StringUtils::utf8ToWide(compiler_name);
                 CompilerConfig cc;
 
                 // Parse network_path
                 if (compiler_config.contains("network_path") && compiler_config["network_path"].is_string())
                 {
-                    std::string network_path = compiler_config["network_path"];
-                    cc.network_path = std::wstring(network_path.begin(), network_path.end());
+                    cc.network_path = StringUtils::utf8ToWide(compiler_config["network_path"]);
+                }
+
+                if (compiler_config.contains("root_path") && compiler_config["root_path"].is_string())
+                {
+                    cc.root_path = StringUtils::utf8ToWide(compiler_config["root_path"]);
                 }
 
                 // Parse cache_size_mb
@@ -80,7 +85,7 @@ std::optional<Config> ConfigParser::parseJsonString(std::string_view json_conten
                         if (pattern.is_string())
                         {
                             std::string str_pattern = pattern;
-                            cc.cache_always_patterns.emplace_back(str_pattern.begin(), str_pattern.end());
+                            cc.cache_always_patterns.emplace_back(StringUtils::utf8ToWide(str_pattern));
                         }
                     }
                 }
@@ -93,7 +98,7 @@ std::optional<Config> ConfigParser::parseJsonString(std::string_view json_conten
                         if (pattern.is_string())
                         {
                             std::string str_pattern = pattern;
-                            cc.prefetch_patterns.emplace_back(str_pattern.begin(), str_pattern.end());
+                            cc.prefetch_patterns.emplace_back(StringUtils::utf8ToWide(str_pattern));
                         }
                     }
                 }
@@ -117,14 +122,14 @@ std::optional<Config> ConfigParser::parseJsonString(std::string_view json_conten
             if (global.contains("eviction_policy") && global["eviction_policy"].is_string())
             {
                 std::string policy = global["eviction_policy"];
-                config.global.eviction_policy = std::wstring(policy.begin(), policy.end());
+                config.global.eviction_policy = StringUtils::utf8ToWide(policy);
             }
 
             // Parse cache_directory
             if (global.contains("cache_directory") && global["cache_directory"].is_string())
             {
                 std::string cache_dir = global["cache_directory"];
-                config.global.cache_directory = std::wstring(cache_dir.begin(), cache_dir.end());
+                config.global.cache_directory = StringUtils::utf8ToWide(cache_dir);
             }
 
             // Parse download_threads

@@ -37,11 +37,11 @@ class DirectoryCache
     void addTestDirectory(const std::wstring &virtual_path, const std::wstring &network_path);
     void clearTree();
 
+    // Path normalization for Windows
+    static std::wstring normalizePath(const std::wstring &path);
+
     private:
     DirectoryTree directory_tree;
-
-    // Path normalization for Windows
-    std::wstring normalizePath(const std::wstring &path);
 
     // Platform-specific network enumeration
     NTSTATUS enumerateNetworkDirectoryWindows(const std::wstring &network_path, const std::wstring &virtual_path);

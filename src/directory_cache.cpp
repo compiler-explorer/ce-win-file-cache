@@ -39,7 +39,8 @@ NTSTATUS DirectoryCache::buildDirectoryTreeFromConfig(const Config &config)
     // Build directory tree from all configured compilers
     for (const auto &[compiler_name, compiler_config] : config.compilers)
     {
-        std::wstring virtual_root = L"/" + compiler_name;
+        std::wstring virtual_root = std::filesystem::relative(compiler_config.network_path, compiler_config.root_path);
+        virtual_root = normalizePath(L"/" + virtual_root);
 
         // Add compiler root directory
         directory_tree.addDirectory(virtual_root, compiler_config.network_path);
@@ -86,7 +87,7 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryWindows(const std::wstring &ne
         }
 
         std::wstring child_name = find_data.cFileName;
-        std::wstring child_virtual_path = virtual_path + L"/" + child_name;
+        std::wstring child_virtual_path = normalizePath(virtual_path + L"/" + child_name);
         std::wstring child_network_path = network_path + L"\\" + child_name;
 
         if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
@@ -96,7 +97,7 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryWindows(const std::wstring &ne
 
             // Recursively enumerate subdirectory (with depth limit for safety)
             static thread_local int recursion_depth = 0;
-            if (recursion_depth < 50) // Prevent infinite recursion
+            //if (recursion_depth < 50) // Prevent infinite recursion
             {
                 recursion_depth++;
                 enumerateNetworkDirectory(child_network_path, child_virtual_path);

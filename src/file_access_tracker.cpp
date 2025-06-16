@@ -93,8 +93,8 @@ void FileAccessTracker::initialize(const std::wstring &report_directory, std::ch
     std::wcout << L"[DEBUG] Directory creation section completed" << std::endl;
 }
 
-void FileAccessTracker::recordAccess(const std::wstring &virtual_path,
-                                     const std::wstring &network_path,
+void FileAccessTracker::recordAccess(const std::wstring virtual_path,
+                                     const std::wstring network_path,
                                      uint64_t file_size,
                                      FileState state,
                                      bool is_cache_hit,
@@ -102,9 +102,12 @@ void FileAccessTracker::recordAccess(const std::wstring &virtual_path,
                                      double access_time_ms,
                                      const std::wstring &cache_policy)
 {
-    std::wcout << L"[DEBUG] recordAccess called for: " << virtual_path << std::endl;
+    std::wcout << L"[DEBUG] recordAccess called for: '" << virtual_path << L"'\n";
+    std::flush(std::wcout);
     std::lock_guard<std::mutex> lock(mutex_);
     std::wcout << L"[DEBUG] Mutex acquired" << std::endl;
+
+    std::wcout << L"Number of items in file_access_map: " << file_access_map_.size() << std::endl;
 
     auto &info = file_access_map_[virtual_path];
     if (!info)
@@ -115,6 +118,8 @@ void FileAccessTracker::recordAccess(const std::wstring &virtual_path,
         info->file_size = file_size;
         info->first_access = std::chrono::system_clock::now();
         info->cache_policy = cache_policy;
+
+        file_access_map_[virtual_path] = std::move(info);
     }
 
     info->access_count++;

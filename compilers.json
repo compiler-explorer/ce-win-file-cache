@@ -2,6 +2,7 @@
   "compilers": {
     "msvc-14.40": {
       "network_path": "\\\\127.0.0.1\\efs\\compilers\\msvc\\14.40.33807-14.40.33811.0",
+	  "root_path": "\\\\127.0.0.1\\efs",
       "cache_size_mb": 2048,
       "cache_always": [
         "bin/Hostx64/x64/*.exe",
@@ -16,6 +17,7 @@
     },
     "windows-kits-10": {
       "network_path": "\\\\127.0.0.1\\efs\\compilers\\windows-kits-10",
+	  "root_path": "\\\\127.0.0.1\\efs",
       "cache_size_mb": 1024,
       "cache_always": [
         "Include/**/*.h",
@@ -25,14 +27,6 @@
       "prefetch_patterns": [
         "Include/**/*.h"
       ]
-    },
-    "ninja": {
-      "network_path": "\\\\127.0.0.1\\efs\\compilers\\ninja",
-      "cache_size_mb": 64,
-      "cache_always": [
-        "*.exe"
-      ],
-      "prefetch_patterns": []
     }
   },
   "global": {

@@ -19,6 +19,8 @@ set(TEST_PROGRAMS
     json_config_test
     glob_test
     file_access_tracker_test
+    directory_integration_test
+    debug_directory_cache_test
 )
 
 # Define test program configurations
@@ -35,6 +37,8 @@ set(metrics_test_SOURCES test_metrics.cpp ../config_parser.cpp ../metrics_collec
 set(json_config_test_SOURCES test_json_config.cpp ../config_parser.cpp)
 set(glob_test_SOURCES glob_test.cpp ../glob_matcher.cpp)
 set(file_access_tracker_test_SOURCES test_file_access_tracker.cpp ../file_access_tracker.cpp)
+set(directory_integration_test_SOURCES ../../test_directory_integration.cpp ../hybrid_filesystem.cpp ../directory_cache.cpp ../directory_tree.cpp ../memory_cache_manager.cpp ../async_download_manager.cpp ../config_parser.cpp ../file_access_tracker.cpp ../glob_matcher.cpp ../string_utils.cpp ../metrics_collector.cpp ../prometheus_metrics_impl.cpp)
+set(debug_directory_cache_test_SOURCES ../../debug_directory_cache.cpp ../directory_cache.cpp ../directory_tree.cpp ../config_parser.cpp)
 
 # Create all test executables
 foreach(TEST_PROGRAM ${TEST_PROGRAMS})
@@ -48,8 +52,8 @@ foreach(TEST_PROGRAM ${TEST_PROGRAMS})
     # Link nlohmann_json for all test programs
     target_link_libraries(${TEST_PROGRAM} nlohmann_json::nlohmann_json)
     
-    # Add Prometheus definitions and libraries for metrics_test
-    if(TEST_PROGRAM STREQUAL "metrics_test")
+    # Add Prometheus definitions and libraries for metrics_test and directory_integration_test
+    if(TEST_PROGRAM STREQUAL "metrics_test" OR TEST_PROGRAM STREQUAL "directory_integration_test")
         if(HAVE_PROMETHEUS)
             target_compile_definitions(${TEST_PROGRAM} PRIVATE HAVE_PROMETHEUS)
             target_link_libraries(${TEST_PROGRAM} 

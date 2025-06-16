@@ -45,11 +45,11 @@ class AsyncDownloadManager
                            const std::wstring &network_path,
                            CacheEntry *cache_entry,
                            CachePolicy policy,
-                           std::function<void(NTSTATUS, const std::wstring &)> callback);
+                           std::function<void(NTSTATUS, const std::wstring)> callback);
 
-    bool isDownloadInProgress(const std::wstring &virtual_path);
+    bool isDownloadInProgress(const std::wstring virtual_path);
 
-    void cancelDownload(const std::wstring &virtual_path);
+    void cancelDownload(const std::wstring virtual_path);
 
     void shutdown();
 
@@ -59,7 +59,7 @@ class AsyncDownloadManager
     private:
     void workerThread();
     void processDownload(std::shared_ptr<DownloadTask> task);
-    bool downloadFile(const std::wstring &network_path, const std::wstring &virtual_path);
+    bool downloadFile(const std::wstring network_path, const std::wstring virtual_path);
 
     MemoryCacheManager &memory_cache;
     const Config &config;

@@ -24,7 +24,7 @@ NTSTATUS AsyncDownloadManager::queueDownload(const std::wstring &virtual_path,
                                              const std::wstring &network_path,
                                              CacheEntry *cache_entry,
                                              CachePolicy policy,
-                                             std::function<void(NTSTATUS, const std::wstring &)> callback)
+                                             std::function<void(NTSTATUS, const std::wstring)> callback)
 {
     std::lock_guard<std::mutex> lock(queue_mutex);
 
@@ -62,13 +62,13 @@ NTSTATUS AsyncDownloadManager::queueDownload(const std::wstring &virtual_path,
     return STATUS_PENDING;
 }
 
-bool AsyncDownloadManager::isDownloadInProgress(const std::wstring &virtual_path)
+bool AsyncDownloadManager::isDownloadInProgress(const std::wstring virtual_path)
 {
     std::lock_guard<std::mutex> lock(queue_mutex);
     return active_downloads.find(virtual_path) != active_downloads.end();
 }
 
-void AsyncDownloadManager::cancelDownload(const std::wstring &virtual_path)
+void AsyncDownloadManager::cancelDownload(const std::wstring virtual_path)
 {
     std::lock_guard<std::mutex> lock(queue_mutex);
 
@@ -229,7 +229,7 @@ void AsyncDownloadManager::processDownload(std::shared_ptr<DownloadTask> task)
     }
 }
 
-bool AsyncDownloadManager::downloadFile(const std::wstring &network_path, const std::wstring &virtual_path)
+bool AsyncDownloadManager::downloadFile(const std::wstring network_path, const std::wstring virtual_path)
 {
     auto start_time = std::chrono::high_resolution_clock::now();
 

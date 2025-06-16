@@ -15,6 +15,7 @@
 #endif
 
 #include <codecvt>
+#include <ce-win-file-cache/glob_matcher.hpp>
 
 using namespace CeWinFileCache;
 
@@ -198,7 +199,7 @@ int testPathResolution(const Config &config)
 
     // Test cases for path resolution
     std::vector<std::wstring> test_paths = { L"/msvc-14.40/bin/Hostx64/x64/cl.exe", L"/msvc-14.40/include/iostream",
-                                             L"/windows-kits-10/Include/10.0.22621.0/um/windows.h", L"/ninja/ninja.exe",
+                                             L"/windows-kits-10/Include/10.0.22621.0/um/windows.h", // L"/ninja/ninja.exe",
                                              L"/invalid-compiler/some/path" };
 
     for (const auto &virtual_path : test_paths)
@@ -233,8 +234,9 @@ int testPathResolution(const Config &config)
             if (!relative_path.empty())
             {
                 // Convert forward slashes to backslashes for Windows
-                std::wstring windows_relative = relative_path;
-                std::replace(windows_relative.begin(), windows_relative.end(), L'/', L'\\');
+                std::wstring windows_relative = DirectoryCache::normalizePath(relative_path);
+                //std::replace(windows_relative.begin(), windows_relative.end(), L'/', L'\\');
+                //windows_relative);
                 resolved_path += L"\\" + windows_relative;
             }
 

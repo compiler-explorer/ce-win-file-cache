@@ -25,8 +25,8 @@ class FileAccessTracker
                     size_t top_files_count = 100);
 
     // Record file access
-    void recordAccess(const std::wstring &virtual_path,
-                      const std::wstring &network_path,
+    void recordAccess(const std::wstring virtual_path,
+                      const std::wstring network_path,
                       uint64_t file_size,
                       FileState state,
                       bool is_cache_hit,

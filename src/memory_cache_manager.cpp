@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <cassert>
 
 namespace CeWinFileCache
 {
@@ -65,9 +66,18 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
     return content;
 }
 
-bool MemoryCacheManager::isFileInMemoryCache(const std::wstring &virtual_path)
+bool MemoryCacheManager::isFileInMemoryCache(const std::wstring virtual_path)
 {
+    //assert(memory_cache.count() != 0);
+    std::wcout << L"isFileInMemoryCache(" << virtual_path << L")\n";
+    std::flush(std::wcout);
+
+
     std::lock_guard<std::mutex> lock(cache_mutex);
+
+    if (memory_cache.size() == 0)
+        return false;
+
     return memory_cache.find(virtual_path) != memory_cache.end();
 }
 

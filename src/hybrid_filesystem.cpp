@@ -71,7 +71,7 @@ NTSTATUS HybridFileSystem::Initialize(const Config &new_config)
         std::wcerr << L"[FS] ERROR: Directory cache initialization failed: 0x" << std::hex << result << std::endl;
         return result;
     }
-    std::wcout << L"[FS] Directory cache initialized successfully" << std::endl;
+    std::wcout << L"[FS] Directory cache initialized successfully, total nodes: " << directory_cache.getTotalNodes() << std::endl;
 
     // Initialize async download manager with configured number of worker threads
     std::wcout << L"[FS] Initializing async download manager with " << new_config.global.download_threads << L" threads" << std::endl;
@@ -380,8 +380,6 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     }
 
     file_desc->entry = entry;
-    *PFileNode = entry;
-    *PFileDesc = file_desc;
 
     std::wcout << L"[FS] Open() - setting up file info" << std::endl;
 
@@ -458,6 +456,9 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
                                      entry->policy == CachePolicy::ON_DEMAND    ? L"on_demand" :
                                                                                   L"never_cache");
     }
+
+    *PFileDesc = file_desc;
+    *PFileNode = nullptr;
 
     std::wcout << L"[FS] Open() completed successfully" << std::endl;
     return STATUS_SUCCESS;
@@ -588,6 +589,7 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
     }
 
     std::wcout << L"[FS] ReadDirectoryEntry() - path: '" << file_desc->entry->virtual_path << L"'" << std::endl;
+    std::flush(std::wcout);
 
     if (*PContext == nullptr)
     {
@@ -622,6 +624,9 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
         }
         else
         {
+            std::wcout << L"[FS] ReadDirectoryEntry() - enumerating root directory" << std::endl;
+            std::flush(std::wcout);
+
             // For non-root directories, use directory cache
             std::vector<DirectoryNode *> contents = directory_cache.getDirectoryContents(file_desc->entry->virtual_path);
 
@@ -645,6 +650,7 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
     else
     {
         std::wcout << L"[FS] ReadDirectoryEntry() - continuing enumeration" << std::endl;
+        std::flush(std::wcout);
         
         // Handle root directory continuation
         // Normalize path for comparison (both \ and / should be treated as root)
@@ -677,7 +683,7 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
             {
                 // End of enumeration
                 std::wcout << L"[FS] ReadDirectoryEntry() - end of root enumeration" << std::endl;
-                delete context_data;
+                //delete context_data;
                 *PContext = nullptr;
                 return STATUS_NO_MORE_FILES;
             }
@@ -734,8 +740,9 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
 
 std::wstring HybridFileSystem::resolveVirtualPath(const std::wstring &virtual_path)
 {
-    // todo: implement proper path resolution for different compilers
-    return virtual_path;
+    std::wstring resolved = L"\\\\127.0.0.1\\efs";
+    resolved.append(virtual_path);
+    return resolved;
 }
 
 CacheEntry *HybridFileSystem::getCacheEntry(const std::wstring &virtual_path)
@@ -763,32 +770,7 @@ CacheEntry *HybridFileSystem::getCacheEntry(const std::wstring &virtual_path)
         return createDynamicCacheEntry(node);
     }
 
-    std::wcout << L"[FS] getCacheEntry() - path not found in DirectoryCache, creating virtual entry for: '" << virtual_path << L"'" << std::endl;
-    // Create virtual entry for files that don't exist yet
-    // In practice, this would check if the file exists on the network
-    auto entry = std::make_unique<CacheEntry>();
-    entry->virtual_path = virtual_path;
-    entry->state = FileState::VIRTUAL;
-    entry->policy = determineCachePolicy(virtual_path);
-
-    // Set default attributes based on path
-    if (virtual_path == L"\\" || virtual_path.back() == L'\\')
-    {
-        entry->file_attributes = FILE_ATTRIBUTE_DIRECTORY;
-        std::wcout << L"[FS] getCacheEntry() - treating as directory" << std::endl;
-    }
-    else
-    {
-        entry->file_attributes = FILE_ATTRIBUTE_NORMAL;
-        std::wcout << L"[FS] getCacheEntry() - treating as file" << std::endl;
-    }
-
-    // todo: determine network path based on virtual path and compiler config
-
-    CacheEntry *result = entry.get();
-    cache_entries[virtual_path] = std::move(entry);
-    std::wcout << L"[FS] getCacheEntry() - created entry with attributes: 0x" << std::hex << result->file_attributes << std::endl;
-    return result;
+    return nullptr;
 }
 
 CacheEntry *HybridFileSystem::createDynamicCacheEntry(DirectoryNode *node)
@@ -820,8 +802,10 @@ CacheEntry *HybridFileSystem::createDynamicCacheEntry(DirectoryNode *node)
         entry->state = FileState::VIRTUAL;
     }
     
+    // [FS] createDynamicCacheEntry() - created entry for: '/[FS] Open() - handling directory
     std::wcout << L"[FS] createDynamicCacheEntry() - created entry for: '" << entry->virtual_path 
                << L"' -> '" << entry->network_path << L"', policy: " << static_cast<int>(entry->policy) << std::endl;
+    std::flush(std::wcout);
     
     // Store in cache_entries for future fast access
     CacheEntry *result = entry.get();
@@ -866,7 +850,7 @@ NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
 
         NTSTATUS status =
         download_manager->queueDownload(entry->virtual_path, entry->network_path, entry, entry->policy,
-                                        [this, entry](NTSTATUS download_status, const std::wstring &error)
+                                        [this, entry](NTSTATUS download_status, const std::wstring error)
                                         {
                                             if (download_status == STATUS_SUCCESS)
                                             {

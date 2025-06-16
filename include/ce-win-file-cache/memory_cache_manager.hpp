@@ -22,7 +22,7 @@ class MemoryCacheManager
 
     std::vector<uint8_t> loadNetworkFileToMemory(const std::wstring &network_path);
 
-    bool isFileInMemoryCache(const std::wstring &virtual_path);
+    bool isFileInMemoryCache(const std::wstring virtual_path);
 
     std::optional<std::vector<uint8_t>> getMemoryCachedFile(const std::wstring &virtual_path);
 
