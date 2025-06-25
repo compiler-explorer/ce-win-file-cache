@@ -39,6 +39,33 @@ cmake .. \
 echo -e "${GREEN}Building...${NC}"
 make -j$(sysctl -n hw.ncpu)
 
+# Run clang-tidy if available
+echo -e "${GREEN}Running clang-tidy analysis...${NC}"
+if command -v clang-tidy >/dev/null 2>&1; then
+    # Run clang-tidy on recently modified files
+    echo -e "${GREEN}Running clang-tidy checks on recently modified files...${NC}"
+    RECENT_FILES=(
+        "../src/directory_tree.cpp"
+        "../include/types/directory_tree.hpp" 
+        "../src/file_access_tracker.cpp"
+        "../include/ce-win-file-cache/file_access_tracker.hpp"
+    )
+    
+    for file in "${RECENT_FILES[@]}"; do
+        if [ -f "$file" ]; then
+            echo "Checking $file..."
+            clang-tidy "$file" --checks='-*,readability-*,performance-*,modernize-*,bugprone-*' \
+                --format-style=file \
+                -- -std=c++20 -DNO_WINFSP -I../include -I../include/ce-win-file-cache -I../include/types \
+                2>/dev/null || echo -e "${YELLOW}Warning: clang-tidy check completed with issues for $file${NC}"
+        fi
+    done
+    echo -e "${GREEN}clang-tidy analysis complete${NC}"
+else
+    echo -e "${YELLOW}clang-tidy not found. Install with: brew install llvm${NC}"
+    echo -e "${YELLOW}Skipping static analysis...${NC}"
+fi
+
 # Create output directory structure
 echo -e "${GREEN}Setting up output directory...${NC}"
 mkdir -p bin
