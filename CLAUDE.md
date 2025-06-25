@@ -51,6 +51,47 @@ if (condition)
 - Don't use "pimpl" as a technique to hide implementation, always add a properly named headers, sources and classes
 - **Do not use private structs inside classes, keep them outside of the class, and preferable in separate headers**
 
+## Header/Implementation Separation
+
+- **Keep only declarations in header files (.hpp)** - no inline implementations unless they are templates
+- **Move all implementations to source files (.cpp)** to improve compilation times
+- **Use forward declarations** where possible to reduce header dependencies
+- **Inline methods only for templates** or trivial one-liner getters/setters
+- **Examples**:
+  ```cpp
+  // Good: Header file (directory_tree.hpp)
+  struct DirectoryNode {
+      std::wstring name;
+      DirectoryNode *findChild(const std::wstring &child_name);  // Declaration only
+  };
+  
+  // Good: Source file (directory_tree.cpp)
+  DirectoryNode *DirectoryNode::findChild(const std::wstring &child_name) {
+      // Implementation here
+  }
+  ```
+
+## Thread Safety
+
+- **Use per-object mutexes** for fine-grained locking when objects can be accessed concurrently
+- **Protect all shared data structures** with appropriate synchronization primitives
+- **Use `std::atomic<bool>`** for simple flags that need thread-safe access
+- **Prefer RAII lock guards** (`std::lock_guard`, `std::unique_lock`) over manual lock/unlock
+- **Examples**:
+  ```cpp
+  // Good: Per-object mutex for fine-grained control
+  struct DirectoryNode {
+      std::unordered_map<std::wstring, std::unique_ptr<DirectoryNode>> children;
+      mutable std::mutex children_mutex;  // Protects children map
+      
+      DirectoryNode *findChild(const std::wstring &child_name) {
+          std::lock_guard<std::mutex> lock(children_mutex);
+          auto it = children.find(child_name);
+          return (it != children.end()) ? it->second.get() : nullptr;
+      }
+  };
+  ```
+
 ## Error Handling
 
 - Use exceptions for critical errors

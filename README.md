@@ -83,7 +83,10 @@ wine build-wine/bin/CeWinFileCacheFS.exe --help
 For cross-platform development and testing:
 
 ```bash
-# Build and run comprehensive test suite
+# Build with integrated static analysis
+./build-macos.sh
+
+# Run comprehensive test suite
 ./run_all_tests.sh
 
 # Available options
@@ -91,6 +94,8 @@ For cross-platform development and testing:
 ./run_all_tests.sh --clean    # Clean build before testing
 ./run_all_tests.sh --quick    # Skip CMake configuration
 ```
+
+The `build-macos.sh` script includes integrated clang-tidy static analysis (if available) to ensure code quality and catch potential issues during development.
 
 The test runner builds and executes 12 comprehensive test programs:
 - Cache operations and performance validation
@@ -374,6 +379,9 @@ Metrics include dynamic labels for detailed analysis:
 - **Test Infrastructure**: Comprehensive test suite with automated runner
 - **Windows CI/CD Pipeline**: Complete MSVC build and WinFsp integration testing
 - **Cross-Platform Development**: Linux development with Windows production target
+- **Security Hardening**: Comprehensive memory safety analysis and fixes
+- **Thread Safety**: Per-node locking for concurrent directory operations
+- **Static Analysis Integration**: clang-tidy checks integrated into build process
 
 ### 📝 Remaining Work
 - **WinFsp Filesystem Operations**: Complete file read/write operations

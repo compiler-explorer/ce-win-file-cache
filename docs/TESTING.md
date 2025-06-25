@@ -23,9 +23,12 @@ This project includes comprehensive testing capabilities with multiple test runn
 ./run_unit_tests.sh --help
 ```
 
-### All Tests (Integration + Unit)
+### All Tests (Integration + Unit + Static Analysis)
 
 ```bash
+# Build with integrated static analysis and run all tests
+./build-macos.sh
+
 # Run comprehensive test suite (all tests)
 ./run_all_tests.sh
 
@@ -211,10 +214,51 @@ The scripts automatically handle:
 - Dependency fetching (Catch2, nlohmann_json, prometheus-cpp)
 - Parallel building
 
+## Security and Code Quality Testing
+
+### Static Analysis Integration
+
+The build system includes integrated static analysis for code quality and security:
+
+```bash
+# Build with clang-tidy analysis (requires: brew install llvm)
+./build-macos.sh
+```
+
+**Static analysis checks:**
+- **readability-***: Code readability and maintainability
+- **performance-***: Performance optimization opportunities  
+- **modernize-***: Modern C++20 usage recommendations
+- **bugprone-***: Potential bugs and error-prone patterns
+
+### Memory Safety Analysis
+
+The project includes comprehensive memory safety documentation:
+
+- **[USE_AFTER_FREE_ANALYSIS.md](../USE_AFTER_FREE_ANALYSIS.md)**: Complete vulnerability analysis with fixes
+- **[DYNAMIC_MEMORY_ANALYSIS.md](../DYNAMIC_MEMORY_ANALYSIS.md)**: Memory allocation patterns and safety
+- **[CACHE_EVICTION_PROTECTION.md](../CACHE_EVICTION_PROTECTION.md)**: Thread-safe cache operations
+
+**Recent security improvements:**
+- ✅ Fixed critical use-after-free vulnerabilities in async callbacks
+- ✅ Added atomic protection against cache eviction during downloads
+- ✅ Eliminated use-after-move bugs with helper functions
+- ✅ Added per-node mutex protection for concurrent directory operations
+
+### Thread Safety Testing
+
+**Concurrent operation tests:**
+- Multi-threaded cache access patterns
+- Async download manager stress testing
+- Directory tree concurrent modification protection
+- Memory cache thread safety validation
+
 ## Best Practices
 
 1. **Use `run_unit_tests.sh --quick` during development** for fast feedback
-2. **Run `run_all_tests.sh` before commits** for full validation  
-3. **Use `--list` to explore available tests** when debugging
-4. **Individual executables for focused testing** of specific components
-5. **CTest integration for IDE support** and automated discovery
+2. **Run `./build-macos.sh` before commits** for build + static analysis
+3. **Run `run_all_tests.sh` before commits** for full validation  
+4. **Use `--list` to explore available tests** when debugging
+5. **Individual executables for focused testing** of specific components
+6. **CTest integration for IDE support** and automated discovery
+7. **Review security analysis documents** for understanding memory safety improvements
