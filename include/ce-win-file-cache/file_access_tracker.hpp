@@ -53,17 +53,17 @@ class FileAccessTracker
     std::wstring formatDuration(std::chrono::system_clock::duration duration) const;
     std::wstring getCurrentTimestamp() const;
 
-    mutable std::mutex mutex_;
+    mutable std::mutex mutex_{};
     std::unordered_map<std::wstring, std::unique_ptr<FileAccessInfo>> file_access_map_;
 
-    std::wstring report_directory_;
-    std::chrono::minutes report_interval_;
-    size_t top_files_count_;
+    std::wstring report_directory_{};
+    std::chrono::minutes report_interval_{};
+    size_t top_files_count_{};
 
     std::atomic<bool> reporting_enabled_{ false };
-    std::unique_ptr<std::thread> reporting_thread_;
+    std::unique_ptr<std::thread> reporting_thread_{};
 
-    std::chrono::system_clock::time_point tracking_start_time_;
+    std::chrono::system_clock::time_point tracking_start_time_{};
     std::atomic<uint64_t> total_accesses_{ 0 };
     std::atomic<uint64_t> total_cache_hits_{ 0 };
     std::atomic<uint64_t> total_cache_misses_{ 0 };

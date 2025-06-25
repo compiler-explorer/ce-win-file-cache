@@ -7,10 +7,10 @@ using namespace CeWinFileCache;
 
 struct GlobTestCase
 {
-    std::wstring path;
-    std::wstring pattern;
-    bool expected;
-    std::string description;
+    std::wstring path{};
+    std::wstring pattern{};
+    bool expected{};
+    std::string description{};
 };
 
 void runGlobTests()
@@ -122,9 +122,9 @@ void testMatchesAny()
 
     struct TestCase
     {
-        std::wstring path;
-        bool expected;
-        std::string description;
+        std::wstring path{};
+        bool expected{};
+        std::string description{};
     };
 
     std::vector<TestCase> test_cases = {

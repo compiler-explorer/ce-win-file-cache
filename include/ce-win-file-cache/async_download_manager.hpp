@@ -64,16 +64,16 @@ class AsyncDownloadManager
     MemoryCacheManager &memory_cache;
     const Config &config;
 
-    std::vector<std::thread> worker_threads;
+    std::vector<std::thread> worker_threads{};
     std::queue<std::shared_ptr<DownloadTask>> download_queue;
     std::unordered_map<std::wstring, std::shared_ptr<DownloadTask>> active_downloads;
 
-    mutable std::mutex queue_mutex;
-    std::condition_variable queue_condition;
-    std::atomic<bool> shutdown_requested;
+    mutable std::mutex queue_mutex{};
+    std::condition_variable queue_condition{};
+    std::atomic<bool> shutdown_requested{};
 
-    std::atomic<size_t> pending_count;
-    std::atomic<size_t> active_count;
+    std::atomic<size_t> pending_count{};
+    std::atomic<size_t> active_count{};
 };
 
 } // namespace CeWinFileCache
