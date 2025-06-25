@@ -2,6 +2,7 @@
 
 # Build script for macOS using clang++
 # This builds without WinFsp support for testing cache logic
+# Usage: ./build-macos.sh [--clean]
 
 set -e
 
@@ -11,15 +12,42 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Parse command line arguments
+CLEAN_BUILD=false
+for arg in "$@"; do
+    case $arg in
+        --clean)
+            CLEAN_BUILD=true
+            ;;
+        --help|-h)
+            echo "Usage: $0 [--clean]"
+            echo "  --clean    Clean build directory before building"
+            echo "  --help     Show this help message"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
 echo -e "${GREEN}Building CeWinFileCacheFS for macOS (NO_WINFSP)${NC}"
 
 # Create build directory
 BUILD_DIR="build-macos"
 if [ -d "$BUILD_DIR" ]; then
-    echo -e "${YELLOW}Build directory exists. Cleaning...${NC}"
-    rm -rf "$BUILD_DIR"
+    if [ "$CLEAN_BUILD" = true ]; then
+        echo -e "${YELLOW}Build directory exists. Cleaning...${NC}"
+        rm -rf "$BUILD_DIR"
+        mkdir -p "$BUILD_DIR"
+    else
+        echo -e "${YELLOW}Build directory exists. Using existing directory...${NC}"
+    fi
+else
+    mkdir -p "$BUILD_DIR"
 fi
-mkdir -p "$BUILD_DIR"
 
 # Configure with CMake
 echo -e "${GREEN}Configuring with CMake...${NC}"

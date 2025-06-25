@@ -9,19 +9,19 @@
 #include <string>
 
 // Basic Windows types
-typedef uint32_t DWORD;
-typedef int32_t BOOL;
-typedef void *HANDLE;
-typedef int32_t LONG;
-typedef uint32_t ULONG;
-typedef int32_t NTSTATUS;
-typedef wchar_t *PWSTR;
-typedef const wchar_t *PCWSTR;
-typedef uint64_t ULONGLONG;
-typedef uint64_t UINT64;
-typedef void *PVOID;
-typedef void *PSECURITY_DESCRIPTOR;
-typedef wchar_t *LPWSTR;
+using DWORD = uint32_t;
+using BOOL = int32_t;
+using HANDLE = void *;
+using LONG = int32_t;
+using ULONG = uint32_t;
+using NTSTATUS = int32_t;
+using PWSTR = wchar_t *;
+using PCWSTR = const wchar_t *;
+using ULONGLONG = uint64_t;
+using UINT64 = uint64_t;
+using PVOID = void *;
+using PSECURITY_DESCRIPTOR = void *;
+using LPWSTR = wchar_t *;
 
 // File time structure
 struct FILETIME
