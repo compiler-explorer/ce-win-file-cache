@@ -10,6 +10,20 @@
 namespace CeWinFileCache
 {
 
+namespace
+{
+    std::ifstream openNetworkFile(const std::wstring &network_path)
+    {
+#ifdef _WIN32
+        return std::ifstream(network_path, std::ios::binary | std::ios::ate);
+#else
+        // Convert wstring to UTF-8 string for non-Windows platforms
+        std::string narrow_path = StringUtils::wideToUtf8(network_path);
+        return std::ifstream(narrow_path, std::ios::binary | std::ios::ate);
+#endif
+    }
+}
+
 std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstring &network_path)
 {
     std::vector<uint8_t> content;
@@ -20,13 +34,7 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
         // Record network operation attempt
         GlobalMetrics::instance().recordNetworkOperation("file_read", false); // Mark as attempt initially
 
-#ifdef _WIN32
-        std::ifstream file(network_path, std::ios::binary | std::ios::ate);
-#else
-        // Convert wstring to UTF-8 string for non-Windows platforms
-        std::string narrow_path = StringUtils::wideToUtf8(network_path);
-        std::ifstream file(narrow_path, std::ios::binary | std::ios::ate);
-#endif
+        std::ifstream file = openNetworkFile(network_path);
         if (!file.is_open())
         {
             std::wcerr << L"Failed to open network file: " << network_path << std::endl;
