@@ -81,7 +81,7 @@ int main()
 
         NTSTATUS status =
         download_manager.queueDownload(virtual_path, test_files[i], nullptr, CachePolicy::ALWAYS_CACHE,
-                                       [&completed, &failed, i](NTSTATUS download_status, const std::wstring & /*error*/)
+                                       [&completed, &failed, i](NTSTATUS download_status, const std::wstring & /*error*/, CacheEntry* /*entry*/)
                                        {
                                            if (download_status == STATUS_SUCCESS)
                                            {

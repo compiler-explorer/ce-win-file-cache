@@ -24,7 +24,7 @@ NTSTATUS AsyncDownloadManager::queueDownload(const std::wstring &virtual_path,
                                              const std::wstring &network_path,
                                              CacheEntry *cache_entry,
                                              CachePolicy policy,
-                                             std::function<void(NTSTATUS, const std::wstring)> callback)
+                                             std::function<void(NTSTATUS, const std::wstring, CacheEntry*)> callback)
 {
     std::lock_guard<std::mutex> lock(queue_mutex);
 
@@ -32,7 +32,7 @@ NTSTATUS AsyncDownloadManager::queueDownload(const std::wstring &virtual_path,
     {
         if (callback)
         {
-            callback(STATUS_UNSUCCESSFUL, L"Download manager is shutting down");
+            callback(STATUS_UNSUCCESSFUL, L"Download manager is shutting down", cache_entry);
         }
         return STATUS_UNSUCCESSFUL;
     }
@@ -41,7 +41,7 @@ NTSTATUS AsyncDownloadManager::queueDownload(const std::wstring &virtual_path,
     {
         if (callback)
         {
-            callback(STATUS_PENDING, L"Download already in progress");
+            callback(STATUS_PENDING, L"Download already in progress", cache_entry);
         }
         return STATUS_PENDING;
     }
@@ -225,7 +225,7 @@ void AsyncDownloadManager::processDownload(std::shared_ptr<DownloadTask> task)
 
     if (task->callback)
     {
-        task->callback(success ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL, error_message);
+        task->callback(success ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL, error_message, task->cache_entry);
     }
 }
 

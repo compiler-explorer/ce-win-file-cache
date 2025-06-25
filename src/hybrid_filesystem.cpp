@@ -850,7 +850,7 @@ NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
 
         NTSTATUS status =
         download_manager->queueDownload(entry->virtual_path, entry->network_path, entry, entry->policy,
-                                        [this, entry](NTSTATUS download_status, const std::wstring error)
+                                        [this](NTSTATUS download_status, const std::wstring error, CacheEntry* entry)
                                         {
                                             if (download_status == STATUS_SUCCESS)
                                             {

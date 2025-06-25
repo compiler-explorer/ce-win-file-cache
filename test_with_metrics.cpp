@@ -65,7 +65,7 @@ void simulateAsyncDownloads()
         download_manager.queueDownload(virtual_path, network_path,
                                        nullptr, // No cache entry for this test
                                        CachePolicy::ALWAYS_CACHE,
-                                       [&completed, &failed, i](NTSTATUS status, const std::wstring &error)
+                                       [&completed, &failed, i](NTSTATUS status, const std::wstring &error, CacheEntry* /*entry*/)
                                        {
                                            if (status == STATUS_SUCCESS)
                                            {

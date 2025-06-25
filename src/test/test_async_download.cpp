@@ -85,7 +85,7 @@ class TestAsyncDownload
                                            nullptr, // No cache entry for this test
                                            CachePolicy::ALWAYS_CACHE,
                                            [&completed_count, &failed_count,
-                                            vpath = virtual_path](NTSTATUS status, const std::wstring &error)
+                                            vpath = virtual_path](NTSTATUS status, const std::wstring &error, CacheEntry* /*entry*/)
                                            {
                                                if (status == STATUS_SUCCESS)
                                                {
@@ -173,7 +173,7 @@ class TestAsyncDownload
             std::wstring virtual_path = L"/cache/" + filename;
 
             download_manager.queueDownload(virtual_path, filename, nullptr, CachePolicy::ALWAYS_CACHE,
-                                           [&completed_count](NTSTATUS status, const std::wstring &error)
+                                           [&completed_count](NTSTATUS status, const std::wstring &error, CacheEntry* /*entry*/)
                                            {
                                                (void)error; // Suppress unused warning
                                                if (status == STATUS_SUCCESS)
@@ -220,7 +220,7 @@ class TestAsyncDownload
         for (int i = 0; i < 5; ++i)
         {
             download_manager.queueDownload(virtual_path, network_path, nullptr, CachePolicy::ALWAYS_CACHE,
-                                           [&in_progress_count, &completed_count, i](NTSTATUS status, const std::wstring &error)
+                                           [&in_progress_count, &completed_count, i](NTSTATUS status, const std::wstring &error, CacheEntry* /*entry*/)
                                            {
                                                (void)error; // Suppress unused warning
                                                if (status == STATUS_PENDING)
