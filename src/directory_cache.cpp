@@ -39,7 +39,7 @@ NTSTATUS DirectoryCache::buildDirectoryTreeFromConfig(const Config &config)
     // Build directory tree from all configured compilers
     for (const auto &[compiler_name, compiler_config] : config.compilers)
     {
-        std::wstring virtual_root = std::filesystem::relative(compiler_config.network_path, compiler_config.root_path);
+        std::wstring virtual_root = std::filesystem::relative(compiler_config.network_path, compiler_config.root_path).wstring();
         virtual_root = normalizePath(L"/" + virtual_root);
 
         // Add compiler root directory
