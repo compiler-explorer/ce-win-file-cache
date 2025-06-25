@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <string_view>
 #include <thread>
 
 using namespace CeWinFileCache;

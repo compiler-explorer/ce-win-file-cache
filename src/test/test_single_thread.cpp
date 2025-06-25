@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <string_view>
 #include <thread>
 
 using namespace CeWinFileCache;

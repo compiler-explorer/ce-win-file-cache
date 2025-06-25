@@ -75,6 +75,32 @@ if (condition)
   void processPath(std::string& path);
   ```
 
+### Critical string_view Rule
+
+**NEVER use `std::string_view` parameters if you need to create a null-terminated string from them**. This defeats the optimization purpose:
+
+```cpp
+// BAD: Creates string anyway, optimization is pointless
+std::wstring utf8ToWide(std::string_view utf8_str)
+{
+    std::string utf8_str_nt{utf8_str}; // Creates string!
+    return convertToWide(utf8_str_nt.c_str());
+}
+
+// GOOD: Use const std::string& for C APIs needing null-terminated strings
+std::wstring utf8ToWide(const std::string& utf8_str)
+{
+    return convertToWide(utf8_str.c_str());
+}
+```
+
+Functions that interface with:
+- C APIs (like `MultiByteToWideChar`, `mbstowcs`)  
+- Standard library functions expecting null-terminated strings
+- File streams (`std::ofstream`, `std::ifstream`)
+
+Should use `const std::string&` parameters, not `std::string_view`.
+
 ## Comments
 
 - Use minimal inline comments
