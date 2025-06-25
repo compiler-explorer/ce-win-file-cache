@@ -18,9 +18,9 @@ enum class NodeType
 
 struct DirectoryNode
 {
-    std::wstring name;
-    std::wstring full_virtual_path; // e.g., "/msvc-14.40/bin/cl.exe"
-    std::wstring network_path; // e.g., "\\server\share\msvc\14.40\bin\cl.exe"
+    std::wstring name{};
+    std::wstring full_virtual_path{}; // e.g., "/msvc-14.40/bin/cl.exe"
+    std::wstring network_path{}; // e.g., "\\server\share\msvc\14.40\bin\cl.exe"
     NodeType type;
 
     // File metadata
@@ -115,8 +115,8 @@ class DirectoryTree
     }
 
     private:
-    std::unique_ptr<DirectoryNode> root;
-    mutable std::mutex tree_mutex;
+    std::unique_ptr<DirectoryNode> root{};
+    mutable std::mutex tree_mutex{};
 
     // Helper methods
     std::vector<std::wstring> splitPath(const std::wstring &path);

@@ -8,7 +8,6 @@ Checks: >
   bugprone-move-forwarding-reference,
   bugprone-use-after-move,
   cppcoreguidelines-pro-type-member-init,
-  cppcoreguidelines-use-default-member-init,
   modernize-use-default-member-init,
   modernize-use-nullptr,
   modernize-use-override,
@@ -33,8 +32,8 @@ CheckOptions:
   - key: performance-for-range-copy.WarnOnAllAutoCopies
     value: true
   
-  # Core guidelines configurations
-  - key: cppcoreguidelines-use-default-member-init.UseAssignment
+  # Member initialization configuration
+  - key: modernize-use-default-member-init.UseAssignment
     value: true
 
 # Header filter - check all project headers

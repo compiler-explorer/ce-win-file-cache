@@ -37,7 +37,7 @@ class MemoryCacheManager
     size_t getCachedFileCount() const;
 
     private:
-    mutable std::mutex cache_mutex;
+    mutable std::mutex cache_mutex{};
     std::unordered_map<std::wstring, std::vector<uint8_t>> memory_cache;
 
     std::wstring resolveVirtualToNetworkPath(const std::wstring &virtual_path, const Config &config);

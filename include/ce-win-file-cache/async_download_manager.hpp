@@ -19,11 +19,11 @@ namespace CeWinFileCache
 
 struct DownloadTask
 {
-    std::wstring virtual_path;
-    std::wstring network_path;
+    std::wstring virtual_path{};
+    std::wstring network_path{};
     CacheEntry *cache_entry;
     CachePolicy policy;
-    std::function<void(NTSTATUS, const std::wstring &)> callback;
+    std::function<void(NTSTATUS, const std::wstring &)> callback{};
 
     DownloadTask(const std::wstring &vpath,
                  const std::wstring &npath,
