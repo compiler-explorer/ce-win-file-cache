@@ -219,7 +219,7 @@ None found in production code paths.
 ## 6. Recommendations
 
 ### 6.1 Immediate Actions
-1. **Fix Exception Safety**: Replace `new FileDescriptor()` with `std::make_unique<FileDescriptor>()`
+1. **Minor Exception Safety**: Consider RAII wrapper for `new FileDescriptor()` (low priority - ownership transfers to WinFsp immediately)
 2. **Fix Test Leak**: Uncomment deletion in `test_simple_integration.cpp:686`
 
 ### 6.2 Code Quality Improvements
