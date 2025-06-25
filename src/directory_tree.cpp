@@ -24,12 +24,14 @@ bool DirectoryNode::isFile() const
 
 DirectoryNode *DirectoryNode::findChild(const std::wstring &child_name)
 {
+    std::lock_guard<std::mutex> lock(children_mutex);
     auto it = children.find(child_name);
     return (it != children.end()) ? it->second.get() : nullptr;
 }
 
 DirectoryNode *DirectoryNode::addChild(const std::wstring &child_name, NodeType child_type)
 {
+    std::lock_guard<std::mutex> lock(children_mutex);
     auto child = std::make_unique<DirectoryNode>(child_name, child_type, this);
     DirectoryNode *result = child.get();
     children[child_name] = std::move(child);
@@ -38,6 +40,7 @@ DirectoryNode *DirectoryNode::addChild(const std::wstring &child_name, NodeType 
 
 std::vector<std::wstring> DirectoryNode::getChildNames() const
 {
+    std::lock_guard<std::mutex> lock(children_mutex);
     std::vector<std::wstring> names;
     names.reserve(children.size());
     for (const auto &[child_name, child] : children)
@@ -45,6 +48,18 @@ std::vector<std::wstring> DirectoryNode::getChildNames() const
         names.push_back(child_name);
     }
     return names;
+}
+
+std::vector<DirectoryNode*> DirectoryNode::getChildNodes() const
+{
+    std::lock_guard<std::mutex> lock(children_mutex);
+    std::vector<DirectoryNode*> nodes;
+    nodes.reserve(children.size());
+    for (const auto &[name, child] : children)
+    {
+        nodes.push_back(child.get());
+    }
+    return nodes;
 }
 
 // DirectoryTree implementations
@@ -108,13 +123,8 @@ std::vector<DirectoryNode *> DirectoryTree::getDirectoryContents(const std::wstr
         return {};
     }
 
-    std::vector<DirectoryNode *> contents;
-    contents.reserve(dir_node->children.size());
-
-    for (const auto &[name, child] : dir_node->children)
-    {
-        contents.push_back(child.get());
-    }
+    // Use DirectoryNode's thread-safe method to get child nodes
+    std::vector<DirectoryNode *> contents = dir_node->getChildNodes();
 
     // Sort for consistent enumeration order
     std::sort(contents.begin(), contents.end(),

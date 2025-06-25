@@ -6,7 +6,7 @@ This document identifies potential memory safety vulnerabilities in the codebase
 
 **CRITICAL ISSUES**: ✅ **2 FIXED** - All critical use-after-free vulnerabilities resolved
 **HIGH-RISK PATTERNS**: 1 remaining pattern with significant risk  
-**MODERATE-RISK ISSUES**: ✅ **1 FIXED**, 2 remaining potential problems requiring review
+**MODERATE-RISK ISSUES**: ✅ **2 FIXED**, 1 remaining potential problem requiring review
 
 ---
 
@@ -270,14 +270,74 @@ info->access_count++; // Safe - no move operation
 - ✅ **No unnecessary map access**: Single map access using reference
 - ✅ **Exception safe**: No intermediate state that could leak on exception
 
-### 2. Iterator Invalidation in DirectoryNode
+### 2. ✅ FIXED: Iterator Invalidation in DirectoryNode
 
-**Location**: `include/types/directory_tree.hpp:59-65`  
+**Location**: `include/types/directory_tree.hpp:34-49` (original)  
 **Severity**: MEDIUM  
-**Risk**: Concurrent modification of children map
+**Risk**: Concurrent modification of children map  
+**Status**: ✅ **FIXED** - Added proper thread synchronization
 
-#### Fix Strategy:
-Add proper locking around DirectoryNode operations in multi-threaded contexts.
+#### Original Vulnerable Code:
+```cpp
+DirectoryNode *findChild(const std::wstring &child_name)
+{
+    auto it = children.find(child_name);  // No lock protection
+    return (it != children.end()) ? it->second.get() : nullptr;
+}
+
+DirectoryNode *addChild(const std::wstring &child_name, NodeType child_type)
+{
+    // ... create child
+    children[child_name] = std::move(child);  // No lock protection
+    return result;
+}
+```
+
+#### ✅ Fix Implemented:
+**Added per-node mutex protection for all children map operations:**
+
+```cpp
+struct DirectoryNode
+{
+    // ... existing fields ...
+    mutable std::mutex children_mutex;  // New: Per-node thread safety
+};
+
+// All methods now properly synchronized
+DirectoryNode *DirectoryNode::findChild(const std::wstring &child_name)
+{
+    std::lock_guard<std::mutex> lock(children_mutex);
+    auto it = children.find(child_name);
+    return (it != children.end()) ? it->second.get() : nullptr;
+}
+
+DirectoryNode *DirectoryNode::addChild(const std::wstring &child_name, NodeType child_type)
+{
+    std::lock_guard<std::mutex> lock(children_mutex);
+    auto child = std::make_unique<DirectoryNode>(child_name, child_type, this);
+    DirectoryNode *result = child.get();
+    children[child_name] = std::move(child);
+    return result;
+}
+
+std::vector<DirectoryNode*> DirectoryNode::getChildNodes() const
+{
+    std::lock_guard<std::mutex> lock(children_mutex);
+    std::vector<DirectoryNode*> nodes;
+    nodes.reserve(children.size());
+    for (const auto &[name, child] : children)
+    {
+        nodes.push_back(child.get());
+    }
+    return nodes;
+}
+```
+
+**Benefits of this fix:**
+- ✅ **Per-node granular locking**: Each DirectoryNode protects its own children independently
+- ✅ **Iterator invalidation protection**: No concurrent modification during iteration
+- ✅ **Consistent API**: All children access goes through thread-safe methods
+- ✅ **Performance**: Fine-grained locking reduces contention vs global tree lock
 
 ### 3. Windows Handle Resource Leaks
 
@@ -323,7 +383,7 @@ HandleGuard handle(CreateFileW(...));
 
 ### Priority 3 (Medium - Future Work)
 1. ✅ **Fix move semantics issues** - Fixed use-after-move in FileAccessTracker with getOrCreateAccessInfo() helper
-2. **Iterator invalidation protection** - Add proper locking for DirectoryNode
+2. ✅ **Iterator invalidation protection** - Added per-node mutex protection for DirectoryNode children operations
 3. **Exception safety audit** - Review all exception paths for resource leaks
 
 ---
@@ -361,7 +421,7 @@ Consider integrating:
 | Cache eviction during downloads | Critical | ✅ **FIXED** | Data corruption | ✅ P0 Complete |
 | Shutdown race conditions | High | ⚠️ Remaining | Crash | P1 |
 | Use-after-move bugs | Medium | ✅ **FIXED** | Undefined behavior | ✅ P2 Complete |
-| Iterator invalidation | Medium | ⚠️ Remaining | Crash | P2 |
+| Iterator invalidation | Medium | ✅ **FIXED** | Crash | ✅ P2 Complete |
 | Handle leaks | Medium | ⚠️ Remaining | Resource exhaustion | P2 |
 
 **Updated Assessment**: ✅ **Major Progress** - All critical use-after-free vulnerabilities have been resolved! The codebase now has robust protection against the most dangerous memory safety issues in asynchronous download scenarios. Remaining issues are lower priority and primarily affect edge cases or high-stress scenarios.
