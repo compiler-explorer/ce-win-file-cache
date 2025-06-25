@@ -6,6 +6,48 @@
 namespace CeWinFileCache
 {
 
+// DirectoryNode implementations
+DirectoryNode::DirectoryNode(const std::wstring &node_name, NodeType node_type, DirectoryNode *parent_node)
+: name(node_name), type(node_type), creation_time{}, last_access_time{}, last_write_time{}, parent(parent_node)
+{
+}
+
+bool DirectoryNode::isDirectory() const
+{
+    return type == NodeType::DIRECTORY;
+}
+
+bool DirectoryNode::isFile() const
+{
+    return type == NodeType::FILE;
+}
+
+DirectoryNode *DirectoryNode::findChild(const std::wstring &child_name)
+{
+    auto it = children.find(child_name);
+    return (it != children.end()) ? it->second.get() : nullptr;
+}
+
+DirectoryNode *DirectoryNode::addChild(const std::wstring &child_name, NodeType child_type)
+{
+    auto child = std::make_unique<DirectoryNode>(child_name, child_type, this);
+    DirectoryNode *result = child.get();
+    children[child_name] = std::move(child);
+    return result;
+}
+
+std::vector<std::wstring> DirectoryNode::getChildNames() const
+{
+    std::vector<std::wstring> names;
+    names.reserve(children.size());
+    for (const auto &[child_name, child] : children)
+    {
+        names.push_back(child_name);
+    }
+    return names;
+}
+
+// DirectoryTree implementations
 DirectoryTree::DirectoryTree() : root(std::make_unique<DirectoryNode>(L"", NodeType::DIRECTORY))
 {
     root->full_virtual_path = L"/";
@@ -255,6 +297,21 @@ void DirectoryTree::updateNodeMetadata(DirectoryNode *node, const std::wstring &
     {
         node->file_attributes = FILE_ATTRIBUTE_DIRECTORY;
     }
+}
+
+void DirectoryTree::lock()
+{
+    tree_mutex.lock();
+}
+
+void DirectoryTree::unlock()
+{
+    tree_mutex.unlock();
+}
+
+std::lock_guard<std::mutex> DirectoryTree::getLock()
+{
+    return std::lock_guard<std::mutex>(tree_mutex);
 }
 
 } // namespace CeWinFileCache

@@ -34,47 +34,15 @@ struct DirectoryNode
     std::unordered_map<std::wstring, std::unique_ptr<DirectoryNode>> children;
     DirectoryNode *parent;
 
-    DirectoryNode(const std::wstring &node_name, NodeType node_type, DirectoryNode *parent_node = nullptr)
-    : name(node_name), type(node_type),  creation_time{}, last_access_time{}, last_write_time{},
-       parent(parent_node)
-    {
-    }
+    // Constructor
+    DirectoryNode(const std::wstring &node_name, NodeType node_type, DirectoryNode *parent_node = nullptr);
 
     // Helper methods
-    bool isDirectory() const
-    {
-        return type == NodeType::DIRECTORY;
-    }
-    bool isFile() const
-    {
-        return type == NodeType::FILE;
-    }
-
-    DirectoryNode *findChild(const std::wstring &child_name)
-    {
-        auto it = children.find(child_name);
-        return (it != children.end()) ? it->second.get() : nullptr;
-    }
-
-    DirectoryNode *addChild(const std::wstring &child_name, NodeType child_type)
-    {
-        auto child = std::make_unique<DirectoryNode>(child_name, child_type, this);
-        DirectoryNode *result = child.get();
-        children[child_name] = std::move(child);
-        return result;
-    }
-
-    // Get all child names for directory enumeration
-    std::vector<std::wstring> getChildNames() const
-    {
-        std::vector<std::wstring> names;
-        names.reserve(children.size());
-        for (const auto &[child_name, child] : children)
-        {
-            names.push_back(child_name);
-        }
-        return names;
-    }
+    bool isDirectory() const;
+    bool isFile() const;
+    DirectoryNode *findChild(const std::wstring &child_name);
+    DirectoryNode *addChild(const std::wstring &child_name, NodeType child_type);
+    std::vector<std::wstring> getChildNames() const;
 };
 
 class DirectoryTree
@@ -101,18 +69,9 @@ class DirectoryTree
     void reset();
 
     // Thread safety
-    void lock()
-    {
-        tree_mutex.lock();
-    }
-    void unlock()
-    {
-        tree_mutex.unlock();
-    }
-    std::lock_guard<std::mutex> getLock()
-    {
-        return std::lock_guard<std::mutex>(tree_mutex);
-    }
+    void lock();
+    void unlock();
+    std::lock_guard<std::mutex> getLock();
 
     private:
     std::unique_ptr<DirectoryNode> root{};
