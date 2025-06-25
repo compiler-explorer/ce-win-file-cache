@@ -239,7 +239,7 @@ void DirectoryTree::updateNodeMetadata(DirectoryNode *node, const std::wstring &
     else
     {
         // Use current time
-        FILETIME current_time;
+        FILETIME current_time{};
         GetSystemTimeAsFileTime(&current_time);
         node->creation_time = current_time;
         node->last_access_time = current_time;

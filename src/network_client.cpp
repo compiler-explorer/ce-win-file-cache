@@ -9,7 +9,7 @@
 namespace CeWinFileCache
 {
 
-NetworkClient::NetworkClient() : is_connected(false)
+NetworkClient::NetworkClient()  
 {
     ZeroMemory(&net_resource, sizeof(net_resource));
 }

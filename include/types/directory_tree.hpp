@@ -24,19 +24,19 @@ struct DirectoryNode
     NodeType type;
 
     // File metadata
-    UINT64 file_size;
+    UINT64 file_size = 0;
     FILETIME creation_time;
     FILETIME last_access_time;
     FILETIME last_write_time;
-    DWORD file_attributes;
+    DWORD file_attributes = 0;
 
     // Directory structure
     std::unordered_map<std::wstring, std::unique_ptr<DirectoryNode>> children;
     DirectoryNode *parent;
 
     DirectoryNode(const std::wstring &node_name, NodeType node_type, DirectoryNode *parent_node = nullptr)
-    : name(node_name), type(node_type), file_size(0), creation_time{}, last_access_time{}, last_write_time{},
-      file_attributes(0), parent(parent_node)
+    : name(node_name), type(node_type),  creation_time{}, last_access_time{}, last_write_time{},
+       parent(parent_node)
     {
     }
 
