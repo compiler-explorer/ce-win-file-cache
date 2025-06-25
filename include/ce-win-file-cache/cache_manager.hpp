@@ -37,18 +37,18 @@ class CacheManager
     size_t calculateFileSize(const std::wstring &file_path);
 
     GlobalConfig config;
-    mutable std::mutex cache_mutex;
+    mutable std::mutex cache_mutex{};
     std::unordered_map<std::wstring, std::unique_ptr<CacheEntry>> cached_files;
 
     // Statistics
-    mutable std::atomic<size_t> current_cache_size;
-    mutable std::atomic<size_t> cache_hits;
-    mutable std::atomic<size_t> cache_misses;
+    mutable std::atomic<size_t> current_cache_size{};
+    mutable std::atomic<size_t> cache_hits{};
+    mutable std::atomic<size_t> cache_misses{};
 
     // Background thread
-    std::thread eviction_thread;
-    std::condition_variable eviction_cv;
-    std::atomic<bool> shutdown_requested;
+    std::thread eviction_thread{};
+    std::condition_variable eviction_cv{};
+    std::atomic<bool> shutdown_requested{};
 };
 
 } // namespace CeWinFileCache
