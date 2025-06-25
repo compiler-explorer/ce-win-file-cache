@@ -235,5 +235,43 @@ public:
 ## Testing
 
 - Prefer writing unit tests for every new function unless there are good reasons not to
+
+## Code Quality Tools
+
+### clang-tidy
+
+clang-tidy is configured to enforce the coding style and catch common issues. Install it with:
+
+```bash
+# macOS
+brew install llvm
+
+# Ubuntu/Debian  
+sudo apt-get install clang-tidy
+
+# Fedora
+sudo dnf install clang-tools-extra
 ```
+
+Run clang-tidy checks:
+
+```bash
+# Check all files
+./scripts/run-clang-tidy.sh
+
+# Apply fixes automatically
+./scripts/run-clang-tidy.sh --fix
+
+# Check specific files
+./scripts/run-clang-tidy.sh --file "cache_manager"
+
+# Run with custom build directory
+./scripts/run-clang-tidy.sh --build-dir build-debug
 ```
+
+The configuration (`.clang-tidy`) includes:
+- Modern C++20 best practices
+- Naming convention enforcement
+- Performance optimizations
+- Bug-prone pattern detection
+- Core Guidelines compliance

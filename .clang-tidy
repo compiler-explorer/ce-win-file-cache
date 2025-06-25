@@ -1,0 +1,111 @@
+---
+# Enable a comprehensive set of checks for modern C++20 code
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  cppcoreguidelines-*,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-owning-memory,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  performance-*,
+  readability-*,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -readability-function-cognitive-complexity,
+  misc-*,
+  -misc-non-private-member-variables-in-classes,
+  hicpp-exception-baseclass,
+  hicpp-multiway-paths-covered,
+  google-readability-namespace-comments,
+  google-build-namespaces,
+  google-runtime-int
+
+# Configure naming conventions to match CLAUDE.md
+CheckOptions:
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: camelBack
+  - key: readability-identifier-naming.MethodCase
+    value: camelBack
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.ParameterCase
+    value: lower_case
+  - key: readability-identifier-naming.MemberCase
+    value: lower_case
+  - key: readability-identifier-naming.PrivateMemberCase
+    value: lower_case
+  - key: readability-identifier-naming.NamespaceCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.ConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.GlobalConstantCase
+    value: UPPER_CASE
+  
+  # Brace style configuration
+  - key: readability-braces-around-statements.ShortStatementLines
+    value: 0
+  
+  # Modern C++ configuration
+  - key: modernize-use-override.IgnoreDestructors
+    value: false
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
+  - key: modernize-loop-convert.MaxCopySize
+    value: 16
+  - key: modernize-loop-convert.MinConfidence
+    value: reasonable
+  - key: modernize-pass-by-value.IncludeStyle
+    value: llvm
+  
+  # Performance configurations
+  - key: performance-unnecessary-value-param.AllowedTypes
+    value: ''
+  - key: performance-move-const-arg.CheckTriviallyCopyableMove
+    value: true
+  
+  # Readability configurations
+  - key: readability-implicit-bool-conversion.AllowIntegerConditions
+    value: true
+  - key: readability-implicit-bool-conversion.AllowPointerConditions
+    value: true
+  - key: readability-function-size.LineThreshold
+    value: 150
+  - key: readability-function-size.StatementThreshold
+    value: 100
+  - key: readability-function-size.BranchThreshold
+    value: 20
+  - key: readability-function-size.ParameterThreshold
+    value: 8
+  
+  # Core guidelines configurations
+  - key: cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor
+    value: true
+  - key: cppcoreguidelines-special-member-functions.AllowMissingMoveFunctions
+    value: true
+  
+  # Miscellaneous configurations
+  - key: misc-throw-by-value-catch-by-reference.CheckThrowTemporaries
+    value: true
+
+# Header filter - check all project headers
+HeaderFilterRegex: '.*\.(h|hpp)$'
+
+# Treat warnings as errors (can be overridden with --warnings-as-errors=false)
+WarningsAsErrors: ''
+
+# Use color in output
+UseColor: true
