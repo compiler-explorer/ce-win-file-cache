@@ -74,7 +74,7 @@ struct SECURITY_CAPABILITIES
 #define SDDL_REVISION_1 1
 
 // Function stubs
-inline void CloseHandle(HANDLE)
+inline void CloseHandle(HANDLE /*unused*/)
 {
 }
 inline DWORD GetLastError()

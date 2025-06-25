@@ -1,14 +1,15 @@
 #include "../include/types/directory_tree.hpp"
 #include <algorithm>
 #include <functional>
+#include <ranges>
 #include <sstream>
 
 namespace CeWinFileCache
 {
 
 // DirectoryNode implementations
-DirectoryNode::DirectoryNode(const std::wstring &node_name, NodeType node_type, DirectoryNode *parent_node)
-: name(node_name), type(node_type), creation_time{}, last_access_time{}, last_write_time{}, parent(parent_node)
+DirectoryNode::DirectoryNode(std::wstring node_name, NodeType node_type, DirectoryNode *parent_node)
+: name(std::move(node_name)), type(node_type), creation_time{}, last_access_time{}, last_write_time{}, parent(parent_node)
 {
 }
 
@@ -25,8 +26,8 @@ bool DirectoryNode::isFile() const
 DirectoryNode *DirectoryNode::findChild(const std::wstring &child_name)
 {
     std::lock_guard<std::mutex> lock(children_mutex);
-    auto it = children.find(child_name);
-    return (it != children.end()) ? it->second.get() : nullptr;
+    auto child_it = children.find(child_name);
+    return (child_it != children.end()) ? child_it->second.get() : nullptr;
 }
 
 DirectoryNode *DirectoryNode::addChild(const std::wstring &child_name, NodeType child_type)
@@ -85,7 +86,7 @@ bool DirectoryTree::addFile(const std::wstring &virtual_path, const std::wstring
     std::lock_guard<std::mutex> tree_lock(tree_mutex);
 
     DirectoryNode *node = findOrCreatePath(virtual_path, true);
-    if (!node)
+    if (node == nullptr)
     {
         return false;
     }
@@ -101,7 +102,7 @@ bool DirectoryTree::addDirectory(const std::wstring &virtual_path, const std::ws
     std::lock_guard<std::mutex> tree_lock(tree_mutex);
 
     DirectoryNode *node = findOrCreatePath(virtual_path, true);
-    if (!node)
+    if (node == nullptr)
     {
         return false;
     }
@@ -118,7 +119,7 @@ std::vector<DirectoryNode *> DirectoryTree::getDirectoryContents(const std::wstr
     std::lock_guard<std::mutex> tree_lock(tree_mutex);
 
     DirectoryNode *dir_node = findOrCreatePath(virtual_path, false);
-    if (!dir_node || !dir_node->isDirectory())
+    if ((dir_node == nullptr) || !dir_node->isDirectory())
     {
         return {};
     }
@@ -127,10 +128,9 @@ std::vector<DirectoryNode *> DirectoryTree::getDirectoryContents(const std::wstr
     std::vector<DirectoryNode *> contents = dir_node->getChildNodes();
 
     // Sort for consistent enumeration order
-    std::sort(contents.begin(), contents.end(),
-              [](const DirectoryNode *a, const DirectoryNode *b)
+    std::ranges::sort(contents, [](const DirectoryNode *first, const DirectoryNode *second)
               {
-                  return a->name < b->name;
+                  return first->name < second->name;
               });
 
     return contents;
@@ -150,7 +150,9 @@ size_t DirectoryTree::getTotalDirectories() const
     std::function<void(const DirectoryNode *)> countDirs = [&](const DirectoryNode *node)
     {
         if (node->isDirectory())
+        {
             count++;
+        }
         for (const auto &[name, child] : node->children)
         {
             countDirs(child.get());
@@ -169,7 +171,9 @@ size_t DirectoryTree::getTotalFiles() const
     std::function<void(const DirectoryNode *)> countFiles = [&](const DirectoryNode *node)
     {
         if (node->isFile())
+        {
             count++;
+        }
         for (const auto &[name, child] : node->children)
         {
             countFiles(child.get());
@@ -247,7 +251,7 @@ DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path,
     {
         DirectoryNode *child = current->findChild(component);
 
-        if (!child)
+        if (child == nullptr)
         {
             if (!create_missing)
             {
@@ -274,7 +278,7 @@ DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path,
 
 void DirectoryTree::updateNodeMetadata(DirectoryNode *node, const std::wstring &network_path, UINT64 size, const FILETIME *creation_time)
 {
-    if (!node)
+    if (node == nullptr)
     {
         return;
     }
@@ -282,7 +286,7 @@ void DirectoryTree::updateNodeMetadata(DirectoryNode *node, const std::wstring &
     node->network_path = network_path;
     node->file_size = size;
 
-    if (creation_time)
+    if (creation_time != nullptr)
     {
         node->creation_time = *creation_time;
         node->last_access_time = *creation_time;

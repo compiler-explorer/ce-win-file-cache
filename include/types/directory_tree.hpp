@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ce-win-file-cache/windows_compat.hpp>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -10,7 +11,7 @@
 namespace CeWinFileCache
 {
 
-enum class NodeType
+enum class NodeType : std::uint8_t
 {
     DIRECTORY,
     FILE
@@ -18,9 +19,9 @@ enum class NodeType
 
 struct DirectoryNode
 {
-    std::wstring name{};
-    std::wstring full_virtual_path{}; // e.g., "/msvc-14.40/bin/cl.exe"
-    std::wstring network_path{}; // e.g., "\\server\share\msvc\14.40\bin\cl.exe"
+    std::wstring name;
+    std::wstring full_virtual_path; // e.g., "/msvc-14.40/bin/cl.exe"
+    std::wstring network_path; // e.g., "\\server\share\msvc\14.40\bin\cl.exe"
     NodeType type;
 
     // File metadata
@@ -38,7 +39,7 @@ struct DirectoryNode
     mutable std::mutex children_mutex;
 
     // Constructor
-    DirectoryNode(const std::wstring &node_name, NodeType node_type, DirectoryNode *parent_node = nullptr);
+    DirectoryNode(std::wstring node_name, NodeType node_type, DirectoryNode *parent_node = nullptr);
 
     // Helper methods
     bool isDirectory() const;
@@ -78,8 +79,8 @@ class DirectoryTree
     std::lock_guard<std::mutex> getLock();
 
     private:
-    std::unique_ptr<DirectoryNode> root{};
-    mutable std::mutex tree_mutex{};
+    std::unique_ptr<DirectoryNode> root;
+    mutable std::mutex tree_mutex;
 
     // Helper methods
     std::vector<std::wstring> splitPath(const std::wstring &path);
