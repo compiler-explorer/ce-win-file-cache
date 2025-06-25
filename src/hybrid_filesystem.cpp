@@ -847,6 +847,7 @@ NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
     if (download_manager && !entry->network_path.empty())
     {
         entry->state = FileState::FETCHING;
+        entry->is_downloading.store(true);
 
         NTSTATUS status =
         download_manager->queueDownload(entry->virtual_path, entry->network_path, entry, entry->policy,

@@ -164,6 +164,13 @@ void AsyncDownloadManager::processDownload(std::shared_ptr<DownloadTask> task)
     std::wstring error_message;
     auto start_time = std::chrono::high_resolution_clock::now();
 
+    // Mark entry as downloading to prevent eviction
+    if (task->cache_entry)
+    {
+        task->cache_entry->is_downloading.store(true);
+        task->cache_entry->state = FileState::FETCHING;
+    }
+
     try
     {
         if (task->policy == CachePolicy::ALWAYS_CACHE || task->policy == CachePolicy::ON_DEMAND)
@@ -221,6 +228,12 @@ void AsyncDownloadManager::processDownload(std::shared_ptr<DownloadTask> task)
             reason = std::string(error_message.begin(), error_message.end());
         }
         GlobalMetrics::instance().recordDownloadFailed(reason);
+    }
+
+    // Clear download flag regardless of success/failure
+    if (task->cache_entry)
+    {
+        task->cache_entry->is_downloading.store(false);
     }
 
     if (task->callback)

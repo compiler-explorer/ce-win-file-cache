@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ce-win-file-cache/windows_compat.hpp>
+#include <atomic>
 #include <chrono>
 #include <string>
 #include <types/file_state.hpp>
@@ -27,6 +28,9 @@ struct CacheEntry
     std::chrono::steady_clock::time_point last_used{};
     size_t access_count{};
     bool is_dirty{false};
+    
+    // Download protection - prevents eviction during active downloads
+    std::atomic<bool> is_downloading{false};
 
     CacheEntry()
     : state(FileState::VIRTUAL), policy(CachePolicy::ON_DEMAND),  creation_time{},

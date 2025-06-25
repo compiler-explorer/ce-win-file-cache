@@ -188,6 +188,11 @@ NTSTATUS CacheManager::performLRUEviction(size_t bytes_needed)
 
     for (const auto &[path, entry] : cached_files)
     {
+        // Skip entries that are currently being downloaded to prevent corruption
+        if (entry->state == FileState::FETCHING || entry->is_downloading.load())
+        {
+            continue;
+        }
         candidates.emplace_back(entry->last_used, path);
     }
 
