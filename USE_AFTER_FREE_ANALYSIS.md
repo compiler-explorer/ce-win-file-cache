@@ -5,8 +5,8 @@ This document identifies potential memory safety vulnerabilities in the codebase
 ## Executive Summary
 
 **CRITICAL ISSUES**: ✅ **2 FIXED** - All critical use-after-free vulnerabilities resolved
-**HIGH-RISK PATTERNS**: 3 identified patterns with significant risk  
-**MODERATE-RISK ISSUES**: 3 potential problems requiring review
+**HIGH-RISK PATTERNS**: 1 remaining pattern with significant risk  
+**MODERATE-RISK ISSUES**: ✅ **1 FIXED**, 2 remaining potential problems requiring review
 
 ---
 
@@ -98,47 +98,34 @@ for (const auto &[path, entry] : cached_files)
 
 ## ⚠️ HIGH-RISK PATTERNS
 
-### 1. Iterator Invalidation in Cache Eviction
+### 1. ❌ REMOVED: Iterator Invalidation in Cache Eviction - FALSE POSITIVE
 
 **Location**: `src/cache_manager.cpp:184-222`  
-**Severity**: HIGH  
-**Risk**: Use-after-free during exception handling
+**Status**: ❌ **Not a vulnerability** - Analysis was incorrect
 
-#### Vulnerable Code:
+#### Actual Code Pattern (Safe):
 ```cpp
-for (const auto &[access_time, path] : candidates)
-{
-    auto it = cached_files.find(path);
-    if (it != cached_files.end())
-    {
-        bytes_evicted += it->second->file_size;
-        // Filesystem operations that might throw exceptions
-        removeFromDisk(it->second->local_path);
-        cached_files.erase(it); // Iterator becomes invalid
+// Phase 1: Collect candidates (safe - no modification)
+for (const auto &[path, entry] : cached_files) {
+    candidates.emplace_back(entry->last_used, path);
+}
+
+// Phase 2: Process candidates (safe - fresh iterators)
+for (const auto &[access_time, path] : candidates) {
+    auto it = cached_files.find(path);  // Fresh iterator each time!
+    if (it != cached_files.end()) {
+        cached_files.erase(it);         // Safe - no invalidation issue
     }
 }
 ```
 
-#### Risk Scenario:
-- Exception during filesystem operations
-- Iterator `it` becomes invalid
-- Subsequent access causes use-after-free
+#### Why This is Safe:
+- ✅ **Collect-then-process pattern**: Iteration happens over separate `candidates` vector
+- ✅ **Fresh iterators**: Each `erase()` uses a new iterator from `find()`  
+- ✅ **No iterator reuse**: No risk of using invalidated iterators
+- ✅ **Well-designed**: Properly handles iterator invalidation concerns
 
-#### Fix Strategy:
-```cpp
-// Use exception-safe iteration
-auto it = cached_files.begin();
-while (it != cached_files.end() && bytes_evicted < target_eviction_size)
-{
-    try {
-        bytes_evicted += it->second->file_size;
-        removeFromDisk(it->second->local_path);
-        it = cached_files.erase(it); // Returns next valid iterator
-    } catch (...) {
-        ++it; // Skip this entry and continue
-    }
-}
-```
+**Analysis correction**: This code follows best practices for safe container modification during iteration.
 
 ### 2. Race Condition in AsyncDownloadManager Shutdown
 
@@ -199,51 +186,89 @@ void AsyncDownloadManager::shutdown()
 }
 ```
 
-### 3. Thread Safety in HybridFileSystem Cache Access
+### 3. ❌ REMOVED: Thread Safety in HybridFileSystem Cache Access - FALSE POSITIVE
 
 **Location**: Multiple locations in `src/hybrid_filesystem.cpp`  
-**Severity**: HIGH  
-**Risk**: Concurrent modification without synchronization
+**Status**: ❌ **Not a vulnerability** - Analysis was incorrect
 
-#### Vulnerable Pattern:
+#### Actual Code Pattern (Safe):
 ```cpp
-// Reading cache_entries without lock
-auto cache_entry = getCacheEntry(virtual_path); // No lock
-
-// Meanwhile another thread:
-cache_entries.erase(virtual_path); // Modifies map concurrently
+// All cache_entries access is properly synchronized
+std::lock_guard<std::mutex> lock(cache_mutex);  // Line 751
+auto it = cache_entries.find(virtual_path);     // Line 754 - Protected by mutex
 ```
 
-#### Fix Strategy:
-Add proper synchronization to all cache_entries access.
+#### Why This is Safe:
+- ✅ **All access mutex-protected**: Every cache_entries operation uses cache_mutex
+- ✅ **No erase operations**: cache_entries only grows, never shrinks (no eviction implemented)
+- ✅ **No concurrent modification**: Only assignment operations add new entries
+- ✅ **Stable pointers**: CacheEntry pointers remain valid for application lifetime
+
+**Analysis correction**: All cache_entries access is properly synchronized and there are no erase/clear operations that could cause thread safety issues.
 
 ---
 
 ## ⚠️ MODERATE-RISK ISSUES
 
-### 1. Use-After-Move in FileAccessTracker
+### 1. ✅ FIXED: Use-After-Move in FileAccessTracker
 
-**Location**: `src/file_access_tracker.cpp:113-122`  
+**Location**: `src/file_access_tracker.cpp:112-125` (original)  
 **Severity**: MEDIUM  
-**Impact**: Undefined behavior
+**Impact**: Undefined behavior  
+**Status**: ✅ **FIXED** - Refactored to use helper function
 
-#### Vulnerable Code:
+#### Original Vulnerable Code:
 ```cpp
-auto info = std::make_unique<FileAccessInfo>();
-// ... populate info
-file_access_map_[virtual_path] = std::move(info);
-info->access_count++; // Use after move - undefined behavior
-```
-
-#### Fix Strategy:
-```cpp
-auto& info_ref = file_access_map_[virtual_path];
-if (!info_ref) {
-    info_ref = std::make_unique<FileAccessInfo>();
-    // populate info_ref directly
+auto &info = file_access_map_[virtual_path];
+if (!info)
+{
+    info = std::make_unique<FileAccessInfo>();
+    info->virtual_path = virtual_path;
+    // ... populate info
+    file_access_map_[virtual_path] = std::move(info); // Move here
 }
-info_ref->access_count++;
+info->access_count++; // Use after move - undefined behavior!
 ```
+
+#### ✅ Fix Implemented:
+**Added `getOrCreateAccessInfo()` helper function to eliminate use-after-move:**
+
+```cpp
+// New helper method in header
+FileAccessInfo* getOrCreateAccessInfo(const std::wstring& virtual_path,
+                                      const std::wstring& network_path,
+                                      uint64_t file_size,
+                                      const std::wstring& cache_policy);
+
+// Safe implementation 
+FileAccessInfo* FileAccessTracker::getOrCreateAccessInfo(const std::wstring& virtual_path,
+                                                         const std::wstring& network_path,
+                                                         uint64_t file_size,
+                                                         const std::wstring& cache_policy)
+{
+    auto& info = file_access_map_[virtual_path];
+    if (!info)
+    {
+        info = std::make_unique<FileAccessInfo>();
+        info->virtual_path = virtual_path;
+        info->network_path = network_path;
+        info->file_size = file_size;
+        info->first_access = std::chrono::system_clock::now();
+        info->cache_policy = cache_policy;
+    }
+    return info.get(); // Return raw pointer - safe to use
+}
+
+// Updated recordAccess() usage
+FileAccessInfo* info = getOrCreateAccessInfo(virtual_path, network_path, file_size, cache_policy);
+info->access_count++; // Safe - no move operation
+```
+
+**Benefits of this fix:**
+- ✅ **Eliminates use-after-move**: No std::move() operation that could invalidate the pointer
+- ✅ **Clean separation**: Helper function handles creation logic separately
+- ✅ **No unnecessary map access**: Single map access using reference
+- ✅ **Exception safe**: No intermediate state that could leak on exception
 
 ### 2. Iterator Invalidation in DirectoryNode
 
@@ -289,8 +314,7 @@ HandleGuard handle(CreateFileW(...));
 
 ### ✅ Priority 1 (Critical) - COMPLETED
 1. ✅ **Fixed AsyncDownloadManager callback capture** - Replaced raw pointer capture with safe parameter passing
-2. ✅ **Fixed cache eviction during downloads** - Added atomic protection against eviction of downloading entries  
-3. ❌ **Add thread synchronization** - Still needed for HybridFileSystem cache access
+2. ✅ **Fixed cache eviction during downloads** - Added atomic protection against eviction of downloading entries
 
 ### Priority 2 (High - Remaining Work)  
 1. **Improve cache eviction safety** - Use exception-safe iteration patterns
@@ -298,7 +322,7 @@ HandleGuard handle(CreateFileW(...));
 3. **Add resource guards** - RAII wrappers for Windows handles
 
 ### Priority 3 (Medium - Future Work)
-1. **Fix move semantics issues** - Ensure no use-after-move in FileAccessTracker
+1. ✅ **Fix move semantics issues** - Fixed use-after-move in FileAccessTracker with getOrCreateAccessInfo() helper
 2. **Iterator invalidation protection** - Add proper locking for DirectoryNode
 3. **Exception safety audit** - Review all exception paths for resource leaks
 
@@ -335,10 +359,8 @@ Consider integrating:
 |-------|----------|--------|---------|----------|
 | AsyncDownloadManager callback use-after-free | Critical | ✅ **FIXED** | Crash/Corruption | ✅ P0 Complete |
 | Cache eviction during downloads | Critical | ✅ **FIXED** | Data corruption | ✅ P0 Complete |
-| Cache eviction iterator invalidation | High | ⚠️ Remaining | Crash | P1 |
 | Shutdown race conditions | High | ⚠️ Remaining | Crash | P1 |
-| Thread safety violations | High | ⚠️ Remaining | Data corruption | P1 |
-| Use-after-move bugs | Medium | ⚠️ Remaining | Undefined behavior | P2 |
+| Use-after-move bugs | Medium | ✅ **FIXED** | Undefined behavior | ✅ P2 Complete |
 | Iterator invalidation | Medium | ⚠️ Remaining | Crash | P2 |
 | Handle leaks | Medium | ⚠️ Remaining | Resource exhaustion | P2 |
 

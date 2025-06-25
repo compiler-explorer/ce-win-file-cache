@@ -49,6 +49,12 @@ class FileAccessTracker
     void writeCSVReport(const std::wstring &filename);
     void writeSummaryReport(const std::wstring &filename);
 
+    // Helper to get or create FileAccessInfo (prevents use-after-move)
+    FileAccessInfo* getOrCreateAccessInfo(const std::wstring& virtual_path,
+                                          const std::wstring& network_path,
+                                          uint64_t file_size,
+                                          const std::wstring& cache_policy);
+
     std::wstring formatFileSize(uint64_t bytes) const;
     std::wstring formatDuration(std::chrono::system_clock::duration duration) const;
     std::wstring getCurrentTimestamp() const;

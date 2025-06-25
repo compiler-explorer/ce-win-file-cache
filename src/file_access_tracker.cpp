@@ -109,18 +109,8 @@ void FileAccessTracker::recordAccess(const std::wstring virtual_path,
 
     std::wcout << L"Number of items in file_access_map: " << file_access_map_.size() << std::endl;
 
-    auto &info = file_access_map_[virtual_path];
-    if (!info)
-    {
-        info = std::make_unique<FileAccessInfo>();
-        info->virtual_path = virtual_path;
-        info->network_path = network_path;
-        info->file_size = file_size;
-        info->first_access = std::chrono::system_clock::now();
-        info->cache_policy = cache_policy;
-
-        file_access_map_[virtual_path] = std::move(info);
-    }
+    // Use helper function to get or create access info safely
+    FileAccessInfo* info = getOrCreateAccessInfo(virtual_path, network_path, file_size, cache_policy);
 
     info->access_count++;
     info->last_access = std::chrono::system_clock::now();
@@ -144,6 +134,29 @@ void FileAccessTracker::recordAccess(const std::wstring virtual_path,
     info->average_access_time_ms = (current_avg * (count - 1) + access_time_ms) / count;
 
     total_accesses_++;
+}
+
+FileAccessInfo* FileAccessTracker::getOrCreateAccessInfo(const std::wstring& virtual_path,
+                                                         const std::wstring& network_path,
+                                                         uint64_t file_size,
+                                                         const std::wstring& cache_policy)
+{
+    auto it = file_access_map_.find(virtual_path);
+    if (it != file_access_map_.end())
+    {
+        return it->second.get();  // Found existing entry
+    }
+    
+    // Create new entry
+    auto new_info = std::make_unique<FileAccessInfo>();
+    new_info->virtual_path = virtual_path;
+    new_info->network_path = network_path;
+    new_info->file_size = file_size;
+    new_info->first_access = std::chrono::system_clock::now();
+    new_info->cache_policy = cache_policy;
+    
+    file_access_map_[virtual_path] = std::move(new_info);  // Move into map
+    return file_access_map_[virtual_path].get();
 }
 
 void FileAccessTracker::startReporting()
