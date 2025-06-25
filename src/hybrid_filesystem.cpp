@@ -5,8 +5,11 @@
 #include <chrono>
 #include <iostream>
 #include <iomanip>
-#include <sddl.h>
 #include <vector>
+
+#ifndef NO_WINFSP
+#include <sddl.h>
+#endif
 
 #ifndef NO_WINFSP
 

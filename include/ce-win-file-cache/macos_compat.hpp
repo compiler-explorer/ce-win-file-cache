@@ -20,6 +20,8 @@ typedef const wchar_t *PCWSTR;
 typedef uint64_t ULONGLONG;
 typedef uint64_t UINT64;
 typedef void *PVOID;
+typedef void *PSECURITY_DESCRIPTOR;
+typedef wchar_t *LPWSTR;
 
 // File time structure
 struct FILETIME
@@ -68,6 +70,9 @@ struct SECURITY_CAPABILITIES
 #define FILE_ATTRIBUTE_DIRECTORY 0x00000010
 #define FILE_ATTRIBUTE_NORMAL 0x00000080
 
+// SDDL constants
+#define SDDL_REVISION_1 1
+
 // Function stubs
 inline void CloseHandle(HANDLE)
 {
@@ -81,6 +86,34 @@ inline void GetSystemTimeAsFileTime(FILETIME *lpSystemTimeAsFileTime)
     // Mock implementation - set to zero
     lpSystemTimeAsFileTime->dwLowDateTime = 0;
     lpSystemTimeAsFileTime->dwHighDateTime = 0;
+}
+
+// SDDL function stubs
+inline BOOL ConvertSidToStringSidW(PVOID /*Sid*/, LPWSTR* StringSid)
+{
+    // Mock implementation - return fake SID string
+    static wchar_t fakeSid[] = L"S-1-5-32-544"; // Built-in Administrators
+    *StringSid = fakeSid;
+    return TRUE;
+}
+
+inline BOOL ConvertStringSecurityDescriptorToSecurityDescriptorW(
+    PCWSTR /*StringSecurityDescriptor*/,
+    DWORD /*StringSDRevision*/,
+    PSECURITY_DESCRIPTOR* SecurityDescriptor,
+    PVOID /*SecurityDescriptorSize*/)
+{
+    // Mock implementation - return fake security descriptor
+    static int fakeSD = 0;
+    *SecurityDescriptor = &fakeSD;
+    return TRUE;
+}
+
+inline PVOID LocalFree(PVOID hMem)
+{
+    // Mock implementation - do nothing for fake pointers
+    (void)hMem;
+    return nullptr;
 }
 
 #endif // !_WIN32
