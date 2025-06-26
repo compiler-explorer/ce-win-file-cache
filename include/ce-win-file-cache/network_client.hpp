@@ -27,7 +27,7 @@ class NetworkClient
     NTSTATUS establishConnection(const std::wstring &share_path);
     void cleanupConnection();
 
-    std::wstring current_share{};
+    std::wstring current_share;
     bool is_connected = false;
     NETRESOURCEW net_resource{};
 };
