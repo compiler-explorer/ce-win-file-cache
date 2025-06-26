@@ -56,7 +56,7 @@ std::vector<DirectoryNode *> DirectoryNode::getChildNodes() const
     std::lock_guard<std::mutex> lock(children_mutex);
     std::vector<DirectoryNode *> nodes;
     nodes.reserve(children.size());
-    for (const auto &[name, child] : children)
+    for (const auto &[child_name, child] : children)
     {
         nodes.push_back(child.get());
     }
@@ -154,7 +154,7 @@ size_t DirectoryTree::getTotalDirectories() const
         {
             count++;
         }
-        for (const auto &[name, child] : node->children)
+        for (const auto &[child_name, child] : node->children)
         {
             countDirs(child.get());
         }
@@ -175,7 +175,7 @@ size_t DirectoryTree::getTotalFiles() const
         {
             count++;
         }
-        for (const auto &[name, child] : node->children)
+        for (const auto &[child_name, child] : node->children)
         {
             countFiles(child.get());
         }
