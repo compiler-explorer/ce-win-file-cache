@@ -2,7 +2,7 @@
 
 #ifdef HAVE_PROMETHEUS
 
-#include <iostream>
+#include "../include/ce-win-file-cache/logger.hpp"
 #include <prometheus/counter.h>
 #include <prometheus/exposer.h>
 #include <prometheus/gauge.h>
@@ -110,11 +110,11 @@ PrometheusMetricsImpl::PrometheusMetricsImpl(const MetricsConfig &config) : conf
                                  .Register(*registry)
                                  .Add({}, networkLatencyBuckets);
 
-        std::cout << "Metrics server started on " << bindAddr << config.endpoint_path << std::endl;
+        CeWinFileCache::Logger::info("Metrics server started on {}{}", bindAddr, config.endpoint_path);
     }
     catch (const std::exception &e)
     {
-        std::cerr << "Failed to initialize metrics: " << e.what() << std::endl;
+        CeWinFileCache::Logger::error("Failed to initialize metrics: {}", e.what());
         throw;
     }
 }

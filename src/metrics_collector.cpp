@@ -2,7 +2,7 @@
 
 #ifdef HAVE_PROMETHEUS
 
-#include <iostream>
+#include "../include/ce-win-file-cache/logger.hpp"
 
 namespace CeWinFileCache
 {
@@ -177,17 +177,17 @@ void GlobalMetrics::initialize(const MetricsConfig &config)
         try
         {
             metrics_instance = std::make_unique<MetricsCollector>(config);
-            std::cout << "Global metrics initialized: " << metrics_instance->getMetricsUrl() << std::endl;
+            CeWinFileCache::Logger::info("Global metrics initialized: {}", metrics_instance->getMetricsUrl());
         }
         catch (const std::exception &e)
         {
-            std::cerr << "Failed to initialize global metrics: " << e.what() << std::endl;
+            CeWinFileCache::Logger::error("Failed to initialize global metrics: {}", e.what());
             metrics_instance = nullptr;
         }
     }
     else
     {
-        std::cout << "Metrics disabled in configuration" << std::endl;
+        CeWinFileCache::Logger::info("Metrics disabled in configuration");
         metrics_instance = nullptr;
     }
 }
@@ -196,7 +196,7 @@ void GlobalMetrics::shutdown()
 {
     if (metrics_instance)
     {
-        std::cout << "Shutting down global metrics" << std::endl;
+        CeWinFileCache::Logger::info("Shutting down global metrics");
         metrics_instance.reset();
     }
     auto_initialized = false;

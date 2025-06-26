@@ -1,28 +1,28 @@
 #include "../include/ce-win-file-cache/memory_cache_manager.hpp"
+#include "../include/ce-win-file-cache/logger.hpp"
 #include "../include/ce-win-file-cache/string_utils.hpp"
 #include <algorithm>
+#include <cassert>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
-#include <cassert>
 
 namespace CeWinFileCache
 {
 
 namespace
 {
-    std::ifstream openNetworkFile(const std::wstring &network_path)
-    {
+std::ifstream openNetworkFile(const std::wstring &network_path)
+{
 #ifdef _WIN32
-        return std::ifstream(network_path, std::ios::binary | std::ios::ate);
+    return std::ifstream(network_path, std::ios::binary | std::ios::ate);
 #else
-        // Convert wstring to UTF-8 string for non-Windows platforms
-        std::string narrow_path = StringUtils::wideToUtf8(network_path);
-        return std::ifstream(narrow_path, std::ios::binary | std::ios::ate);
+    // Convert wstring to UTF-8 string for non-Windows platforms
+    std::string narrow_path = StringUtils::wideToUtf8(network_path);
+    return std::ifstream(narrow_path, std::ios::binary | std::ios::ate);
 #endif
-    }
 }
+} // namespace
 
 std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstring &network_path)
 {
@@ -37,7 +37,7 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
         std::ifstream file = openNetworkFile(network_path);
         if (!file.is_open())
         {
-            std::wcerr << L"Failed to open network file: " << network_path << std::endl;
+            CeWinFileCache::Logger::error("Failed to open network file: {}", Logger::wstringToString(network_path));
             // Record failed network operation
             auto end_time = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration<double>(end_time - start_time).count();
@@ -51,7 +51,7 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
         content.resize(static_cast<size_t>(size));
         if (!file.read(reinterpret_cast<char *>(content.data()), size))
         {
-            std::wcerr << L"Failed to read network file: " << network_path << std::endl;
+            CeWinFileCache::Logger::error("Failed to read network file: {}", Logger::wstringToString(network_path));
             content.clear();
         }
         else
@@ -62,7 +62,8 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
     }
     catch (const std::exception &e)
     {
-        std::wcerr << L"Exception loading network file: " << network_path << L" - " << e.what() << std::endl;
+        CeWinFileCache::Logger::error("Exception loading network file: {} - {}", Logger::wstringToString(network_path),
+                                      e.what());
         content.clear();
     }
 
@@ -76,9 +77,8 @@ std::vector<uint8_t> MemoryCacheManager::loadNetworkFileToMemory(const std::wstr
 
 bool MemoryCacheManager::isFileInMemoryCache(const std::wstring virtual_path)
 {
-    //assert(memory_cache.count() != 0);
-    std::wcout << L"isFileInMemoryCache(" << virtual_path << L")\n";
-    std::flush(std::wcout);
+    // assert(memory_cache.count() != 0);
+    CeWinFileCache::Logger::debug("isFileInMemoryCache({})", Logger::wstringToString(virtual_path));
 
 
     std::lock_guard<std::mutex> lock(cache_mutex);
@@ -133,7 +133,7 @@ std::vector<uint8_t> MemoryCacheManager::getFileContent(const std::wstring &virt
     std::wstring network_path = resolveVirtualToNetworkPath(virtual_path, config);
     if (network_path.empty())
     {
-        std::wcerr << L"Failed to resolve virtual path: " << virtual_path << std::endl;
+        CeWinFileCache::Logger::error("Failed to resolve virtual path: {}", Logger::wstringToString(virtual_path));
         return std::vector<uint8_t>();
     }
 

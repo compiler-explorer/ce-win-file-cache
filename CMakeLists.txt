@@ -242,6 +242,7 @@ set(SOURCES
     src/file_access_tracker.cpp
     src/glob_matcher.cpp
     src/string_utils.cpp
+    src/logger.cpp
     src/main.cpp
 )
 

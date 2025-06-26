@@ -1,55 +1,56 @@
 #include <ce-win-file-cache/config_parser.hpp>
+#include <ce-win-file-cache/logger.hpp>
+#include <ce-win-file-cache/string_utils.hpp>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <nlohmann/json.hpp>
-#include <ce-win-file-cache/string_utils.hpp>
 
 namespace CeWinFileCache
 {
 
 std::optional<Config> ConfigParser::parseJsonFile(std::wstring_view file_path)
 {
-    std::wcout << L"[CONFIG] Attempting to open config file: " << file_path << std::endl;
+    CeWinFileCache::Logger::debug("[CONFIG] Attempting to open config file: {}", Logger::wstringToString(std::wstring(file_path)));
 
     std::ifstream file;
     auto filename = std::filesystem::path(file_path).string();
-    std::wcout << L"[CONFIG] Converted to filesystem path: " << std::wstring(filename.begin(), filename.end()) << std::endl;
+    CeWinFileCache::Logger::debug("[CONFIG] Converted to filesystem path: {}", filename);
 
     file.open(filename, std::ios::in);
     if (!file.is_open())
     {
-        std::wcerr << L"[CONFIG ERROR] Failed to open config file: " << file_path << std::endl;
-        std::wcerr << L"[CONFIG ERROR] Current working directory: " << std::filesystem::current_path().wstring() << std::endl;
+        CeWinFileCache::Logger::error("[CONFIG ERROR] Failed to open config file: {}",
+                                      Logger::wstringToString(std::wstring(file_path)));
+        CeWinFileCache::Logger::error("[CONFIG ERROR] Current working directory: {}", std::filesystem::current_path().string());
 
         // Check if file exists
         if (std::filesystem::exists(filename))
         {
-            std::wcerr << L"[CONFIG ERROR] File exists but cannot be opened (permission issue?)" << std::endl;
+            CeWinFileCache::Logger::error("[CONFIG ERROR] File exists but cannot be opened (permission issue?)");
         }
         else
         {
-            std::wcerr << L"[CONFIG ERROR] File does not exist" << std::endl;
+            CeWinFileCache::Logger::error("[CONFIG ERROR] File does not exist");
         }
 
         return std::nullopt;
     }
 
-    std::wcout << L"[CONFIG] File opened successfully, reading content..." << std::endl;
+    CeWinFileCache::Logger::debug("[CONFIG] File opened successfully, reading content...");
     std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-    std::wcout << L"[CONFIG] Read " << content.size() << L" bytes from config file" << std::endl;
+    CeWinFileCache::Logger::debug("[CONFIG] Read {} bytes from config file", content.size());
 
     return parseJsonString(content);
 }
 
 std::optional<Config> ConfigParser::parseJsonString(std::string_view json_content)
 {
-    std::wcout << L"[CONFIG] Parsing JSON content (" << json_content.size() << L" bytes)..." << std::endl;
+    CeWinFileCache::Logger::debug("[CONFIG] Parsing JSON content ({} bytes)...", json_content.size());
 
     try
     {
         nlohmann::json j = nlohmann::json::parse(json_content);
-        std::wcout << L"[CONFIG] JSON parsing successful" << std::endl;
+        CeWinFileCache::Logger::debug("[CONFIG] JSON parsing successful");
         Config config;
 
         // Parse compilers section
@@ -163,7 +164,7 @@ std::optional<Config> ConfigParser::parseJsonString(std::string_view json_conten
                     config.global.metrics.endpoint_path = metrics["endpoint_path"];
                 }
             }
-            
+
             // Parse file tracking configuration
             if (global.contains("file_tracking") && global["file_tracking"].is_object())
             {
@@ -206,19 +207,18 @@ std::optional<Config> ConfigParser::parseJsonString(std::string_view json_conten
             config.global.total_cache_size_mb = 8192; // 8GB default
         }
 
-        std::wcout << L"[CONFIG] Configuration parsing completed successfully" << std::endl;
-        std::wcout << L"[CONFIG] Found " << config.compilers.size() << L" compilers" << std::endl;
+        CeWinFileCache::Logger::info("[CONFIG] Configuration parsing completed successfully");
+        CeWinFileCache::Logger::info("[CONFIG] Found {} compilers", config.compilers.size());
         return config;
     }
     catch (const nlohmann::json::exception &e)
     {
-        std::wcerr << L"[CONFIG ERROR] JSON parsing error: " << std::wstring(e.what(), e.what() + strlen(e.what())) << std::endl;
+        CeWinFileCache::Logger::error("[CONFIG ERROR] JSON parsing error: {}", e.what());
         return std::nullopt;
     }
     catch (const std::exception &e)
     {
-        std::wcerr << L"[CONFIG ERROR] Configuration parsing error: "
-                   << std::wstring(e.what(), e.what() + strlen(e.what())) << std::endl;
+        CeWinFileCache::Logger::error("[CONFIG ERROR] Configuration parsing error: {}", e.what());
         return std::nullopt;
     }
 }
