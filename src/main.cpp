@@ -90,6 +90,7 @@ struct ProgramOptions
     LogLevel log_level = LogLevel::INFO;
     LogOutput log_output = LogOutput::CONSOLE;
     std::string log_file = "cewinfilecache.log";
+    bool diagnose = false;
 };
 
 // Function to print usage information
@@ -114,11 +115,13 @@ void printUsage()
     "  -l, --log-level LEVEL  Set log level: trace, debug, info, warn, error, fatal, off (default: info)\n"
     "  -o, --log-output TYPE  Set output: console, file, both, debug, disabled (default: console)\n"
     "  -f, --log-file FILE    Log file path (default: cewinfilecache.log)\n"
+    "      --diagnose         Run system diagnostics and environment checks\n"
     "\n"
     "Examples:\n"
     "  CeWinFileCacheFS --config compilers.json --mount M:\n"
     "  CeWinFileCacheFS --mount C:\\compilers --debug\n"
     "  CeWinFileCacheFS --test --config test.json\n"
+    "  CeWinFileCacheFS --diagnose --config compilers.json --mount M:\n"
     "  CeWinFileCacheFS --log-level debug --log-output both --log-file debug.log\n"
     "  CeWinFileCacheFS --log-level trace --log-output file";
 
@@ -255,6 +258,10 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
                 options.show_help = true;
                 break;
             }
+        }
+        else if (arg == L"--diagnose")
+        {
+            options.diagnose = true;
         }
         else if (arg == L"-h" || arg == L"--help")
         {
@@ -582,6 +589,139 @@ int runTestMode(const ProgramOptions &options)
     }
 }
 
+// Diagnostic function to check system prerequisites
+int runDiagnostics(const ProgramOptions &options)
+{
+    Logger::info("=== CeWinFileCacheFS System Diagnostics ===");
+
+    // Check WinFsp installation
+    Logger::info("1. Checking WinFsp installation...");
+
+    // Check WinFsp services
+    SC_HANDLE scm = OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT);
+    if (scm)
+    {
+        SC_HANDLE winfsp_service = OpenService(scm, L"WinFsp", SERVICE_QUERY_STATUS);
+        if (winfsp_service)
+        {
+            SERVICE_STATUS status;
+            if (QueryServiceStatus(winfsp_service, &status))
+            {
+                Logger::info("   WinFsp service status: {} (1=stopped, 2=start_pending, 3=stop_pending, 4=running)",
+                             status.dwCurrentState);
+            }
+            else
+            {
+                Logger::error("   Failed to query WinFsp service status");
+            }
+            CloseServiceHandle(winfsp_service);
+        }
+        else
+        {
+            Logger::error("   WinFsp service not found - WinFsp may not be installed");
+        }
+        CloseServiceHandle(scm);
+    }
+    else
+    {
+        Logger::error("   Failed to open Service Control Manager");
+    }
+
+    // Check mount point availability
+    Logger::info("2. Checking mount point availability...");
+    if (options.mount_point.length() == 2 && options.mount_point[1] == L':')
+    {
+        std::wstring drive_root = options.mount_point + L"\\";
+        UINT drive_type = GetDriveTypeW(drive_root.c_str());
+        Logger::info("   Mount point {}: drive type {} (1=unknown/available, 2=removable, 3=fixed, 4=remote, 5=cdrom, "
+                     "6=ramdisk)",
+                     StringUtils::wideToUtf8(options.mount_point), drive_type);
+
+        if (drive_type != DRIVE_UNKNOWN)
+        {
+            Logger::warn("   WARNING: Mount point {} appears to be in use (type {})",
+                         StringUtils::wideToUtf8(options.mount_point), drive_type);
+        }
+    }
+
+    // Check configuration file
+    Logger::info("3. Checking configuration file...");
+    auto config_opt = loadConfigFile(options.config_file);
+    if (config_opt)
+    {
+        Config config = *config_opt;
+        Logger::info("   Configuration loaded successfully");
+        Logger::info("   Cache directory: {}", StringUtils::wideToUtf8(config.global.cache_directory));
+
+        // Check cache directory accessibility
+        DWORD attrs = GetFileAttributesW(config.global.cache_directory.c_str());
+        if (attrs == INVALID_FILE_ATTRIBUTES)
+        {
+            Logger::warn("   Cache directory does not exist: {}", StringUtils::wideToUtf8(config.global.cache_directory));
+        }
+        else if (!(attrs & FILE_ATTRIBUTE_DIRECTORY))
+        {
+            Logger::error("   Cache path exists but is not a directory: {}", StringUtils::wideToUtf8(config.global.cache_directory));
+        }
+        else
+        {
+            Logger::info("   Cache directory exists and is accessible");
+        }
+
+        // Check network paths
+        Logger::info("   Checking compiler network paths...");
+        for (const auto &[name, compiler_config] : config.compilers)
+        {
+            Logger::info("   Testing {}: {}", StringUtils::wideToUtf8(name), StringUtils::wideToUtf8(compiler_config.network_path));
+            DWORD net_attrs = GetFileAttributesW(compiler_config.network_path.c_str());
+            if (net_attrs == INVALID_FILE_ATTRIBUTES)
+            {
+                DWORD error = GetLastError();
+                Logger::warn("     Network path not accessible. Error: 0x{:x} ({})", error, error);
+            }
+            else
+            {
+                Logger::info("     Network path accessible");
+            }
+        }
+    }
+    else
+    {
+        Logger::error("   Failed to load configuration file: {}", StringUtils::wideToUtf8(options.config_file));
+    }
+
+    // Check system resources
+    Logger::info("4. Checking system resources...");
+    MEMORYSTATUSEX mem_status;
+    mem_status.dwLength = sizeof(mem_status);
+    if (GlobalMemoryStatusEx(&mem_status))
+    {
+        Logger::info("   Available memory: {:.1f} GB", mem_status.ullAvailPhys / (1024.0 * 1024.0 * 1024.0));
+        Logger::info("   Memory usage: {:.1f}%", mem_status.dwMemoryLoad);
+    }
+
+    // Check process privileges
+    Logger::info("5. Checking process privileges...");
+    HANDLE token;
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+    {
+        TOKEN_ELEVATION elevation;
+        DWORD size;
+        if (GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size))
+        {
+            Logger::info("   Running as administrator: {}", elevation.TokenIsElevated ? "YES" : "NO");
+            if (!elevation.TokenIsElevated)
+            {
+                Logger::warn("   WARNING: Not running as administrator - this may cause permission issues");
+            }
+        }
+        CloseHandle(token);
+    }
+
+    Logger::info("=== Diagnostics Complete ===");
+    return 0;
+}
+
 #ifndef NO_WINFSP
 class CompilerCacheService : public Fsp::Service
 {
@@ -615,56 +755,123 @@ class CompilerCacheService : public Fsp::Service
 
         // Initialize filesystem
         Logger::info("[SERVICE] Initializing filesystem...");
-        NTSTATUS result = filesystem.Initialize(config);
-        if (!NT_SUCCESS(result))
+        NTSTATUS result = STATUS_SUCCESS;
+
+        try
         {
-            Logger::error("[SERVICE] ERROR: Failed to initialize filesystem. Status: 0x{:x}", static_cast<unsigned>(result));
-            return result;
+            result = filesystem.Initialize(config);
+            if (!NT_SUCCESS(result))
+            {
+                Logger::error("[SERVICE] ERROR: Failed to initialize filesystem. Status: 0x{:x}", static_cast<unsigned>(result));
+                return result;
+            }
+            Logger::info("[SERVICE] Filesystem initialized successfully");
         }
-        Logger::info("[SERVICE] Filesystem initialized successfully");
+        catch (const std::exception &e)
+        {
+            Logger::error("[SERVICE] EXCEPTION during filesystem initialization: {}", e.what());
+            return STATUS_UNSUCCESSFUL;
+        }
+        catch (...)
+        {
+            Logger::error("[SERVICE] UNKNOWN EXCEPTION during filesystem initialization");
+            return STATUS_UNSUCCESSFUL;
+        }
 
         // Set up compiler paths (for now, just use the network paths directly)
         Logger::info("[SERVICE] Setting up compiler paths...");
-        std::unordered_map<std::wstring, std::wstring> compiler_paths;
-        for (const auto &[name, compiler_config] : config.compilers)
+        try
         {
-            Logger::info("[SERVICE] Adding compiler: {} -> {}", StringUtils::wideToUtf8(name),
-                         StringUtils::wideToUtf8(compiler_config.network_path));
-            compiler_paths[name] = compiler_config.network_path;
-        }
+            std::unordered_map<std::wstring, std::wstring> compiler_paths;
+            for (const auto &[name, compiler_config] : config.compilers)
+            {
+                Logger::info("[SERVICE] Adding compiler: {} -> {}", StringUtils::wideToUtf8(name),
+                             StringUtils::wideToUtf8(compiler_config.network_path));
+                compiler_paths[name] = compiler_config.network_path;
+            }
 
-        result = filesystem.SetCompilerPaths(compiler_paths);
-        if (!NT_SUCCESS(result))
-        {
-            Logger::error("[SERVICE] ERROR: Failed to set compiler paths. Status: 0x{:x}", static_cast<unsigned>(result));
-            return result;
+            result = filesystem.SetCompilerPaths(compiler_paths);
+            if (!NT_SUCCESS(result))
+            {
+                Logger::error("[SERVICE] ERROR: Failed to set compiler paths. Status: 0x{:x}", static_cast<unsigned>(result));
+                return result;
+            }
+            Logger::info("[SERVICE] Compiler paths set successfully");
         }
-        Logger::info("[SERVICE] Compiler paths set successfully");
+        catch (const std::exception &e)
+        {
+            Logger::error("[SERVICE] EXCEPTION during compiler paths setup: {}", e.what());
+            return STATUS_UNSUCCESSFUL;
+        }
+        catch (...)
+        {
+            Logger::error("[SERVICE] UNKNOWN EXCEPTION during compiler paths setup");
+            return STATUS_UNSUCCESSFUL;
+        }
 
         // Configure host
-        if (!options_.volume_prefix.empty())
+        try
         {
-            Logger::info("[SERVICE] Setting volume prefix: {}", StringUtils::wideToUtf8(options_.volume_prefix));
-            std::wstring volume_prefix_copy = options_.volume_prefix;
-            host.SetPrefix(volume_prefix_copy.data());
-        }
+            if (!options_.volume_prefix.empty())
+            {
+                Logger::info("[SERVICE] Setting volume prefix: {}", StringUtils::wideToUtf8(options_.volume_prefix));
+                std::wstring volume_prefix_copy = options_.volume_prefix;
+                host.SetPrefix(volume_prefix_copy.data());
+            }
 
-        // Mount filesystem
-        Logger::info("[SERVICE] Mounting filesystem at: {}", StringUtils::wideToUtf8(options_.mount_point));
-        Logger::info("[SERVICE] Debug flags: 0x{:x}", options_.debug_flags);
-        std::wstring mount_point_copy = options_.mount_point;
-        result = host.Mount(mount_point_copy.data(), nullptr, FALSE, options_.debug_flags);
-        if (!NT_SUCCESS(result))
+            // Pre-mount diagnostics
+            Logger::info("[SERVICE] Pre-mount diagnostics:");
+            Logger::info("[SERVICE]   Mount point: {}", StringUtils::wideToUtf8(options_.mount_point));
+            Logger::info("[SERVICE]   Debug flags: 0x{:x}", options_.debug_flags);
+            Logger::info("[SERVICE]   Cache directory: {}", StringUtils::wideToUtf8(config.global.cache_directory));
+
+            // Check if mount point is available
+            if (options_.mount_point.length() == 2 && options_.mount_point[1] == L':')
+            {
+                // Drive letter mount - check if already in use
+                std::wstring drive_root = options_.mount_point + L"\\";
+                UINT drive_type = GetDriveTypeW(drive_root.c_str());
+                Logger::info("[SERVICE]   Drive type check: {} (1=unknown, 2=removable, 3=fixed, 4=remote, 5=cdrom, "
+                             "6=ramdisk)",
+                             drive_type);
+            }
+
+            // Mount filesystem
+            Logger::info("[SERVICE] Attempting to mount filesystem...");
+            std::wstring mount_point_copy = options_.mount_point;
+            result = host.Mount(mount_point_copy.data(), nullptr, FALSE, options_.debug_flags);
+
+            if (!NT_SUCCESS(result))
+            {
+                Logger::error("[SERVICE] ERROR: Failed to mount filesystem at {}. Status: 0x{:x}",
+                              StringUtils::wideToUtf8(options_.mount_point), static_cast<unsigned>(result));
+
+                // Additional error diagnostics
+                DWORD last_error = GetLastError();
+                Logger::error("[SERVICE] Last Windows error: 0x{:x} ({})", last_error, last_error);
+
+                return result;
+            }
+
+            Logger::info("[SERVICE] SUCCESS: CompilerCacheFS mounted at {}", StringUtils::wideToUtf8(host.MountPoint()));
+            Logger::info("[SERVICE] Cache directory: {}", StringUtils::wideToUtf8(config.global.cache_directory));
+            Logger::info("[SERVICE] Total cache size: {} MB", config.global.total_cache_size_mb);
+            Logger::info("[SERVICE] Filesystem is now ready for access");
+        }
+        catch (const std::exception &e)
         {
-            Logger::error("[SERVICE] ERROR: Failed to mount filesystem at {}. Status: 0x{:x}",
-                          StringUtils::wideToUtf8(options_.mount_point), static_cast<unsigned>(result));
-            return result;
+            Logger::error("[SERVICE] EXCEPTION during filesystem mounting: {}", e.what());
+            DWORD last_error = GetLastError();
+            Logger::error("[SERVICE] Last Windows error: 0x{:x} ({})", last_error, last_error);
+            return STATUS_UNSUCCESSFUL;
         }
-
-        Logger::info("[SERVICE] SUCCESS: CompilerCacheFS mounted at {}", StringUtils::wideToUtf8(host.MountPoint()));
-        Logger::info("[SERVICE] Cache directory: {}", StringUtils::wideToUtf8(config.global.cache_directory));
-        Logger::info("[SERVICE] Total cache size: {} MB", config.global.total_cache_size_mb);
-        Logger::info("[SERVICE] Filesystem is now ready for access");
+        catch (...)
+        {
+            Logger::error("[SERVICE] UNKNOWN EXCEPTION during filesystem mounting");
+            DWORD last_error = GetLastError();
+            Logger::error("[SERVICE] Last Windows error: 0x{:x} ({})", last_error, last_error);
+            return STATUS_UNSUCCESSFUL;
+        }
 
         return STATUS_SUCCESS;
     }
@@ -702,6 +909,12 @@ int wmain(int argc, wchar_t **argv)
     {
         printUsage();
         return 0;
+    }
+
+    // If diagnostics requested, run diagnostics
+    if (options.diagnose)
+    {
+        return runDiagnostics(options);
     }
 
     // If test mode is requested, run without WinFsp
