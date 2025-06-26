@@ -6,8 +6,8 @@
 #ifndef _WIN32
 
 #include <cstdint>
-#include <string>
 #include <iostream>
+#include <string>
 
 // Basic Windows types
 using DWORD = uint32_t;
