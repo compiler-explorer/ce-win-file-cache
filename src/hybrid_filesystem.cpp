@@ -579,14 +579,151 @@ NTSTATUS HybridFileSystem::GetFileInfo(PVOID FileNode, PVOID FileDesc, FileInfo 
 
 NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID Buffer, ULONG Length, PULONG PBytesTransferred)
 {
-    std::wcout << L"[FS] ReadDirectory() called" << std::endl;
+    Logger::debug("[FS] ReadDirectory() called - Length: {}, Marker: {}", Length, Marker ? StringUtils::wideToUtf8(Marker) : "null");
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
-    return BufferedReadDirectory(&file_desc->dir_buffer, FileNode, FileDesc, Pattern, Marker, Buffer, Length, PBytesTransferred);
+
+    // Instead of using BufferedReadDirectory, implement directory enumeration directly
+    // This gives us more control over the marker handling
+
+    // Get directory path
+    std::wstring dir_path = file_desc->entry->virtual_path;
+    std::wstring normalized_path = normalizePath(dir_path);
+
+    Logger::debug("[FS] ReadDirectory() - enumerating directory: '{}'", StringUtils::wideToUtf8(normalized_path));
+
+    // Get directory contents
+    std::vector<DirectoryNode *> contents;
+    if (normalized_path == L"/")
+    {
+        contents = directory_cache.getDirectoryContents(L"/");
+        Logger::debug("[FS] ReadDirectory() - root directory has {} entries", contents.size());
+    }
+    else
+    {
+        contents = directory_cache.getDirectoryContents(dir_path);
+        Logger::debug("[FS] ReadDirectory() - directory '{}' has {} entries", StringUtils::wideToUtf8(dir_path),
+                      contents.size());
+    }
+
+    if (contents.empty())
+    {
+        Logger::debug("[FS] ReadDirectory() - no entries found");
+        *PBytesTransferred = 0;
+        return STATUS_NO_MORE_FILES;
+    }
+
+    // Find starting index based on marker
+    size_t start_index = 0;
+    if (Marker && wcslen(Marker) > 0)
+    {
+        std::string marker_str = StringUtils::wideToUtf8(Marker);
+        Logger::debug("[FS] ReadDirectory() - searching for marker: '{}'", marker_str);
+
+        for (size_t i = 0; i < contents.size(); i++)
+        {
+            if (contents[i]->name == Marker)
+            {
+                start_index = i + 1; // Next entry after marker
+                Logger::debug("[FS] ReadDirectory() - found marker at index {}, starting from {}", i, start_index);
+                break;
+            }
+        }
+    }
+    else
+    {
+        Logger::debug("[FS] ReadDirectory() - no marker, starting from beginning");
+    }
+
+    // Fill buffer with directory entries
+    PUCHAR buffer_ptr = (PUCHAR)Buffer;
+    ULONG bytes_used = 0;
+    size_t entries_returned = 0;
+
+    for (size_t i = start_index; i < contents.size(); i++)
+    {
+        DirectoryNode *node = contents[i];
+
+        // Calculate size needed for this entry
+        size_t name_chars = node->name.length();
+        size_t name_bytes = name_chars * sizeof(WCHAR);
+        ULONG entry_size = sizeof(FSP_FSCTL_DIR_INFO) + name_bytes + sizeof(WCHAR); // +WCHAR for null terminator
+
+        // Align to 8-byte boundary
+        entry_size = (entry_size + 7) & ~7;
+
+        Logger::debug("[FS] ReadDirectory() - entry[{}]: '{}', size: {}", i, StringUtils::wideToUtf8(node->name), entry_size);
+
+        // Check if entry fits in remaining buffer
+        if (bytes_used + entry_size > Length)
+        {
+            Logger::debug("[FS] ReadDirectory() - buffer full, stopping at index {}", i);
+            break;
+        }
+
+        // Fill directory info
+        FSP_FSCTL_DIR_INFO *dir_info = (FSP_FSCTL_DIR_INFO *)(buffer_ptr + bytes_used);
+        dir_info->Size = (UINT16)entry_size;
+
+        // Set file attributes
+        dir_info->FileInfo.FileAttributes = node->isDirectory() ? FILE_ATTRIBUTE_DIRECTORY : FILE_ATTRIBUTE_NORMAL;
+        dir_info->FileInfo.ReparseTag = 0;
+        dir_info->FileInfo.FileSize = node->isDirectory() ? 0 : node->file_size;
+        dir_info->FileInfo.AllocationSize =
+        node->isDirectory() ? ALLOCATION_UNIT : (dir_info->FileInfo.FileSize + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
+
+        // Set timestamps
+        UINT64 creation_ts = ((PLARGE_INTEGER)&node->creation_time)->QuadPart;
+        UINT64 access_ts = ((PLARGE_INTEGER)&node->last_access_time)->QuadPart;
+        UINT64 write_ts = ((PLARGE_INTEGER)&node->last_write_time)->QuadPart;
+
+        if (creation_ts == 0)
+            creation_ts = creation_time;
+        if (access_ts == 0)
+            access_ts = creation_time;
+        if (write_ts == 0)
+            write_ts = creation_time;
+
+        dir_info->FileInfo.CreationTime = creation_ts;
+        dir_info->FileInfo.LastAccessTime = access_ts;
+        dir_info->FileInfo.LastWriteTime = write_ts;
+        dir_info->FileInfo.ChangeTime = write_ts;
+        dir_info->FileInfo.IndexNumber = 0;
+        dir_info->FileInfo.HardLinks = 0;
+
+        // Clear padding
+        memset(dir_info->Padding, 0, sizeof(dir_info->Padding));
+
+        // Copy filename with null termination
+        memcpy(dir_info->FileNameBuf, node->name.c_str(), name_bytes);
+        WCHAR *filename_end = (WCHAR *)((char *)dir_info->FileNameBuf + name_bytes);
+        *filename_end = L'\0';
+
+        bytes_used += entry_size;
+        entries_returned++;
+
+        Logger::debug("[FS] ReadDirectory() - added entry '{}', total bytes: {}", StringUtils::wideToUtf8(node->name), bytes_used);
+    }
+
+    *PBytesTransferred = bytes_used;
+
+    Logger::debug("[FS] ReadDirectory() - returning {} entries, {} bytes total", entries_returned, bytes_used);
+
+    if (start_index + entries_returned >= contents.size())
+    {
+        Logger::debug("[FS] ReadDirectory() - enumeration complete");
+        return STATUS_SUCCESS; // End of directory
+    }
+    else
+    {
+        Logger::debug("[FS] ReadDirectory() - more entries available");
+        return STATUS_SUCCESS; // More entries available
+    }
 }
 
 NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID *PContext, DirInfo *DirInfo)
 {
-    Logger::debug("[FS] ReadDirectoryEntry() called");
+    Logger::debug("[FS] ReadDirectoryEntry() called - Context: {}, Marker: {}", *PContext ? "exists" : "null",
+                  Marker ? StringUtils::wideToUtf8(Marker) : "null");
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
 
     if (!file_desc->entry)
@@ -617,6 +754,13 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
                 return STATUS_NO_MORE_FILES;
             }
 
+            Logger::debug("[FS] ReadDirectoryEntry() - found {} entries in root directory", root_contents.size());
+            for (size_t i = 0; i < root_contents.size(); i++)
+            {
+                Logger::debug("[FS] ReadDirectoryEntry() - root entry[{}]: '{}'", i,
+                              StringUtils::wideToUtf8(root_contents[i]->name));
+            }
+
             // Store the contents vector as context for enumeration
             auto *context = new std::vector<DirectoryNode *>(std::move(root_contents));
             *PContext = context;
@@ -625,8 +769,8 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
             auto *first_entry = (*context)[0];
             fillDirInfo(DirInfo, first_entry);
 
-            Logger::debug("[FS] ReadDirectoryEntry() - returning first root entry: '{}'",
-                          StringUtils::wideToUtf8(first_entry->full_virtual_path));
+            Logger::debug("[FS] ReadDirectoryEntry() - returning first root entry: '{}' (name: '{}')",
+                          StringUtils::wideToUtf8(first_entry->full_virtual_path), StringUtils::wideToUtf8(first_entry->name));
             return STATUS_SUCCESS;
         }
         else
@@ -661,6 +805,13 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
 
         // Continue enumeration using stored context
         auto *context_data = static_cast<std::vector<DirectoryNode *> *>(*PContext);
+
+        Logger::debug("[FS] ReadDirectoryEntry() - context has {} entries", context_data->size());
+        for (size_t i = 0; i < context_data->size() && i < 5; i++) // Show first 5 entries
+        {
+            Logger::debug("[FS] ReadDirectoryEntry() - context entry[{}]: '{}'", i,
+                          StringUtils::wideToUtf8((*context_data)[i]->name));
+        }
 
         // Find current position based on marker
         size_t current_index = 0;
@@ -1046,7 +1197,13 @@ void HybridFileSystem::fillDirInfo(DirInfo *dir_info, DirectoryNode *node)
 
     // Fill DirInfo structure properly based on WinFsp FSP_FSCTL_DIR_INFO
     const std::wstring &name = node->name;
-    dir_info->Size = (UINT16)(sizeof(FSP_FSCTL_DIR_INFO) + name.length() * sizeof(WCHAR));
+    size_t name_length_chars = name.length();
+    size_t name_size_bytes = name_length_chars * sizeof(WCHAR);
+
+    // Size includes the structure + filename + null terminator
+    dir_info->Size = (UINT16)(sizeof(FSP_FSCTL_DIR_INFO) + name_size_bytes + sizeof(WCHAR));
+
+    Logger::debug("[FS] fillDirInfo() - filling entry for: '{}', size: {}", StringUtils::wideToUtf8(name), dir_info->Size);
 
     // Set file attributes based on node type
     dir_info->FileInfo.FileAttributes = node->isDirectory() ? FILE_ATTRIBUTE_DIRECTORY : FILE_ATTRIBUTE_NORMAL;
@@ -1078,8 +1235,13 @@ void HybridFileSystem::fillDirInfo(DirInfo *dir_info, DirectoryNode *node)
     // Clear padding
     memset(dir_info->Padding, 0, sizeof(dir_info->Padding));
 
-    // Copy filename to FileNameBuf
-    memcpy(dir_info->FileNameBuf, name.c_str(), dir_info->Size - sizeof(FSP_FSCTL_DIR_INFO));
+    // Copy filename to FileNameBuf with proper null termination
+    memcpy(dir_info->FileNameBuf, name.c_str(), name_size_bytes);
+    // Ensure null termination
+    WCHAR *filename_end = (WCHAR *)((char *)dir_info->FileNameBuf + name_size_bytes);
+    *filename_end = L'\0';
+
+    Logger::debug("[FS] fillDirInfo() - completed for: '{}', filename set in buffer", StringUtils::wideToUtf8(name));
 }
 
 NTSTATUS HybridFileSystem::evictIfNeeded()
