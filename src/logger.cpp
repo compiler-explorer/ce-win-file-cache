@@ -5,6 +5,14 @@
 #include <iostream>
 #include <locale>
 
+// Windows headers for OutputDebugStringA
+#if defined(_WIN32) || defined(WIN32)
+#include <windows.h>
+#elif defined(__APPLE__)
+// Include macOS compatibility header for Windows API stubs
+#include "../include/ce-win-file-cache/macos_compat.hpp"
+#endif
+
 namespace CeWinFileCache
 {
 
@@ -32,6 +40,16 @@ void Logger::initialize(LogLevel level, LogOutput output)
             instance.output_type = LogOutput::CONSOLE;
             std::cerr << "[Logger] Warning: Could not open log file '" << instance.log_filename << "', falling back to console output\n";
         }
+    }
+    
+    // For debug output, verify Windows API is available
+    if (output == LogOutput::DEBUG_OUTPUT)
+    {
+#if !defined(_WIN32) && !defined(WIN32) && !defined(__APPLE__)
+        // Fallback to console on platforms without OutputDebugStringA support
+        instance.output_type = LogOutput::CONSOLE;
+        std::cerr << "[Logger] Warning: OutputDebugStringA not available on this platform, falling back to console output\n";
+#endif
     }
 }
 
@@ -198,6 +216,9 @@ void Logger::writeLog(LogLevel level, const std::string &message)
         writeToConsole(level, message);
         writeToFile(level, message);
         break;
+    case LogOutput::DEBUG_OUTPUT:
+        writeToDebugOutput(level, message);
+        break;
     case LogOutput::DISABLED:
         // Do nothing
         break;
@@ -227,6 +248,25 @@ void Logger::writeToFile(LogLevel level, const std::string &message)
 
     *log_file << "[" << timestamp << "] [" << level_str << "] " << message << std::endl;
     log_file->flush(); // Ensure immediate write for important logs
+}
+
+void Logger::writeToDebugOutput(LogLevel level, const std::string &message)
+{
+    const std::string timestamp = getCurrentTimestamp();
+    const std::string level_str = levelToString(level);
+    
+    std::string formatted_message = "[" + timestamp + "] [" + level_str + "] " + message + "\n";
+    
+#if defined(_WIN32) || defined(WIN32)
+    // Use native Windows OutputDebugStringA
+    OutputDebugStringA(formatted_message.c_str());
+#elif defined(__APPLE__)
+    // Use macOS compatibility stub (outputs to stderr as fallback)
+    OutputDebugStringA(formatted_message.c_str());
+#else
+    // Fallback to stderr for other platforms
+    std::cerr << formatted_message;
+#endif
 }
 
 std::string Logger::wstringToString(const std::wstring &wstr)

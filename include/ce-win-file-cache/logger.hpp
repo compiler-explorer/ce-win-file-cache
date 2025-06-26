@@ -26,7 +26,8 @@ enum class LogOutput : std::uint8_t
     CONSOLE = 0,
     FILE = 1,
     BOTH = 2,
-    DISABLED = 3
+    DEBUG_OUTPUT = 3,
+    DISABLED = 4
 };
 
 class Logger
@@ -87,6 +88,7 @@ class Logger
     void writeLog(LogLevel level, const std::string &message);
     void writeToConsole(LogLevel level, const std::string &message);
     void writeToFile(LogLevel level, const std::string &message);
+    void writeToDebugOutput(LogLevel level, const std::string &message);
 
     // Template implementation for formatted strings
     template <typename... Args>

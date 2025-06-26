@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <string>
+#include <iostream>
 
 // Basic Windows types
 using DWORD = uint32_t;
@@ -113,6 +114,15 @@ inline PVOID LocalFree(PVOID hMem)
     // Mock implementation - do nothing for fake pointers
     (void)hMem;
     return nullptr;
+}
+
+inline void OutputDebugStringA(const char *lpOutputString)
+{
+    // Mock implementation - output to stderr for debugging on macOS
+    if (lpOutputString)
+    {
+        std::cerr << lpOutputString;
+    }
 }
 
 #endif // !_WIN32

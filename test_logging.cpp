@@ -34,11 +34,18 @@ int main()
     CeWinFileCache::Logger::setOutput(CeWinFileCache::LogOutput::BOTH);
     CeWinFileCache::Logger::error("This message should appear in both console and file");
     
+    // Test debug output (OutputDebugStringA)
+    CeWinFileCache::Logger::setOutput(CeWinFileCache::LogOutput::DEBUG_OUTPUT);
+    CeWinFileCache::Logger::setLevel(CeWinFileCache::LogLevel::DEBUG);
+    CeWinFileCache::Logger::info("This message should go to OutputDebugStringA (Windows debug output)");
+    CeWinFileCache::Logger::debug("Debug message via OutputDebugStringA");
+    CeWinFileCache::Logger::warn("Warning message via OutputDebugStringA");
+    
     CeWinFileCache::Logger::info("Logger test completed successfully");
     
     // Clean up
     CeWinFileCache::Logger::shutdown();
     
-    std::cout << "Test completed. Check console output and test_log.txt file." << std::endl;
+    std::cout << "Test completed. Check console output, test_log.txt file, and debug output (on Windows: use DebugView or Visual Studio output window)." << std::endl;
     return 0;
 }
