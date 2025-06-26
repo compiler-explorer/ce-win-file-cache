@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <ce-win-file-cache/glob_matcher.hpp>
 #include <ce-win-file-cache/hybrid_filesystem.hpp>
+#include <ce-win-file-cache/logger.hpp>
+#include <ce-win-file-cache/string_utils.hpp>
 #include <ce-win-file-cache/windows_compat.hpp>
 #include <chrono>
 #include <iomanip>
@@ -584,35 +586,34 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
 
 NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID *PContext, DirInfo *DirInfo)
 {
-    std::wcout << L"[FS] ReadDirectoryEntry() called" << std::endl;
+    Logger::debug("[FS] ReadDirectoryEntry() called");
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
 
     if (!file_desc->entry)
     {
-        std::wcout << L"[FS] ReadDirectoryEntry() - no entry" << std::endl;
+        Logger::debug("[FS] ReadDirectoryEntry() - no entry");
         return STATUS_INVALID_PARAMETER;
     }
 
-    std::wcout << L"[FS] ReadDirectoryEntry() - path: '" << file_desc->entry->virtual_path << L"'" << std::endl;
-    std::flush(std::wcout);
+    Logger::debug("[FS] ReadDirectoryEntry() - path: '{}'", StringUtils::wideToUtf8(file_desc->entry->virtual_path));
 
     if (*PContext == nullptr)
     {
-        std::wcout << L"[FS] ReadDirectoryEntry() - starting enumeration" << std::endl;
+        Logger::debug("[FS] ReadDirectoryEntry() - starting enumeration");
 
         // Handle root directory specially - return compiler directories
         // Normalize path for comparison (both \ and / should be treated as root)
         std::wstring normalized_path = normalizePath(file_desc->entry->virtual_path);
         if (normalized_path == L"/")
         {
-            std::wcout << L"[FS] ReadDirectoryEntry() - enumerating root directory" << std::endl;
+            Logger::debug("[FS] ReadDirectoryEntry() - enumerating root directory");
 
             // Use DirectoryCache to get all contents in root directory
             std::vector<DirectoryNode *> root_contents = directory_cache.getDirectoryContents(L"/");
 
             if (root_contents.empty())
             {
-                std::wcout << L"[FS] ReadDirectoryEntry() - no contents from DirectoryCache for root" << std::endl;
+                Logger::debug("[FS] ReadDirectoryEntry() - no contents from DirectoryCache for root");
                 return STATUS_NO_MORE_FILES;
             }
 
@@ -624,21 +625,20 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
             auto *first_entry = (*context)[0];
             fillDirInfo(DirInfo, first_entry);
 
-            std::wcout << L"[FS] ReadDirectoryEntry() - returning first root entry: '" << first_entry->full_virtual_path
-                       << L"'" << std::endl;
+            Logger::debug("[FS] ReadDirectoryEntry() - returning first root entry: '{}'",
+                          StringUtils::wideToUtf8(first_entry->full_virtual_path));
             return STATUS_SUCCESS;
         }
         else
         {
-            std::wcout << L"[FS] ReadDirectoryEntry() - enumerating root directory" << std::endl;
-            std::flush(std::wcout);
+            Logger::debug("[FS] ReadDirectoryEntry() - enumerating non-root directory");
 
             // For non-root directories, use directory cache
             std::vector<DirectoryNode *> contents = directory_cache.getDirectoryContents(file_desc->entry->virtual_path);
 
             if (contents.empty())
             {
-                std::wcout << L"[FS] ReadDirectoryEntry() - no contents from directory cache" << std::endl;
+                Logger::debug("[FS] ReadDirectoryEntry() - no contents from directory cache");
                 return STATUS_NO_MORE_FILES;
             }
 
@@ -650,96 +650,69 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
             auto *first_entry = (*context_data)[0];
             fillDirInfo(DirInfo, first_entry);
 
+            Logger::debug("[FS] ReadDirectoryEntry() - returning first non-root entry: '{}'",
+                          StringUtils::wideToUtf8(first_entry->full_virtual_path));
             return STATUS_SUCCESS;
         }
     }
     else
     {
-        std::wcout << L"[FS] ReadDirectoryEntry() - continuing enumeration" << std::endl;
-        std::flush(std::wcout);
+        Logger::debug("[FS] ReadDirectoryEntry() - continuing enumeration");
 
-        // Handle root directory continuation
-        // Normalize path for comparison (both \ and / should be treated as root)
-        std::wstring normalized_path = normalizePath(file_desc->entry->virtual_path);
-        if (normalized_path == L"/")
+        // Continue enumeration using stored context
+        auto *context_data = static_cast<std::vector<DirectoryNode *> *>(*PContext);
+
+        // Find current position based on marker
+        size_t current_index = 0;
+        bool found_marker = false;
+
+        if (Marker && wcslen(Marker) > 0)
         {
-            // Continue enumeration for root directory using DirectoryNode context
-            auto *context_data = static_cast<std::vector<DirectoryNode *> *>(*PContext);
+            std::string marker_str = StringUtils::wideToUtf8(Marker);
+            Logger::debug("[FS] ReadDirectoryEntry() - searching for marker: '{}'", marker_str);
 
-            // Find current position
-            size_t current_index = 0;
-            if (Marker && wcslen(Marker) > 0)
+            // Find marker in the list - marker is the name of the last returned entry
+            for (size_t i = 0; i < context_data->size(); i++)
             {
-                // Find marker in the list
-                for (size_t i = 0; i < context_data->size(); i++)
+                if ((*context_data)[i]->name == Marker)
                 {
-                    if ((*context_data)[i]->name == Marker)
-                    {
-                        current_index = i + 1;
-                        break;
-                    }
+                    current_index = i + 1; // Next entry after the marker
+                    found_marker = true;
+                    Logger::debug("[FS] ReadDirectoryEntry() - found marker at index {}, next index: {}", i, current_index);
+                    break;
                 }
             }
-            else
+
+            if (!found_marker)
             {
-                current_index = 1; // Next after first
+                Logger::debug("[FS] ReadDirectoryEntry() - marker '{}' not found, starting from index 1", marker_str);
+                current_index = 1; // Fallback to second entry
             }
-
-            if (current_index >= context_data->size())
-            {
-                // End of enumeration
-                std::wcout << L"[FS] ReadDirectoryEntry() - end of root enumeration" << std::endl;
-                // delete context_data;
-                *PContext = nullptr;
-                return STATUS_NO_MORE_FILES;
-            }
-
-            // Return next entry
-            auto *next_entry = (*context_data)[current_index];
-            fillDirInfo(DirInfo, next_entry);
-
-            std::wcout << L"[FS] ReadDirectoryEntry() - returning next root entry: '" << next_entry->full_virtual_path
-                       << L"' (index " << current_index << L")" << std::endl;
-            return STATUS_SUCCESS;
         }
         else
         {
-            // Continue enumeration for non-root directories
-            auto *context_data = static_cast<std::vector<DirectoryNode *> *>(*PContext);
-
-            // Find current position
-            size_t current_index = 0;
-            if (Marker && wcslen(Marker) > 0)
-            {
-                // Find marker in the list
-                for (size_t i = 0; i < context_data->size(); i++)
-                {
-                    if ((*context_data)[i]->name == Marker)
-                    {
-                        current_index = i + 1;
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                current_index = 1; // Next after first
-            }
-
-            if (current_index >= context_data->size())
-            {
-                // End of enumeration
-                delete context_data;
-                *PContext = nullptr;
-                return STATUS_NO_MORE_FILES;
-            }
-
-            // Return next entry
-            auto *next_entry = (*context_data)[current_index];
-            fillDirInfo(DirInfo, next_entry);
-
-            return STATUS_SUCCESS;
+            Logger::debug("[FS] ReadDirectoryEntry() - no marker, continuing from index 1");
+            current_index = 1; // Next after first
         }
+
+        if (current_index >= context_data->size())
+        {
+            // End of enumeration
+            Logger::debug("[FS] ReadDirectoryEntry() - end of enumeration at index {} (total: {})", current_index,
+                          context_data->size());
+            delete context_data;
+            *PContext = nullptr;
+            return STATUS_NO_MORE_FILES;
+        }
+
+        // Return next entry
+        auto *next_entry = (*context_data)[current_index];
+        fillDirInfo(DirInfo, next_entry);
+
+        Logger::debug("[FS] ReadDirectoryEntry() - returning entry: '{}' (full path: '{}', index {})",
+                      StringUtils::wideToUtf8(next_entry->name), StringUtils::wideToUtf8(next_entry->full_virtual_path),
+                      current_index);
+        return STATUS_SUCCESS;
     }
 }
 
