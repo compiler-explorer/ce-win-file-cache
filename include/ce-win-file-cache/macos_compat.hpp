@@ -36,13 +36,15 @@ struct FILETIME
 #define INVALID_HANDLE_VALUE ((HANDLE)(intptr_t)-1)
 
 // Boolean values
-enum : std::uint8_t {
+enum : std::uint8_t
+{
     FALSE = 0,
     TRUE = 1
 };
 
 // Path constants
-enum : std::uint16_t {
+enum : std::uint16_t
+{
     MAX_PATH = 260
 };
 
@@ -77,13 +79,15 @@ struct SECURITY_CAPABILITIES
 };
 
 // File attributes
-enum : std::uint8_t {
+enum : std::uint8_t
+{
     FILE_ATTRIBUTE_DIRECTORY = 0x10,
     FILE_ATTRIBUTE_NORMAL = 0x80
 };
 
 // SDDL constants
-enum : std::uint8_t {
+enum : std::uint8_t
+{
     SDDL_REVISION_1 = 1
 };
 
@@ -107,7 +111,8 @@ inline BOOL ConvertSidToStringSidW(PVOID /*Sid*/, LPWSTR *StringSid)
 {
     // Mock implementation - return fake SID string
     constexpr size_t FAKE_SID_SIZE = 13;
-    static std::array<wchar_t, FAKE_SID_SIZE> fakeSid = {L'S', L'-', L'1', L'-', L'5', L'-', L'3', L'2', L'-', L'5', L'4', L'4', L'\0'};
+    static std::array<wchar_t, FAKE_SID_SIZE> fakeSid = { L'S', L'-', L'1', L'-', L'5', L'-', L'3',
+                                                          L'2', L'-', L'5', L'4', L'4', L'\0' };
     *StringSid = fakeSid.data();
     return TRUE;
 }

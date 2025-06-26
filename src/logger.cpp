@@ -1,8 +1,8 @@
 #include "../include/ce-win-file-cache/logger.hpp"
 #include "../include/ce-win-file-cache/string_utils.hpp"
 #include <chrono>
-#include <iostream>
 #include <fmt/chrono.h>
+#include <iostream>
 
 // Windows headers for OutputDebugStringA
 #if defined(_WIN32) || defined(WIN32)
@@ -181,17 +181,15 @@ std::string Logger::getCurrentTimestamp()
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
-    
+
     std::tm local_tm{};
 #ifdef _WIN32
     localtime_s(&local_tm, &time_t);
 #else
     local_tm = *std::localtime(&time_t);
 #endif
-    
-    return fmt::format("{:%Y-%m-%d %H:%M:%S}.{:03d}", 
-                      local_tm, 
-                      ms.count());
+
+    return fmt::format("{:%Y-%m-%d %H:%M:%S}.{:03d}", local_tm, ms.count());
 }
 
 Logger &Logger::getInstance()
@@ -259,9 +257,9 @@ void Logger::writeToDebugOutput(LogLevel level, const std::string &message)
 {
     const std::string timestamp = getCurrentTimestamp();
     const std::string level_str = levelToString(level);
-    
+
     std::string formatted_message = fmt::format("[{}] [{}] {}\n", timestamp, level_str, message);
-    
+
 #if defined(_WIN32) || defined(WIN32)
     // Use native Windows OutputDebugStringA
     OutputDebugStringA(formatted_message.c_str());

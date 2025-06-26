@@ -1,11 +1,11 @@
 #pragma once
 
 #include <cstdint>
+#include <fmt/format.h>
 #include <fstream>
 #include <memory>
 #include <mutex>
 #include <string>
-#include <fmt/format.h>
 
 namespace CeWinFileCache
 {
@@ -16,7 +16,7 @@ enum class LogLevel : std::uint8_t
     DEBUG = 1,
     INFO = 2,
     WARN = 3,
-    ERR = 4,    // Renamed from ERROR to avoid Windows macro conflict
+    ERR = 4, // Renamed from ERROR to avoid Windows macro conflict
     FATAL = 5,
     OFF = 6
 };
@@ -39,14 +39,14 @@ class Logger
     static void setOutput(LogOutput output);
     static void setLogFile(const std::string &filename);
     static void shutdown();
-    
+
     // Fallback logging methods for use before initialization
     static void error_fallback(const std::string &message);
     static void warn_fallback(const std::string &message);
-    
+
     template <typename... Args>
     static void error_fallback(const std::string &format, Args &&...args);
-    
+
     template <typename... Args>
     static void warn_fallback(const std::string &format, Args &&...args);
 

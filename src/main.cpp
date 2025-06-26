@@ -26,15 +26,22 @@ LogLevel parseLogLevel(const std::string &level_str)
 {
     std::string lower_level = level_str;
     std::transform(lower_level.begin(), lower_level.end(), lower_level.begin(), ::tolower);
-    
-    if (lower_level == "trace") return LogLevel::TRACE;
-    if (lower_level == "debug") return LogLevel::DEBUG;
-    if (lower_level == "info") return LogLevel::INFO;
-    if (lower_level == "warn") return LogLevel::WARN;
-    if (lower_level == "error") return LogLevel::ERR;
-    if (lower_level == "fatal") return LogLevel::FATAL;
-    if (lower_level == "off") return LogLevel::OFF;
-    
+
+    if (lower_level == "trace")
+        return LogLevel::TRACE;
+    if (lower_level == "debug")
+        return LogLevel::DEBUG;
+    if (lower_level == "info")
+        return LogLevel::INFO;
+    if (lower_level == "warn")
+        return LogLevel::WARN;
+    if (lower_level == "error")
+        return LogLevel::ERR;
+    if (lower_level == "fatal")
+        return LogLevel::FATAL;
+    if (lower_level == "off")
+        return LogLevel::OFF;
+
     Logger::warn_fallback("Unknown log level '{}', using INFO", level_str);
     return LogLevel::INFO;
 }
@@ -43,13 +50,18 @@ LogOutput parseLogOutput(const std::string &output_str)
 {
     std::string lower_output = output_str;
     std::transform(lower_output.begin(), lower_output.end(), lower_output.begin(), ::tolower);
-    
-    if (lower_output == "console") return LogOutput::CONSOLE;
-    if (lower_output == "file") return LogOutput::FILE;
-    if (lower_output == "both") return LogOutput::BOTH;
-    if (lower_output == "debug") return LogOutput::DEBUG_OUTPUT;
-    if (lower_output == "disabled") return LogOutput::DISABLED;
-    
+
+    if (lower_output == "console")
+        return LogOutput::CONSOLE;
+    if (lower_output == "file")
+        return LogOutput::FILE;
+    if (lower_output == "both")
+        return LogOutput::BOTH;
+    if (lower_output == "debug")
+        return LogOutput::DEBUG_OUTPUT;
+    if (lower_output == "disabled")
+        return LogOutput::DISABLED;
+
     Logger::warn_fallback("Unknown log output '{}', using CONSOLE", output_str);
     return LogOutput::CONSOLE;
 }
@@ -73,7 +85,7 @@ struct ProgramOptions
     bool test_network_mapping = false;
     bool test_config_only = false;
     bool test_cache_operations = false;
-    
+
     // Application logging options
     LogLevel log_level = LogLevel::INFO;
     LogOutput log_output = LogOutput::CONSOLE;
@@ -83,32 +95,33 @@ struct ProgramOptions
 // Function to print usage information
 void printUsage()
 {
-    std::string usage = "Usage: CeWinFileCacheFS [OPTIONS]\n"
-                       "\n"
-                       "Options:\n"
-                       "  -c, --config FILE      Configuration file (default: compilers.json)\n"
-                       "  -m, --mount POINT      Mount point (default: M:)\n"
-                       "  -u, --volume-prefix    Volume prefix for UNC paths\n"
-                       "  -d, --debug [LEVEL]    WinFsp debug flags (0=off, -1=all, bitmask)\n"
-                       "  -t, --test             Test mode (no WinFsp mounting)\n"
-                       "      --test-paths       Test path resolution only\n"
-                       "      --test-network     Test network mapping only\n"
-                       "      --test-config      Test config parsing only\n"
-                       "      --test-cache       Test cache operations\n"
-                       "  -h, --help             Show this help message\n"
-                       "\n"
-                       "Application Logging Options:\n"
-                       "  -l, --log-level LEVEL  Set log level: trace, debug, info, warn, error, fatal, off (default: info)\n"
-                       "  -o, --log-output TYPE  Set output: console, file, both, debug, disabled (default: console)\n"
-                       "  -f, --log-file FILE    Log file path (default: cewinfilecache.log)\n"
-                       "\n"
-                       "Examples:\n"
-                       "  CeWinFileCacheFS --config compilers.json --mount M:\n"
-                       "  CeWinFileCacheFS --mount C:\\compilers --debug\n"
-                       "  CeWinFileCacheFS --test --config test.json\n"
-                       "  CeWinFileCacheFS --log-level debug --log-output both --log-file debug.log\n"
-                       "  CeWinFileCacheFS --log-level trace --log-output file";
-    
+    std::string usage =
+    "Usage: CeWinFileCacheFS [OPTIONS]\n"
+    "\n"
+    "Options:\n"
+    "  -c, --config FILE      Configuration file (default: compilers.json)\n"
+    "  -m, --mount POINT      Mount point (default: M:)\n"
+    "  -u, --volume-prefix    Volume prefix for UNC paths\n"
+    "  -d, --debug [LEVEL]    WinFsp debug flags (0=off, -1=all, bitmask)\n"
+    "  -t, --test             Test mode (no WinFsp mounting)\n"
+    "      --test-paths       Test path resolution only\n"
+    "      --test-network     Test network mapping only\n"
+    "      --test-config      Test config parsing only\n"
+    "      --test-cache       Test cache operations\n"
+    "  -h, --help             Show this help message\n"
+    "\n"
+    "Application Logging Options:\n"
+    "  -l, --log-level LEVEL  Set log level: trace, debug, info, warn, error, fatal, off (default: info)\n"
+    "  -o, --log-output TYPE  Set output: console, file, both, debug, disabled (default: console)\n"
+    "  -f, --log-file FILE    Log file path (default: cewinfilecache.log)\n"
+    "\n"
+    "Examples:\n"
+    "  CeWinFileCacheFS --config compilers.json --mount M:\n"
+    "  CeWinFileCacheFS --mount C:\\compilers --debug\n"
+    "  CeWinFileCacheFS --test --config test.json\n"
+    "  CeWinFileCacheFS --log-level debug --log-output both --log-file debug.log\n"
+    "  CeWinFileCacheFS --log-level trace --log-output file";
+
     Logger::info(usage);
 }
 
@@ -271,7 +284,8 @@ int testConfigOnly(const Config &config)
 
     for (const auto &[name, compiler_config] : config.compilers)
     {
-        Logger::info("[CONFIG TEST]     - {}: {}", StringUtils::wideToUtf8(name), StringUtils::wideToUtf8(compiler_config.network_path));
+        Logger::info("[CONFIG TEST]     - {}: {}", StringUtils::wideToUtf8(name),
+                     StringUtils::wideToUtf8(compiler_config.network_path));
         Logger::info("[CONFIG TEST]       Cache size: {} MB", compiler_config.cache_size_mb);
         Logger::info("[CONFIG TEST]       Cache patterns: {} patterns", compiler_config.cache_always_patterns.size());
         Logger::info("[CONFIG TEST]       Prefetch patterns: {} patterns", compiler_config.prefetch_patterns.size());
@@ -614,7 +628,8 @@ class CompilerCacheService : public Fsp::Service
         std::unordered_map<std::wstring, std::wstring> compiler_paths;
         for (const auto &[name, compiler_config] : config.compilers)
         {
-            Logger::info("[SERVICE] Adding compiler: {} -> {}", StringUtils::wideToUtf8(name), StringUtils::wideToUtf8(compiler_config.network_path));
+            Logger::info("[SERVICE] Adding compiler: {} -> {}", StringUtils::wideToUtf8(name),
+                         StringUtils::wideToUtf8(compiler_config.network_path));
             compiler_paths[name] = compiler_config.network_path;
         }
 
@@ -641,7 +656,8 @@ class CompilerCacheService : public Fsp::Service
         result = host.Mount(mount_point_copy.data(), nullptr, FALSE, options_.debug_flags);
         if (!NT_SUCCESS(result))
         {
-            Logger::error("[SERVICE] ERROR: Failed to mount filesystem at {}. Status: 0x{:x}", StringUtils::wideToUtf8(options_.mount_point), static_cast<unsigned>(result));
+            Logger::error("[SERVICE] ERROR: Failed to mount filesystem at {}. Status: 0x{:x}",
+                          StringUtils::wideToUtf8(options_.mount_point), static_cast<unsigned>(result));
             return result;
         }
 
@@ -674,7 +690,7 @@ int wmain(int argc, wchar_t **argv)
 
     // Parse command line arguments
     ProgramOptions options = parseCommandLine(argc, argv);
-    
+
     // Reconfigure logger with user-specified settings
     Logger::initialize(options.log_level, options.log_output);
     if (options.log_output == LogOutput::FILE || options.log_output == LogOutput::BOTH)
@@ -718,7 +734,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 {
     // Initialize logger for WinMain entry point
     Logger::initialize(LogLevel::INFO, LogOutput::CONSOLE);
-    
+
     Logger::info("CeWinFileCacheFS starting...");
 
     // call wmain with command line arguments
