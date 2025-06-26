@@ -5,6 +5,7 @@
 
 #ifndef _WIN32
 
+#include <array>
 #include <cstdint>
 #include <iostream>
 #include <string>
@@ -33,9 +34,17 @@ struct FILETIME
 
 // Windows constants
 #define INVALID_HANDLE_VALUE ((HANDLE)(intptr_t)-1)
-#define MAX_PATH 260
-#define FALSE 0
-#define TRUE 1
+
+// Boolean values
+enum : std::uint8_t {
+    FALSE = 0,
+    TRUE = 1
+};
+
+// Path constants
+enum : std::uint16_t {
+    MAX_PATH = 260
+};
 
 // Status codes
 #define STATUS_SUCCESS ((NTSTATUS)0x00000000L)
@@ -67,12 +76,16 @@ struct SECURITY_CAPABILITIES
     DWORD Reserved;
 };
 
-// Fake file attributes
-#define FILE_ATTRIBUTE_DIRECTORY 0x00000010
-#define FILE_ATTRIBUTE_NORMAL 0x00000080
+// File attributes
+enum : std::uint8_t {
+    FILE_ATTRIBUTE_DIRECTORY = 0x10,
+    FILE_ATTRIBUTE_NORMAL = 0x80
+};
 
 // SDDL constants
-#define SDDL_REVISION_1 1
+enum : std::uint8_t {
+    SDDL_REVISION_1 = 1
+};
 
 // Function stubs
 inline void CloseHandle(HANDLE /*unused*/)
@@ -93,8 +106,9 @@ inline void GetSystemTimeAsFileTime(FILETIME *lpSystemTimeAsFileTime)
 inline BOOL ConvertSidToStringSidW(PVOID /*Sid*/, LPWSTR *StringSid)
 {
     // Mock implementation - return fake SID string
-    static wchar_t fakeSid[] = L"S-1-5-32-544"; // Built-in Administrators
-    *StringSid = fakeSid;
+    constexpr size_t FAKE_SID_SIZE = 13;
+    static std::array<wchar_t, FAKE_SID_SIZE> fakeSid = {L'S', L'-', L'1', L'-', L'5', L'-', L'3', L'2', L'-', L'5', L'4', L'4', L'\0'};
+    *StringSid = fakeSid.data();
     return TRUE;
 }
 
@@ -119,7 +133,7 @@ inline PVOID LocalFree(PVOID hMem)
 inline void OutputDebugStringA(const char *lpOutputString)
 {
     // Mock implementation - output to stderr for debugging on macOS
-    if (lpOutputString)
+    if (lpOutputString != nullptr)
     {
         std::cerr << lpOutputString;
     }

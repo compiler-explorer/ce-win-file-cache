@@ -40,7 +40,7 @@ set(glob_test_SOURCES glob_test.cpp ../glob_matcher.cpp)
 set(file_access_tracker_test_SOURCES test_file_access_tracker.cpp ../file_access_tracker.cpp)
 set(directory_integration_test_SOURCES ../../test_directory_integration.cpp ../hybrid_filesystem.cpp ../directory_cache.cpp ../directory_tree.cpp ../memory_cache_manager.cpp ../async_download_manager.cpp ../config_parser.cpp ../file_access_tracker.cpp ../glob_matcher.cpp ../string_utils.cpp ../metrics_collector.cpp ../prometheus_metrics_impl.cpp ../logger.cpp)
 set(debug_directory_cache_test_SOURCES ../../debug_directory_cache.cpp ../directory_cache.cpp ../directory_tree.cpp ../config_parser.cpp ../string_utils.cpp ../logger.cpp)
-set(logging_test_SOURCES ../../test_logging.cpp ../logger.cpp)
+set(logging_test_SOURCES ../../test_logging.cpp ../logger.cpp ../string_utils.cpp)
 
 # Create all test executables
 foreach(TEST_PROGRAM ${TEST_PROGRAMS})

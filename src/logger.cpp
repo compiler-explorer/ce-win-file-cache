@@ -1,6 +1,6 @@
 #include "../include/ce-win-file-cache/logger.hpp"
+#include "../include/ce-win-file-cache/string_utils.hpp"
 #include <chrono>
-#include <codecvt>
 #include <iomanip>
 #include <iostream>
 #include <locale>
@@ -255,21 +255,24 @@ void Logger::writeToDebugOutput(LogLevel level, const std::string &message)
 {
     const std::string timestamp = getCurrentTimestamp();
     const std::string level_str = levelToString(level);
-
+    
     std::string formatted_message = "[" + timestamp + "] [" + level_str + "] " + message + "\n";
-
+    
+#if defined(_WIN32) || defined(WIN32)
+    // Use native Windows OutputDebugStringA
     OutputDebugStringA(formatted_message.c_str());
+#elif defined(__APPLE__)
+    // Use macOS compatibility stub (outputs to stderr as fallback)
+    OutputDebugStringA(formatted_message.c_str());
+#else
+    // Fallback to stderr for other platforms
+    std::cerr << formatted_message;
+#endif
 }
 
 std::string Logger::wstringToString(const std::wstring &wstr)
 {
-    if (wstr.empty())
-    {
-        return std::string();
-    }
-
-    std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-    return converter.to_bytes(wstr);
+    return StringUtils::wideToUtf8(wstr);
 }
 
 } // namespace CeWinFileCache
