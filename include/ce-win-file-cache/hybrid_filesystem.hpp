@@ -52,7 +52,7 @@ class HybridFileSystem : public Fsp::FileSystemBase
 
     // Path normalization for Windows (handle both / and \ as separators)
     std::wstring normalizePath(const std::wstring &path);
-    
+
     // Directory tree management
     void fillDirInfo(DirInfo *dir_info, DirectoryNode *node);
 

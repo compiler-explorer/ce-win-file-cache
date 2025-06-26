@@ -3,8 +3,8 @@
 #include <ce-win-file-cache/hybrid_filesystem.hpp>
 #include <ce-win-file-cache/windows_compat.hpp>
 #include <chrono>
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #include <vector>
 
 #ifndef NO_WINFSP
@@ -38,8 +38,10 @@ NTSTATUS HybridFileSystem::Initialize(const Config &new_config)
     // Initialize global metrics if enabled
     if (new_config.global.metrics.enabled)
     {
-        std::wcout << L"[FS] Initializing metrics on " << std::wstring(new_config.global.metrics.bind_address.begin(), new_config.global.metrics.bind_address.end())
-                   << L":" << new_config.global.metrics.port << std::endl;
+        std::wcout
+        << L"[FS] Initializing metrics on "
+        << std::wstring(new_config.global.metrics.bind_address.begin(), new_config.global.metrics.bind_address.end())
+        << L":" << new_config.global.metrics.port << std::endl;
         GlobalMetrics::initialize(new_config.global.metrics);
     }
 
@@ -77,7 +79,8 @@ NTSTATUS HybridFileSystem::Initialize(const Config &new_config)
     std::wcout << L"[FS] Directory cache initialized successfully, total nodes: " << directory_cache.getTotalNodes() << std::endl;
 
     // Initialize async download manager with configured number of worker threads
-    std::wcout << L"[FS] Initializing async download manager with " << new_config.global.download_threads << L" threads" << std::endl;
+    std::wcout << L"[FS] Initializing async download manager with " << new_config.global.download_threads << L" threads"
+               << std::endl;
     download_manager = std::make_unique<AsyncDownloadManager>(memory_cache, new_config, new_config.global.download_threads);
 
     // Initialize file access tracker if enabled
@@ -158,9 +161,9 @@ NTSTATUS HybridFileSystem::GetVolumeInfo(VolumeInfo *VolumeInfo)
     std::wcout << L"[FS] GetVolumeInfo() called" << std::endl;
     VolumeInfo->TotalSize = config.global.total_cache_size_mb * 1024ULL * 1024ULL;
     VolumeInfo->FreeSize = VolumeInfo->TotalSize - (current_cache_size * 1024ULL * 1024ULL);
-    
-    std::wcout << L"[FS] Volume info - Total: " << VolumeInfo->TotalSize 
-               << L" bytes, Free: " << VolumeInfo->FreeSize << L" bytes" << std::endl;
+
+    std::wcout << L"[FS] Volume info - Total: " << VolumeInfo->TotalSize << L" bytes, Free: " << VolumeInfo->FreeSize
+               << L" bytes" << std::endl;
 
     return STATUS_SUCCESS;
 }
@@ -189,7 +192,7 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
     if (PSecurityDescriptorSize)
     {
         std::wcout << L"[FS] GetSecurityByName() - security descriptor requested" << std::endl;
-        
+
         // Get current user SID to create real 164-byte security descriptors
         static std::wstring cachedUserSid;
         if (cachedUserSid.empty())
@@ -215,41 +218,39 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
                 }
                 CloseHandle(hToken);
             }
-            
+
             // Fallback if we can't get user SID
             if (cachedUserSid.empty())
             {
                 cachedUserSid = L"S-1-5-32-545"; // Users group
             }
         }
-        
+
         // Create real Windows SDDL that matches 164-byte user-created objects
         std::wstring sddl;
         if (entry->file_attributes & FILE_ATTRIBUTE_DIRECTORY)
         {
             // Directory: Match real user-created directory pattern (164 bytes)
-            sddl = L"O:" + cachedUserSid + L"G:" + cachedUserSid + 
-                   L"D:(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;" + cachedUserSid + L")";
+            sddl = L"O:" + cachedUserSid + L"G:" + cachedUserSid + L"D:(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;" +
+                   cachedUserSid + L")";
         }
         else
         {
-            // File: Match real user-created file pattern (164 bytes)  
-            sddl = L"O:" + cachedUserSid + L"G:" + cachedUserSid + 
-                   L"D:(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;" + cachedUserSid + L")";
+            // File: Match real user-created file pattern (164 bytes)
+            sddl = L"O:" + cachedUserSid + L"G:" + cachedUserSid + L"D:(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;" + cachedUserSid + L")";
         }
-        
+
         PSECURITY_DESCRIPTOR pSD = nullptr;
-        if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
-            sddl.c_str(), SDDL_REVISION_1, &pSD, nullptr))
+        if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1, &pSD, nullptr))
         {
             DWORD err = GetLastError();
             std::wcout << L"[FS] GetSecurityByName() - ConvertStringSecurityDescriptor failed: " << err << std::endl;
             return STATUS_UNSUCCESSFUL;
         }
-        
+
         // Get the size of the security descriptor
         DWORD sdSize = GetSecurityDescriptorLength(pSD);
-        
+
         // If SecurityDescriptor is NULL, caller wants to know the required size
         if (!SecurityDescriptor)
         {
@@ -258,7 +259,7 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
             LocalFree(pSD);
             return STATUS_SUCCESS;
         }
-        
+
         // Check if the provided buffer is large enough
         if (*PSecurityDescriptorSize < sdSize)
         {
@@ -267,14 +268,14 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
             LocalFree(pSD);
             return STATUS_BUFFER_TOO_SMALL;
         }
-        
+
         // Copy the security descriptor to the output buffer
         memcpy(SecurityDescriptor, pSD, sdSize);
         *PSecurityDescriptorSize = sdSize;
-        
-        std::wcout << L"[FS] GetSecurityByName() - provided real security descriptor, size: " << sdSize 
-                   << L", SDDL: " << sddl << std::endl;
-        
+
+        std::wcout << L"[FS] GetSecurityByName() - provided real security descriptor, size: " << sdSize << L", SDDL: "
+                   << sddl << std::endl;
+
         LocalFree(pSD);
     }
 
@@ -286,7 +287,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
 {
     std::wstring virtual_path(FileName);
     std::wcout << L"[FS] Open() called for: '" << virtual_path << L"'" << std::endl;
-    
+
     auto start_time = std::chrono::high_resolution_clock::now();
 
     // Record filesystem operation
@@ -401,7 +402,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         OpenFileInfo->FileInfo.ChangeTime = creation_time;
         OpenFileInfo->FileInfo.IndexNumber = 0;
         OpenFileInfo->FileInfo.HardLinks = 0;
-        
+
         // Update cache entry metadata with default values
         entry->file_size = 0;
         GetSystemTimeAsFileTime(&entry->creation_time);
@@ -423,7 +424,8 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         OpenFileInfo->FileInfo.FileAttributes = file_info.dwFileAttributes;
         OpenFileInfo->FileInfo.ReparseTag = 0;
         OpenFileInfo->FileInfo.FileSize = ((UINT64)file_info.nFileSizeHigh << 32) | (UINT64)file_info.nFileSizeLow;
-        OpenFileInfo->FileInfo.AllocationSize = (OpenFileInfo->FileInfo.FileSize + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
+        OpenFileInfo->FileInfo.AllocationSize =
+        (OpenFileInfo->FileInfo.FileSize + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
         OpenFileInfo->FileInfo.CreationTime = ((PLARGE_INTEGER)&file_info.ftCreationTime)->QuadPart;
         OpenFileInfo->FileInfo.LastAccessTime = ((PLARGE_INTEGER)&file_info.ftLastAccessTime)->QuadPart;
         OpenFileInfo->FileInfo.LastWriteTime = ((PLARGE_INTEGER)&file_info.ftLastWriteTime)->QuadPart;
@@ -597,32 +599,33 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
     if (*PContext == nullptr)
     {
         std::wcout << L"[FS] ReadDirectoryEntry() - starting enumeration" << std::endl;
-        
+
         // Handle root directory specially - return compiler directories
         // Normalize path for comparison (both \ and / should be treated as root)
         std::wstring normalized_path = normalizePath(file_desc->entry->virtual_path);
         if (normalized_path == L"/")
         {
             std::wcout << L"[FS] ReadDirectoryEntry() - enumerating root directory" << std::endl;
-            
+
             // Use DirectoryCache to get all contents in root directory
             std::vector<DirectoryNode *> root_contents = directory_cache.getDirectoryContents(L"/");
-            
+
             if (root_contents.empty())
             {
                 std::wcout << L"[FS] ReadDirectoryEntry() - no contents from DirectoryCache for root" << std::endl;
                 return STATUS_NO_MORE_FILES;
             }
-            
+
             // Store the contents vector as context for enumeration
             auto *context = new std::vector<DirectoryNode *>(std::move(root_contents));
             *PContext = context;
-            
+
             // Return first entry
             auto *first_entry = (*context)[0];
             fillDirInfo(DirInfo, first_entry);
-            
-            std::wcout << L"[FS] ReadDirectoryEntry() - returning first root entry: '" << first_entry->full_virtual_path << L"'" << std::endl;
+
+            std::wcout << L"[FS] ReadDirectoryEntry() - returning first root entry: '" << first_entry->full_virtual_path
+                       << L"'" << std::endl;
             return STATUS_SUCCESS;
         }
         else
@@ -654,7 +657,7 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
     {
         std::wcout << L"[FS] ReadDirectoryEntry() - continuing enumeration" << std::endl;
         std::flush(std::wcout);
-        
+
         // Handle root directory continuation
         // Normalize path for comparison (both \ and / should be treated as root)
         std::wstring normalized_path = normalizePath(file_desc->entry->virtual_path);
@@ -686,7 +689,7 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
             {
                 // End of enumeration
                 std::wcout << L"[FS] ReadDirectoryEntry() - end of root enumeration" << std::endl;
-                //delete context_data;
+                // delete context_data;
                 *PContext = nullptr;
                 return STATUS_NO_MORE_FILES;
             }
@@ -694,8 +697,9 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
             // Return next entry
             auto *next_entry = (*context_data)[current_index];
             fillDirInfo(DirInfo, next_entry);
-            
-            std::wcout << L"[FS] ReadDirectoryEntry() - returning next root entry: '" << next_entry->full_virtual_path << L"' (index " << current_index << L")" << std::endl;
+
+            std::wcout << L"[FS] ReadDirectoryEntry() - returning next root entry: '" << next_entry->full_virtual_path
+                       << L"' (index " << current_index << L")" << std::endl;
             return STATUS_SUCCESS;
         }
         else
@@ -758,7 +762,7 @@ CacheEntry *HybridFileSystem::getCacheEntry(const std::wstring &virtual_path)
     if (it != cache_entries.end())
     {
         std::wcout << L"[FS] getCacheEntry() - found existing entry for: '" << virtual_path << L"'" << std::endl;
-        std::wcout << L"[FS] getCacheEntry() - entry state: " << static_cast<int>(it->second->state) 
+        std::wcout << L"[FS] getCacheEntry() - entry state: " << static_cast<int>(it->second->state)
                    << L", attributes: 0x" << std::hex << it->second->file_attributes << std::endl;
         return it->second.get();
     }
@@ -779,7 +783,7 @@ CacheEntry *HybridFileSystem::getCacheEntry(const std::wstring &virtual_path)
 CacheEntry *HybridFileSystem::createDynamicCacheEntry(DirectoryNode *node)
 {
     std::wcout << L"[FS] createDynamicCacheEntry() called for: '" << node->full_virtual_path << L"'" << std::endl;
-    
+
     // Create cache entry from DirectoryNode
     auto entry = std::make_unique<CacheEntry>();
     entry->virtual_path = node->full_virtual_path;
@@ -789,10 +793,10 @@ CacheEntry *HybridFileSystem::createDynamicCacheEntry(DirectoryNode *node)
     entry->creation_time = node->creation_time;
     entry->last_access_time = node->last_access_time;
     entry->last_write_time = node->last_write_time;
-    
+
     // Determine caching policy based on the file path
     entry->policy = determineCachePolicy(node->full_virtual_path);
-    
+
     // Set initial state based on policy
     if (entry->policy == CachePolicy::NEVER_CACHE)
     {
@@ -804,16 +808,16 @@ CacheEntry *HybridFileSystem::createDynamicCacheEntry(DirectoryNode *node)
         // For files that should be cached, start as VIRTUAL and let ensureFileAvailable handle caching
         entry->state = FileState::VIRTUAL;
     }
-    
+
     // [FS] createDynamicCacheEntry() - created entry for: '/[FS] Open() - handling directory
-    std::wcout << L"[FS] createDynamicCacheEntry() - created entry for: '" << entry->virtual_path 
-               << L"' -> '" << entry->network_path << L"', policy: " << static_cast<int>(entry->policy) << std::endl;
+    std::wcout << L"[FS] createDynamicCacheEntry() - created entry for: '" << entry->virtual_path << L"' -> '"
+               << entry->network_path << L"', policy: " << static_cast<int>(entry->policy) << std::endl;
     std::flush(std::wcout);
-    
+
     // Store in cache_entries for future fast access
     CacheEntry *result = entry.get();
     cache_entries[node->full_virtual_path] = std::move(entry);
-    
+
     return result;
 }
 
@@ -854,7 +858,7 @@ NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
 
         NTSTATUS status =
         download_manager->queueDownload(entry->virtual_path, entry->network_path, entry, entry->policy,
-                                        [this](NTSTATUS download_status, const std::wstring error, CacheEntry* entry)
+                                        [this](NTSTATUS download_status, const std::wstring error, CacheEntry *entry)
                                         {
                                             if (download_status == STATUS_SUCCESS)
                                             {
@@ -1027,9 +1031,9 @@ std::wstring HybridFileSystem::normalizePath(const std::wstring &path)
     {
         return L"/";
     }
-    
+
     std::wstring normalized = path;
-    
+
     // Convert backslashes to forward slashes for consistent storage
     for (auto &ch : normalized)
     {
@@ -1038,25 +1042,25 @@ std::wstring HybridFileSystem::normalizePath(const std::wstring &path)
             ch = L'/';
         }
     }
-    
+
     // Ensure path starts with /
     if (normalized[0] != L'/')
     {
         normalized = L"/" + normalized;
     }
-    
+
     // Handle root path specially
     if (normalized == L"/")
     {
         return L"/";
     }
-    
+
     // Remove trailing slash (except for root)
     if (normalized.length() > 1 && normalized.back() == L'/')
     {
         normalized.pop_back();
     }
-    
+
     return normalized;
 }
 
@@ -1070,34 +1074,37 @@ void HybridFileSystem::fillDirInfo(DirInfo *dir_info, DirectoryNode *node)
     // Fill DirInfo structure properly based on WinFsp FSP_FSCTL_DIR_INFO
     const std::wstring &name = node->name;
     dir_info->Size = (UINT16)(sizeof(FSP_FSCTL_DIR_INFO) + name.length() * sizeof(WCHAR));
-    
+
     // Set file attributes based on node type
     dir_info->FileInfo.FileAttributes = node->isDirectory() ? FILE_ATTRIBUTE_DIRECTORY : FILE_ATTRIBUTE_NORMAL;
     dir_info->FileInfo.ReparseTag = 0;
     dir_info->FileInfo.FileSize = node->isDirectory() ? 0 : node->file_size;
-    dir_info->FileInfo.AllocationSize = node->isDirectory() ? ALLOCATION_UNIT : 
-        (dir_info->FileInfo.FileSize + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
-    
+    dir_info->FileInfo.AllocationSize =
+    node->isDirectory() ? ALLOCATION_UNIT : (dir_info->FileInfo.FileSize + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
+
     // Convert FILETIME to UINT64 timestamps
     UINT64 creation_timestamp = ((PLARGE_INTEGER)&node->creation_time)->QuadPart;
     UINT64 access_timestamp = ((PLARGE_INTEGER)&node->last_access_time)->QuadPart;
     UINT64 write_timestamp = ((PLARGE_INTEGER)&node->last_write_time)->QuadPart;
-    
+
     // Use default creation time if node times are not set
-    if (creation_timestamp == 0) creation_timestamp = creation_time;
-    if (access_timestamp == 0) access_timestamp = creation_time;
-    if (write_timestamp == 0) write_timestamp = creation_time;
-    
+    if (creation_timestamp == 0)
+        creation_timestamp = creation_time;
+    if (access_timestamp == 0)
+        access_timestamp = creation_time;
+    if (write_timestamp == 0)
+        write_timestamp = creation_time;
+
     dir_info->FileInfo.CreationTime = creation_timestamp;
     dir_info->FileInfo.LastAccessTime = access_timestamp;
     dir_info->FileInfo.LastWriteTime = write_timestamp;
     dir_info->FileInfo.ChangeTime = write_timestamp;
     dir_info->FileInfo.IndexNumber = 0;
     dir_info->FileInfo.HardLinks = 0;
-    
+
     // Clear padding
     memset(dir_info->Padding, 0, sizeof(dir_info->Padding));
-    
+
     // Copy filename to FileNameBuf
     memcpy(dir_info->FileNameBuf, name.c_str(), dir_info->Size - sizeof(FSP_FSCTL_DIR_INFO));
 }

@@ -23,13 +23,13 @@ struct DownloadTask
     std::wstring network_path{};
     CacheEntry *cache_entry;
     CachePolicy policy;
-    std::function<void(NTSTATUS, const std::wstring &, CacheEntry*)> callback{};
+    std::function<void(NTSTATUS, const std::wstring &, CacheEntry *)> callback{};
 
     DownloadTask(const std::wstring &vpath,
                  const std::wstring &npath,
                  CacheEntry *entry,
                  CachePolicy pol,
-                 std::function<void(NTSTATUS, const std::wstring &, CacheEntry*)> cb)
+                 std::function<void(NTSTATUS, const std::wstring &, CacheEntry *)> cb)
     : virtual_path(vpath), network_path(npath), cache_entry(entry), policy(pol), callback(cb)
     {
     }
@@ -45,7 +45,7 @@ class AsyncDownloadManager
                            const std::wstring &network_path,
                            CacheEntry *cache_entry,
                            CachePolicy policy,
-                           std::function<void(NTSTATUS, const std::wstring, CacheEntry*)> callback);
+                           std::function<void(NTSTATUS, const std::wstring, CacheEntry *)> callback);
 
     bool isDownloadInProgress(const std::wstring virtual_path);
 

@@ -79,14 +79,14 @@ void FileAccessTracker::initialize(const std::wstring &report_directory, std::ch
         std::wcerr << L"[FileAccessTracker] Warning: Could not create report directory via system call" << std::endl;
     }
 #else
-    try 
+    try
     {
         std::filesystem::path report_path(report_directory);
         std::filesystem::create_directories(report_path);
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
-        std::wcerr << L"[FileAccessTracker] Warning: Could not create report directory: " 
+        std::wcerr << L"[FileAccessTracker] Warning: Could not create report directory: "
                    << std::wstring(e.what(), e.what() + strlen(e.what())) << std::endl;
     }
 #endif
@@ -110,7 +110,7 @@ void FileAccessTracker::recordAccess(const std::wstring virtual_path,
     std::wcout << L"Number of items in file_access_map: " << file_access_map_.size() << std::endl;
 
     // Use helper function to get or create access info safely
-    FileAccessInfo* info = getOrCreateAccessInfo(virtual_path, network_path, file_size, cache_policy);
+    FileAccessInfo *info = getOrCreateAccessInfo(virtual_path, network_path, file_size, cache_policy);
 
     info->access_count++;
     info->last_access = std::chrono::system_clock::now();
@@ -136,17 +136,17 @@ void FileAccessTracker::recordAccess(const std::wstring virtual_path,
     total_accesses_++;
 }
 
-FileAccessInfo* FileAccessTracker::getOrCreateAccessInfo(const std::wstring& virtual_path,
-                                                         const std::wstring& network_path,
+FileAccessInfo *FileAccessTracker::getOrCreateAccessInfo(const std::wstring &virtual_path,
+                                                         const std::wstring &network_path,
                                                          uint64_t file_size,
-                                                         const std::wstring& cache_policy)
+                                                         const std::wstring &cache_policy)
 {
     auto it = file_access_map_.find(virtual_path);
     if (it != file_access_map_.end())
     {
-        return it->second.get();  // Found existing entry
+        return it->second.get(); // Found existing entry
     }
-    
+
     // Create new entry
     auto new_info = std::make_unique<FileAccessInfo>();
     new_info->virtual_path = virtual_path;
@@ -154,8 +154,8 @@ FileAccessInfo* FileAccessTracker::getOrCreateAccessInfo(const std::wstring& vir
     new_info->file_size = file_size;
     new_info->first_access = std::chrono::system_clock::now();
     new_info->cache_policy = cache_policy;
-    
-    file_access_map_[virtual_path] = std::move(new_info);  // Move into map
+
+    file_access_map_[virtual_path] = std::move(new_info); // Move into map
     return file_access_map_[virtual_path].get();
 }
 
@@ -215,7 +215,7 @@ void FileAccessTracker::writeCSVReport(const std::wstring &filename)
     try
     {
         std::filesystem::path filepath(filename);
-        
+
         // Ensure parent directory exists
 #ifdef __APPLE__
         std::string parent_dir_str = filepath.parent_path().string();
@@ -224,7 +224,7 @@ void FileAccessTracker::writeCSVReport(const std::wstring &filename)
 #else
         std::filesystem::create_directories(filepath.parent_path());
 #endif
-        
+
         std::wofstream file(filepath);
         if (!file.is_open())
         {
@@ -232,53 +232,53 @@ void FileAccessTracker::writeCSVReport(const std::wstring &filename)
             return;
         }
 
-    // Write CSV header
-    file << L"Virtual Path,Network Path,File Size (MB),Access Count,Cache Hits,Cache Misses,"
-         << L"Hit Rate %,State,Memory Cached,Avg Access Time (ms),First Access,Last Access,"
-         << L"Time Since First Access,Cache Policy\n";
+        // Write CSV header
+        file << L"Virtual Path,Network Path,File Size (MB),Access Count,Cache Hits,Cache Misses,"
+             << L"Hit Rate %,State,Memory Cached,Avg Access Time (ms),First Access,Last Access,"
+             << L"Time Since First Access,Cache Policy\n";
 
-    std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mutex_);
 
-    // Sort files by access count for the report
-    std::vector<FileAccessInfo *> sorted_files;
-    for (const auto &[path, info] : file_access_map_)
-    {
-        sorted_files.push_back(info.get());
-    }
-
-    std::sort(sorted_files.begin(), sorted_files.end(),
-              [](const FileAccessInfo *a, const FileAccessInfo *b)
-              {
-                  return a->access_count.load() > b->access_count.load();
-              });
-
-    // Write data rows
-    for (const auto *info : sorted_files)
-    {
-        double hit_rate = 0.0;
-        uint64_t hits = info->cache_hits.load();
-        uint64_t misses = info->cache_misses.load();
-        if (hits + misses > 0)
+        // Sort files by access count for the report
+        std::vector<FileAccessInfo *> sorted_files;
+        for (const auto &[path, info] : file_access_map_)
         {
-            hit_rate = (double)hits / (hits + misses) * 100.0;
+            sorted_files.push_back(info.get());
         }
 
-        auto time_since_first = info->last_access - info->first_access;
+        std::sort(sorted_files.begin(), sorted_files.end(),
+                  [](const FileAccessInfo *a, const FileAccessInfo *b)
+                  {
+                      return a->access_count.load() > b->access_count.load();
+                  });
 
-        file << L"\"" << info->virtual_path << L"\"," << L"\"" << info->network_path << L"\"," << std::fixed
-             << std::setprecision(2) << (info->file_size / (1024.0 * 1024.0)) << L"," << info->access_count.load()
-             << L"," << hits << L"," << misses << L"," << std::fixed << std::setprecision(1) << hit_rate << L","
-             << fileStateToString(info->current_state) << L"," << (info->is_memory_cached ? L"Yes" : L"No") << L","
-             << std::fixed << std::setprecision(2) << info->average_access_time_ms << L","
-             << formatTimestamp(info->first_access) << L"," << formatTimestamp(info->last_access) << L","
-             << formatDuration(time_since_first) << L"," << info->cache_policy << L"\n";
-    }
+        // Write data rows
+        for (const auto *info : sorted_files)
+        {
+            double hit_rate = 0.0;
+            uint64_t hits = info->cache_hits.load();
+            uint64_t misses = info->cache_misses.load();
+            if (hits + misses > 0)
+            {
+                hit_rate = (double)hits / (hits + misses) * 100.0;
+            }
+
+            auto time_since_first = info->last_access - info->first_access;
+
+            file << L"\"" << info->virtual_path << L"\"," << L"\"" << info->network_path << L"\"," << std::fixed
+                 << std::setprecision(2) << (info->file_size / (1024.0 * 1024.0)) << L"," << info->access_count.load()
+                 << L"," << hits << L"," << misses << L"," << std::fixed << std::setprecision(1) << hit_rate << L","
+                 << fileStateToString(info->current_state) << L"," << (info->is_memory_cached ? L"Yes" : L"No") << L","
+                 << std::fixed << std::setprecision(2) << info->average_access_time_ms << L","
+                 << formatTimestamp(info->first_access) << L"," << formatTimestamp(info->last_access) << L","
+                 << formatDuration(time_since_first) << L"," << info->cache_policy << L"\n";
+        }
 
         file.close();
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
-        std::wcerr << L"[FileAccessTracker] Error writing CSV report: " 
+        std::wcerr << L"[FileAccessTracker] Error writing CSV report: "
                    << std::wstring(e.what(), e.what() + strlen(e.what())) << std::endl;
     }
 }
@@ -288,7 +288,7 @@ void FileAccessTracker::writeSummaryReport(const std::wstring &filename)
     try
     {
         std::filesystem::path filepath(filename);
-        
+
         // Ensure parent directory exists
 #ifdef __APPLE__
         std::string parent_dir_str = filepath.parent_path().string();
@@ -297,7 +297,7 @@ void FileAccessTracker::writeSummaryReport(const std::wstring &filename)
 #else
         std::filesystem::create_directories(filepath.parent_path());
 #endif
-        
+
         std::wofstream file(filepath);
         if (!file.is_open())
         {
@@ -305,54 +305,54 @@ void FileAccessTracker::writeSummaryReport(const std::wstring &filename)
             return;
         }
 
-    auto stats = getStatistics();
-    auto now = std::chrono::system_clock::now();
-    auto tracking_duration = now - tracking_start_time_;
+        auto stats = getStatistics();
+        auto now = std::chrono::system_clock::now();
+        auto tracking_duration = now - tracking_start_time_;
 
-    file << L"CE Win File Cache - File Access Summary Report\n";
-    file << L"==============================================\n\n";
-    file << L"Report Generated: " << formatTimestamp(now) << L"\n";
-    file << L"Tracking Duration: " << formatDuration(tracking_duration) << L"\n\n";
+        file << L"CE Win File Cache - File Access Summary Report\n";
+        file << L"==============================================\n\n";
+        file << L"Report Generated: " << formatTimestamp(now) << L"\n";
+        file << L"Tracking Duration: " << formatDuration(tracking_duration) << L"\n\n";
 
-    file << L"Overall Statistics\n";
-    file << L"------------------\n";
-    file << L"Total Files Tracked: " << stats.total_files_tracked << L"\n";
-    file << L"Total File Accesses: " << stats.total_accesses << L"\n";
-    file << L"Total Cache Hits: " << stats.total_cache_hits << L"\n";
-    file << L"Total Cache Misses: " << stats.total_cache_misses << L"\n";
-    file << L"Overall Hit Rate: " << std::fixed << std::setprecision(1) << stats.cache_hit_rate << L"%\n";
-    file << L"Total Bytes Accessed: " << formatFileSize(stats.total_bytes_accessed) << L"\n";
-    file << L"Cached Bytes: " << formatFileSize(stats.cached_bytes) << L"\n\n";
+        file << L"Overall Statistics\n";
+        file << L"------------------\n";
+        file << L"Total Files Tracked: " << stats.total_files_tracked << L"\n";
+        file << L"Total File Accesses: " << stats.total_accesses << L"\n";
+        file << L"Total Cache Hits: " << stats.total_cache_hits << L"\n";
+        file << L"Total Cache Misses: " << stats.total_cache_misses << L"\n";
+        file << L"Overall Hit Rate: " << std::fixed << std::setprecision(1) << stats.cache_hit_rate << L"%\n";
+        file << L"Total Bytes Accessed: " << formatFileSize(stats.total_bytes_accessed) << L"\n";
+        file << L"Cached Bytes: " << formatFileSize(stats.cached_bytes) << L"\n\n";
 
-    file << L"Top " << stats.top_accessed_files.size() << L" Most Accessed Files\n";
-    file << L"--------------------------------\n";
-    for (size_t i = 0; i < stats.top_accessed_files.size(); ++i)
-    {
-        file << std::setw(3) << (i + 1) << L". " << stats.top_accessed_files[i].first << L" ("
-             << stats.top_accessed_files[i].second << L" accesses)\n";
-    }
+        file << L"Top " << stats.top_accessed_files.size() << L" Most Accessed Files\n";
+        file << L"--------------------------------\n";
+        for (size_t i = 0; i < stats.top_accessed_files.size(); ++i)
+        {
+            file << std::setw(3) << (i + 1) << L". " << stats.top_accessed_files[i].first << L" ("
+                 << stats.top_accessed_files[i].second << L" accesses)\n";
+        }
 
-    file << L"\nLargest Cached Files\n";
-    file << L"--------------------\n";
-    for (size_t i = 0; i < stats.largest_cached_files.size(); ++i)
-    {
-        file << std::setw(3) << (i + 1) << L". " << stats.largest_cached_files[i].first << L" ("
-             << formatFileSize(stats.largest_cached_files[i].second) << L")\n";
-    }
+        file << L"\nLargest Cached Files\n";
+        file << L"--------------------\n";
+        for (size_t i = 0; i < stats.largest_cached_files.size(); ++i)
+        {
+            file << std::setw(3) << (i + 1) << L". " << stats.largest_cached_files[i].first << L" ("
+                 << formatFileSize(stats.largest_cached_files[i].second) << L")\n";
+        }
 
-    file << L"\nSlowest Average Access Times\n";
-    file << L"----------------------------\n";
-    for (size_t i = 0; i < stats.slowest_access_files.size(); ++i)
-    {
-        file << std::setw(3) << (i + 1) << L". " << stats.slowest_access_files[i].first << L" (" << std::fixed
-             << std::setprecision(2) << stats.slowest_access_files[i].second << L" ms)\n";
-    }
+        file << L"\nSlowest Average Access Times\n";
+        file << L"----------------------------\n";
+        for (size_t i = 0; i < stats.slowest_access_files.size(); ++i)
+        {
+            file << std::setw(3) << (i + 1) << L". " << stats.slowest_access_files[i].first << L" (" << std::fixed
+                 << std::setprecision(2) << stats.slowest_access_files[i].second << L" ms)\n";
+        }
 
         file.close();
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
-        std::wcerr << L"[FileAccessTracker] Error writing summary report: " 
+        std::wcerr << L"[FileAccessTracker] Error writing summary report: "
                    << std::wstring(e.what(), e.what() + strlen(e.what())) << std::endl;
     }
 }

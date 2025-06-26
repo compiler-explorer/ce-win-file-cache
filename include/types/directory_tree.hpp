@@ -34,7 +34,7 @@ struct DirectoryNode
     // Directory structure
     std::unordered_map<std::wstring, std::unique_ptr<DirectoryNode>> children;
     DirectoryNode *parent;
-    
+
     // Thread safety for children operations
     mutable std::mutex children_mutex;
 
@@ -47,7 +47,7 @@ struct DirectoryNode
     DirectoryNode *findChild(const std::wstring &child_name);
     DirectoryNode *addChild(const std::wstring &child_name, NodeType child_type);
     std::vector<std::wstring> getChildNames() const;
-    std::vector<DirectoryNode*> getChildNodes() const;
+    std::vector<DirectoryNode *> getChildNodes() const;
 };
 
 class DirectoryTree

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <ce-win-file-cache/windows_compat.hpp>
 #include <atomic>
+#include <ce-win-file-cache/windows_compat.hpp>
 #include <chrono>
 #include <string>
 #include <types/file_state.hpp>
@@ -27,14 +27,14 @@ struct CacheEntry
     // Cache metadata
     std::chrono::steady_clock::time_point last_used{};
     size_t access_count{};
-    bool is_dirty{false};
-    
+    bool is_dirty{ false };
+
     // Download protection - prevents eviction during active downloads
-    std::atomic<bool> is_downloading{false};
+    std::atomic<bool> is_downloading{ false };
 
     CacheEntry()
-    : state(FileState::VIRTUAL), policy(CachePolicy::ON_DEMAND),  creation_time{},
-      last_access_time{}, last_write_time{}, last_used(std::chrono::steady_clock::now()), access_count(0) 
+    : state(FileState::VIRTUAL), policy(CachePolicy::ON_DEMAND), creation_time{}, last_access_time{}, last_write_time{},
+      last_used(std::chrono::steady_clock::now()), access_count(0)
     {
     }
 };

@@ -35,7 +35,7 @@ NTSTATUS DirectoryCache::buildDirectoryTreeFromConfig(const Config &config)
 {
     // Add root directory entry to handle requests for "\" or "/"
     directory_tree.addDirectory(L"/", L"");
-    
+
     // Build directory tree from all configured compilers
     for (const auto &[compiler_name, compiler_config] : config.compilers)
     {
@@ -97,7 +97,7 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryWindows(const std::wstring &ne
 
             // Recursively enumerate subdirectory (with depth limit for safety)
             static thread_local int recursion_depth = 0;
-            //if (recursion_depth < 50) // Prevent infinite recursion
+            // if (recursion_depth < 50) // Prevent infinite recursion
             {
                 recursion_depth++;
                 enumerateNetworkDirectory(child_network_path, child_virtual_path);
@@ -225,9 +225,9 @@ std::wstring DirectoryCache::normalizePath(const std::wstring &path)
     {
         return L"/";
     }
-    
+
     std::wstring normalized = path;
-    
+
     // Convert backslashes to forward slashes for consistent storage
     for (auto &ch : normalized)
     {
@@ -236,25 +236,25 @@ std::wstring DirectoryCache::normalizePath(const std::wstring &path)
             ch = L'/';
         }
     }
-    
+
     // Ensure path starts with /
     if (normalized[0] != L'/')
     {
         normalized = L"/" + normalized;
     }
-    
+
     // Handle root path specially
     if (normalized == L"/" || normalized == L"\\")
     {
         return L"/";
     }
-    
+
     // Remove trailing slash (except for root)
     if (normalized.length() > 1 && normalized.back() == L'/')
     {
         normalized.pop_back();
     }
-    
+
     return normalized;
 }
 

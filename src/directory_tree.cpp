@@ -51,10 +51,10 @@ std::vector<std::wstring> DirectoryNode::getChildNames() const
     return names;
 }
 
-std::vector<DirectoryNode*> DirectoryNode::getChildNodes() const
+std::vector<DirectoryNode *> DirectoryNode::getChildNodes() const
 {
     std::lock_guard<std::mutex> lock(children_mutex);
-    std::vector<DirectoryNode*> nodes;
+    std::vector<DirectoryNode *> nodes;
     nodes.reserve(children.size());
     for (const auto &[name, child] : children)
     {
@@ -128,10 +128,11 @@ std::vector<DirectoryNode *> DirectoryTree::getDirectoryContents(const std::wstr
     std::vector<DirectoryNode *> contents = dir_node->getChildNodes();
 
     // Sort for consistent enumeration order
-    std::ranges::sort(contents, [](const DirectoryNode *first, const DirectoryNode *second)
-              {
-                  return first->name < second->name;
-              });
+    std::ranges::sort(contents,
+                      [](const DirectoryNode *first, const DirectoryNode *second)
+                      {
+                          return first->name < second->name;
+                      });
 
     return contents;
 }

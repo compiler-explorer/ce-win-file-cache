@@ -24,7 +24,7 @@ NTSTATUS AsyncDownloadManager::queueDownload(const std::wstring &virtual_path,
                                              const std::wstring &network_path,
                                              CacheEntry *cache_entry,
                                              CachePolicy policy,
-                                             std::function<void(NTSTATUS, const std::wstring, CacheEntry*)> callback)
+                                             std::function<void(NTSTATUS, const std::wstring, CacheEntry *)> callback)
 {
     std::lock_guard<std::mutex> lock(queue_mutex);
 

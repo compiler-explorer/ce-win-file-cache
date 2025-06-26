@@ -89,7 +89,7 @@ inline void GetSystemTimeAsFileTime(FILETIME *lpSystemTimeAsFileTime)
 }
 
 // SDDL function stubs
-inline BOOL ConvertSidToStringSidW(PVOID /*Sid*/, LPWSTR* StringSid)
+inline BOOL ConvertSidToStringSidW(PVOID /*Sid*/, LPWSTR *StringSid)
 {
     // Mock implementation - return fake SID string
     static wchar_t fakeSid[] = L"S-1-5-32-544"; // Built-in Administrators
@@ -97,11 +97,10 @@ inline BOOL ConvertSidToStringSidW(PVOID /*Sid*/, LPWSTR* StringSid)
     return TRUE;
 }
 
-inline BOOL ConvertStringSecurityDescriptorToSecurityDescriptorW(
-    PCWSTR /*StringSecurityDescriptor*/,
-    DWORD /*StringSDRevision*/,
-    PSECURITY_DESCRIPTOR* SecurityDescriptor,
-    PVOID /*SecurityDescriptorSize*/)
+inline BOOL ConvertStringSecurityDescriptorToSecurityDescriptorW(PCWSTR /*StringSecurityDescriptor*/,
+                                                                 DWORD /*StringSDRevision*/,
+                                                                 PSECURITY_DESCRIPTOR *SecurityDescriptor,
+                                                                 PVOID /*SecurityDescriptorSize*/)
 {
     // Mock implementation - return fake security descriptor
     static int fakeSD = 0;

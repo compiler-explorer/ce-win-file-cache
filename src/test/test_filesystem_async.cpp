@@ -33,11 +33,12 @@ void simulateFileSystemOperation()
 
         NTSTATUS status =
         download_manager.queueDownload(cache_entry.virtual_path, cache_entry.network_path, &cache_entry, cache_entry.policy,
-                                       [](NTSTATUS download_status, const std::wstring &error, CacheEntry* entry)
+                                       [](NTSTATUS download_status, const std::wstring &error, CacheEntry *entry)
                                        {
                                            if (download_status == STATUS_SUCCESS)
                                            {
-                                               std::wcout << L"✓ Download completed: " << (entry ? entry->virtual_path : L"unknown") << std::endl;
+                                               std::wcout << L"✓ Download completed: "
+                                                          << (entry ? entry->virtual_path : L"unknown") << std::endl;
                                                std::cout << "  File is now ready for use!" << std::endl;
                                            }
                                            else if (download_status == STATUS_PENDING)

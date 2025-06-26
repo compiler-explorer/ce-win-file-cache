@@ -14,8 +14,8 @@
 #include <winfsp/winfsp.hpp>
 #endif
 
-#include <codecvt>
 #include <ce-win-file-cache/glob_matcher.hpp>
+#include <codecvt>
 
 using namespace CeWinFileCache;
 
@@ -235,8 +235,8 @@ int testPathResolution(const Config &config)
             {
                 // Convert forward slashes to backslashes for Windows
                 std::wstring windows_relative = DirectoryCache::normalizePath(relative_path);
-                //std::replace(windows_relative.begin(), windows_relative.end(), L'/', L'\\');
-                //windows_relative);
+                // std::replace(windows_relative.begin(), windows_relative.end(), L'/', L'\\');
+                // windows_relative);
                 resolved_path += L"\\" + windows_relative;
             }
 
@@ -550,8 +550,8 @@ class CompilerCacheService : public Fsp::Service
         result = host.Mount(mount_point_copy.data(), nullptr, FALSE, options_.debug_flags);
         if (!NT_SUCCESS(result))
         {
-            std::wcerr << L"[SERVICE] ERROR: Failed to mount filesystem at " << options_.mount_point << L". Status: 0x" << std::hex
-                       << result << std::endl;
+            std::wcerr << L"[SERVICE] ERROR: Failed to mount filesystem at " << options_.mount_point << L". Status: 0x"
+                       << std::hex << result << std::endl;
             return result;
         }
 
