@@ -133,9 +133,9 @@ void Logger::warn(const std::string &message)
 
 void Logger::error(const std::string &message)
 {
-    if (isEnabled(LogLevel::ERROR))
+    if (isEnabled(LogLevel::ERR))
     {
-        getInstance().writeLog(LogLevel::ERROR, message);
+        getInstance().writeLog(LogLevel::ERR, message);
     }
 }
 
@@ -165,7 +165,7 @@ std::string Logger::levelToString(LogLevel level)
         return "INFO ";
     case LogLevel::WARN:
         return "WARN ";
-    case LogLevel::ERROR:
+    case LogLevel::ERR:
         return "ERROR";
     case LogLevel::FATAL:
         return "FATAL";
@@ -182,8 +182,15 @@ std::string Logger::getCurrentTimestamp()
     auto time_t = std::chrono::system_clock::to_time_t(now);
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
     
+    std::tm local_tm{};
+#ifdef _WIN32
+    localtime_s(&local_tm, &time_t);
+#else
+    local_tm = *std::localtime(&time_t);
+#endif
+    
     return fmt::format("{:%Y-%m-%d %H:%M:%S}.{:03d}", 
-                      *std::localtime(&time_t), 
+                      local_tm, 
                       ms.count());
 }
 

@@ -16,7 +16,7 @@ enum class LogLevel : std::uint8_t
     DEBUG = 1,
     INFO = 2,
     WARN = 3,
-    ERROR = 4,
+    ERR = 4,    // Renamed from ERROR to avoid Windows macro conflict
     FATAL = 5,
     OFF = 6
 };
@@ -143,9 +143,9 @@ void Logger::warn(const std::string &format, Args &&...args)
 template <typename... Args>
 void Logger::error(const std::string &format, Args &&...args)
 {
-    if (isEnabled(LogLevel::ERROR))
+    if (isEnabled(LogLevel::ERR))
     {
-        getInstance().writeLog(LogLevel::ERROR, formatString(format, std::forward<Args>(args)...));
+        getInstance().writeLog(LogLevel::ERR, formatString(format, std::forward<Args>(args)...));
     }
 }
 
