@@ -39,6 +39,16 @@ class Logger
     static void setOutput(LogOutput output);
     static void setLogFile(const std::string &filename);
     static void shutdown();
+    
+    // Fallback logging methods for use before initialization
+    static void error_fallback(const std::string &message);
+    static void warn_fallback(const std::string &message);
+    
+    template <typename... Args>
+    static void error_fallback(const std::string &format, Args &&...args);
+    
+    template <typename... Args>
+    static void warn_fallback(const std::string &format, Args &&...args);
 
     // Main logging methods
     static void trace(const std::string &message);
@@ -156,6 +166,20 @@ void Logger::fatal(const std::string &format, Args &&...args)
     {
         getInstance().writeLog(LogLevel::FATAL, formatString(format, std::forward<Args>(args)...));
     }
+}
+
+template <typename... Args>
+void Logger::error_fallback(const std::string &format, Args &&...args)
+{
+    std::string message = formatString(format, std::forward<Args>(args)...);
+    error_fallback(message);
+}
+
+template <typename... Args>
+void Logger::warn_fallback(const std::string &format, Args &&...args)
+{
+    std::string message = formatString(format, std::forward<Args>(args)...);
+    warn_fallback(message);
 }
 
 template <typename... Args>

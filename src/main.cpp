@@ -1,6 +1,8 @@
 #include <algorithm>
+#include <cctype>
 #include <ce-win-file-cache/config_parser.hpp>
 #include <ce-win-file-cache/hybrid_filesystem.hpp>
+#include <ce-win-file-cache/logger.hpp>
 #include <ce-win-file-cache/memory_cache_manager.hpp>
 #include <ce-win-file-cache/string_utils.hpp>
 #include <chrono>
@@ -18,6 +20,39 @@
 #include <codecvt>
 
 using namespace CeWinFileCache;
+
+// Helper functions for logging configuration
+LogLevel parseLogLevel(const std::string &level_str)
+{
+    std::string lower_level = level_str;
+    std::transform(lower_level.begin(), lower_level.end(), lower_level.begin(), ::tolower);
+    
+    if (lower_level == "trace") return LogLevel::TRACE;
+    if (lower_level == "debug") return LogLevel::DEBUG;
+    if (lower_level == "info") return LogLevel::INFO;
+    if (lower_level == "warn") return LogLevel::WARN;
+    if (lower_level == "error") return LogLevel::ERR;
+    if (lower_level == "fatal") return LogLevel::FATAL;
+    if (lower_level == "off") return LogLevel::OFF;
+    
+    Logger::warn_fallback("Unknown log level '{}', using INFO", level_str);
+    return LogLevel::INFO;
+}
+
+LogOutput parseLogOutput(const std::string &output_str)
+{
+    std::string lower_output = output_str;
+    std::transform(lower_output.begin(), lower_output.end(), lower_output.begin(), ::tolower);
+    
+    if (lower_output == "console") return LogOutput::CONSOLE;
+    if (lower_output == "file") return LogOutput::FILE;
+    if (lower_output == "both") return LogOutput::BOTH;
+    if (lower_output == "debug") return LogOutput::DEBUG_OUTPUT;
+    if (lower_output == "disabled") return LogOutput::DISABLED;
+    
+    Logger::warn_fallback("Unknown log output '{}', using CONSOLE", output_str);
+    return LogOutput::CONSOLE;
+}
 
 // Helper function to load config file (JSON only)
 std::optional<Config> loadConfigFile(const std::wstring &config_file)
@@ -38,30 +73,43 @@ struct ProgramOptions
     bool test_network_mapping = false;
     bool test_config_only = false;
     bool test_cache_operations = false;
+    
+    // Application logging options
+    LogLevel log_level = LogLevel::INFO;
+    LogOutput log_output = LogOutput::CONSOLE;
+    std::string log_file = "cewinfilecache.log";
 };
 
 // Function to print usage information
 void printUsage()
 {
-    std::wcout << L"Usage: CeWinFileCacheFS [OPTIONS]\n"
-               << L"\n"
-               << L"Options:\n"
-               << L"  -c, --config FILE      Configuration file (default: compilers.json)\n"
-               << L"  -m, --mount POINT      Mount point (default: M:)\n"
-               << L"  -u, --volume-prefix    Volume prefix for UNC paths\n"
-               << L"  -d, --debug [LEVEL]    Enable debug logging\n"
-               << L"  -t, --test             Test mode (no WinFsp mounting)\n"
-               << L"      --test-paths       Test path resolution only\n"
-               << L"      --test-network     Test network mapping only\n"
-               << L"      --test-config      Test config parsing only\n"
-               << L"      --test-cache       Test cache operations\n"
-               << L"  -h, --help             Show this help message\n"
-               << L"\n"
-               << L"Examples:\n"
-               << L"  CeWinFileCacheFS --config compilers.json --mount M:\n"
-               << L"  CeWinFileCacheFS --mount C:\\compilers --debug\n"
-               << L"  CeWinFileCacheFS --test --config test.json\n"
-               << std::endl;
+    std::string usage = "Usage: CeWinFileCacheFS [OPTIONS]\n"
+                       "\n"
+                       "Options:\n"
+                       "  -c, --config FILE      Configuration file (default: compilers.json)\n"
+                       "  -m, --mount POINT      Mount point (default: M:)\n"
+                       "  -u, --volume-prefix    Volume prefix for UNC paths\n"
+                       "  -d, --debug [LEVEL]    WinFsp debug flags (0=off, -1=all, bitmask)\n"
+                       "  -t, --test             Test mode (no WinFsp mounting)\n"
+                       "      --test-paths       Test path resolution only\n"
+                       "      --test-network     Test network mapping only\n"
+                       "      --test-config      Test config parsing only\n"
+                       "      --test-cache       Test cache operations\n"
+                       "  -h, --help             Show this help message\n"
+                       "\n"
+                       "Application Logging Options:\n"
+                       "  -l, --log-level LEVEL  Set log level: trace, debug, info, warn, error, fatal, off (default: info)\n"
+                       "  -o, --log-output TYPE  Set output: console, file, both, debug, disabled (default: console)\n"
+                       "  -f, --log-file FILE    Log file path (default: cewinfilecache.log)\n"
+                       "\n"
+                       "Examples:\n"
+                       "  CeWinFileCacheFS --config compilers.json --mount M:\n"
+                       "  CeWinFileCacheFS --mount C:\\compilers --debug\n"
+                       "  CeWinFileCacheFS --test --config test.json\n"
+                       "  CeWinFileCacheFS --log-level debug --log-output both --log-file debug.log\n"
+                       "  CeWinFileCacheFS --log-level trace --log-output file";
+    
+    Logger::info(usage);
 }
 
 // Parse command line arguments
@@ -82,7 +130,7 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
             }
             else
             {
-                std::wcerr << L"Error: --config requires a file path" << std::endl;
+                Logger::error("Error: --config requires a file path");
                 options.show_help = true;
                 break;
             }
@@ -96,7 +144,7 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
             }
             else
             {
-                std::wcerr << L"Error: --mount requires a mount point" << std::endl;
+                Logger::error("Error: --mount requires a mount point");
                 options.show_help = true;
                 break;
             }
@@ -110,7 +158,7 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
             }
             else
             {
-                std::wcerr << L"Error: --volume-prefix requires a prefix" << std::endl;
+                Logger::error("Error: --volume-prefix requires a prefix");
                 options.show_help = true;
                 break;
             }
@@ -125,7 +173,7 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
             {
                 options.debug_flags = static_cast<ULONG>(-1); // Enable all debug
             }
-            std::wcout << L"[MAIN] Debug mode enabled with flags: 0x" << std::hex << options.debug_flags << std::endl;
+            Logger::info("Debug mode enabled with flags: 0x{:x}", options.debug_flags);
         }
         else if (arg == L"-t" || arg == L"--test")
         {
@@ -151,6 +199,50 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
             options.test_mode = true;
             options.test_cache_operations = true;
         }
+        else if (arg == L"-l" || arg == L"--log-level")
+        {
+            const wchar_t *log_level = StringUtils::getNextArg(argv, i, argc);
+            if (log_level)
+            {
+                std::string level_str = StringUtils::wideToUtf8(log_level);
+                options.log_level = parseLogLevel(level_str);
+            }
+            else
+            {
+                Logger::error("Error: --log-level requires a level (trace, debug, info, warn, error, fatal, off)");
+                options.show_help = true;
+                break;
+            }
+        }
+        else if (arg == L"-o" || arg == L"--log-output")
+        {
+            const wchar_t *log_output = StringUtils::getNextArg(argv, i, argc);
+            if (log_output)
+            {
+                std::string output_str = StringUtils::wideToUtf8(log_output);
+                options.log_output = parseLogOutput(output_str);
+            }
+            else
+            {
+                Logger::error("Error: --log-output requires a type (console, file, both, debug, disabled)");
+                options.show_help = true;
+                break;
+            }
+        }
+        else if (arg == L"-f" || arg == L"--log-file")
+        {
+            const wchar_t *log_file = StringUtils::getNextArg(argv, i, argc);
+            if (log_file)
+            {
+                options.log_file = StringUtils::wideToUtf8(log_file);
+            }
+            else
+            {
+                Logger::error("Error: --log-file requires a file path");
+                options.show_help = true;
+                break;
+            }
+        }
         else if (arg == L"-h" || arg == L"--help")
         {
             options.show_help = true;
@@ -158,7 +250,7 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
         }
         else
         {
-            std::wcerr << L"Unknown argument: " << arg << std::endl;
+            Logger::error("Unknown argument: {}", StringUtils::wideToUtf8(arg));
             options.show_help = true;
             break;
         }
@@ -170,32 +262,30 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
 // Test function for config parsing only
 int testConfigOnly(const Config &config)
 {
-    std::wcout << L"[CONFIG TEST] === Config Parsing Test ===" << std::endl;
-    std::wcout << L"[CONFIG TEST] Configuration loaded successfully:" << std::endl;
-    std::wcout << L"[CONFIG TEST]   Cache directory: " << config.global.cache_directory << std::endl;
-    std::wcout << L"[CONFIG TEST]   Total cache size: " << config.global.total_cache_size_mb << L" MB" << std::endl;
-    std::wcout << L"[CONFIG TEST]   Eviction policy: " << config.global.eviction_policy << std::endl;
-    std::wcout << L"[CONFIG TEST]   Number of compilers: " << config.compilers.size() << std::endl;
+    Logger::info("[CONFIG TEST] === Config Parsing Test ===");
+    Logger::info("[CONFIG TEST] Configuration loaded successfully:");
+    Logger::info("[CONFIG TEST]   Cache directory: {}", StringUtils::wideToUtf8(config.global.cache_directory));
+    Logger::info("[CONFIG TEST]   Total cache size: {} MB", config.global.total_cache_size_mb);
+    Logger::info("[CONFIG TEST]   Eviction policy: {}", StringUtils::wideToUtf8(config.global.eviction_policy));
+    Logger::info("[CONFIG TEST]   Number of compilers: {}", config.compilers.size());
 
     for (const auto &[name, compiler_config] : config.compilers)
     {
-        std::wcout << L"[CONFIG TEST]     - " << name << L": " << compiler_config.network_path << std::endl;
-        std::wcout << L"[CONFIG TEST]       Cache size: " << compiler_config.cache_size_mb << L" MB" << std::endl;
-        std::wcout << L"[CONFIG TEST]       Cache patterns: " << compiler_config.cache_always_patterns.size()
-                   << L" patterns" << std::endl;
-        std::wcout << L"[CONFIG TEST]       Prefetch patterns: " << compiler_config.prefetch_patterns.size()
-                   << L" patterns" << std::endl;
+        Logger::info("[CONFIG TEST]     - {}: {}", StringUtils::wideToUtf8(name), StringUtils::wideToUtf8(compiler_config.network_path));
+        Logger::info("[CONFIG TEST]       Cache size: {} MB", compiler_config.cache_size_mb);
+        Logger::info("[CONFIG TEST]       Cache patterns: {} patterns", compiler_config.cache_always_patterns.size());
+        Logger::info("[CONFIG TEST]       Prefetch patterns: {} patterns", compiler_config.prefetch_patterns.size());
     }
 
-    std::wcout << L"[CONFIG TEST] Config test completed successfully!" << std::endl;
-    std::wcout << L"[CONFIG TEST] Returning exit code 0" << std::endl;
+    Logger::info("[CONFIG TEST] Config test completed successfully!");
+    Logger::info("[CONFIG TEST] Returning exit code 0");
     return 0;
 }
 
 // Test function for path resolution (TODO #3)
 int testPathResolution(const Config &config)
 {
-    std::wcout << L"=== Path Resolution Test ===" << std::endl;
+    Logger::info("=== Path Resolution Test ===");
 
     // Test cases for path resolution
     std::vector<std::wstring> test_paths = { L"/msvc-14.40/bin/Hostx64/x64/cl.exe", L"/msvc-14.40/include/iostream",
@@ -204,7 +294,7 @@ int testPathResolution(const Config &config)
 
     for (const auto &virtual_path : test_paths)
     {
-        std::wcout << L"Testing virtual path: " << virtual_path << std::endl;
+        Logger::info("Testing virtual path: {}", StringUtils::wideToUtf8(virtual_path));
 
         // Extract compiler name from virtual path
         std::wstring compiler_name;
@@ -240,23 +330,23 @@ int testPathResolution(const Config &config)
                 resolved_path += L"\\" + windows_relative;
             }
 
-            std::wcout << L"  -> Resolved to: " << resolved_path << std::endl;
+            Logger::info("  -> Resolved to: {}", StringUtils::wideToUtf8(resolved_path));
         }
         else
         {
-            std::wcout << L"  -> ERROR: Compiler '" << compiler_name << L"' not found in config" << std::endl;
+            Logger::error("  -> ERROR: Compiler '{}' not found in config", StringUtils::wideToUtf8(compiler_name));
         }
-        std::wcout << std::endl;
+        // Empty line for readability
     }
 
-    std::wcout << L"Path resolution test completed!" << std::endl;
+    Logger::info("Path resolution test completed!");
     return 0;
 }
 
 // Test function for network mapping (TODO #4)
 int testNetworkMapping(const Config &config)
 {
-    std::wcout << L"=== Network Mapping Test ===" << std::endl;
+    Logger::info("=== Network Mapping Test ===");
 
     // Test cases for network path mapping
     std::vector<std::pair<std::wstring, std::wstring>> test_cases = {
@@ -271,8 +361,8 @@ int testNetworkMapping(const Config &config)
 
     for (const auto &[virtual_path, expected_network_path] : test_cases)
     {
-        std::wcout << L"Testing virtual path: " << virtual_path << std::endl;
-        std::wcout << L"Expected network path: " << expected_network_path << std::endl;
+        Logger::info("Testing virtual path: {}", StringUtils::wideToUtf8(virtual_path));
+        Logger::info("Expected network path: {}", StringUtils::wideToUtf8(expected_network_path));
 
         // Extract compiler name
         std::wstring compiler_name;
@@ -305,35 +395,35 @@ int testNetworkMapping(const Config &config)
                 actual_network_path += L"\\" + relative_path;
             }
 
-            std::wcout << L"Actual network path: " << actual_network_path << std::endl;
+            Logger::info("Actual network path: {}", StringUtils::wideToUtf8(actual_network_path));
 
             // Check if mapping is correct
             if (actual_network_path == expected_network_path)
             {
-                std::wcout << L"  -> PASS: Network mapping correct" << std::endl;
+                Logger::info("  -> PASS: Network mapping correct");
             }
             else
             {
-                std::wcout << L"  -> FAIL: Network mapping mismatch" << std::endl;
+                Logger::error("  -> FAIL: Network mapping mismatch");
                 return 1;
             }
         }
         else
         {
-            std::wcout << L"  -> ERROR: Compiler '" << compiler_name << L"' not found" << std::endl;
+            Logger::error("  -> ERROR: Compiler '{}' not found", StringUtils::wideToUtf8(compiler_name));
             return 1;
         }
-        std::wcout << std::endl;
+        // Empty line for readability
     }
 
-    std::wcout << L"Network mapping test completed successfully!" << std::endl;
+    Logger::info("Network mapping test completed successfully!");
     return 0;
 }
 
 // Test function for cache operations
 int testCacheOperations(const Config &config)
 {
-    std::wcout << L"=== Cache Operations Test ===" << std::endl;
+    Logger::info("=== Cache Operations Test ===");
 
     // Create cache manager
     MemoryCacheManager cache_manager;
@@ -341,15 +431,15 @@ int testCacheOperations(const Config &config)
     // Test files (use real compiler paths)
     std::vector<std::wstring> test_files = { L"/msvc-14.40/bin/Hostx64/x64/cl.exe", L"/msvc-14.40/include/iostream", L"/ninja/ninja.exe" };
 
-    std::wcout << L"\n1. Testing cache miss and network loading..." << std::endl;
+    Logger::info("\n1. Testing cache miss and network loading...");
     for (const auto &virtual_path : test_files)
     {
-        std::wcout << L"  Loading: " << virtual_path << std::endl;
+        Logger::info("  Loading: {}", StringUtils::wideToUtf8(virtual_path));
 
         // Check cache (should miss)
         if (cache_manager.isFileInMemoryCache(virtual_path))
         {
-            std::wcout << L"    ERROR: File unexpectedly in cache" << std::endl;
+            Logger::error("    ERROR: File unexpectedly in cache");
             return 1;
         }
 
@@ -362,25 +452,25 @@ int testCacheOperations(const Config &config)
 
         if (content.empty())
         {
-            std::wcout << L"    WARNING: Failed to load file (may not exist)" << std::endl;
+            Logger::warn("    WARNING: Failed to load file (may not exist)");
         }
         else
         {
-            std::wcout << L"    Loaded " << content.size() << L" bytes in " << duration << L"ms" << std::endl;
+            Logger::info("    Loaded {} bytes in {}ms", content.size(), duration);
         }
     }
 
-    std::wcout << L"\n2. Testing cache hits..." << std::endl;
+    Logger::info("\n2. Testing cache hits...");
     for (const auto &virtual_path : test_files)
     {
         // Skip if file wasn't loaded
         if (!cache_manager.isFileInMemoryCache(virtual_path))
         {
-            std::wcout << L"  Skipping: " << virtual_path << L" (not in cache)" << std::endl;
+            Logger::info("  Skipping: {} (not in cache)", StringUtils::wideToUtf8(virtual_path));
             continue;
         }
 
-        std::wcout << L"  Reading from cache: " << virtual_path << std::endl;
+        Logger::info("  Reading from cache: {}", StringUtils::wideToUtf8(virtual_path));
 
         auto start = std::chrono::high_resolution_clock::now();
         auto cached = cache_manager.getMemoryCachedFile(virtual_path);
@@ -390,54 +480,54 @@ int testCacheOperations(const Config &config)
 
         if (!cached.has_value())
         {
-            std::wcout << L"    ERROR: Failed to retrieve cached file" << std::endl;
+            Logger::error("    ERROR: Failed to retrieve cached file");
             return 1;
         }
 
-        std::wcout << L"    Retrieved " << cached->size() << L" bytes in " << duration << L"μs" << std::endl;
+        Logger::info("    Retrieved {} bytes in {}μs", cached->size(), duration);
     }
 
-    std::wcout << L"\n3. Cache statistics..." << std::endl;
-    std::wcout << L"  Total cached files: " << cache_manager.getCachedFileCount() << std::endl;
-    std::wcout << L"  Total cache size: " << cache_manager.getCacheSize() << L" bytes" << std::endl;
-    std::wcout << L"  Average cache hit time: <1ms" << std::endl;
+    Logger::info("\n3. Cache statistics...");
+    Logger::info("  Total cached files: {}", cache_manager.getCachedFileCount());
+    Logger::info("  Total cache size: {} bytes", cache_manager.getCacheSize());
+    Logger::info("  Average cache hit time: <1ms");
 
-    std::wcout << L"\n4. Testing cache clear..." << std::endl;
+    Logger::info("\n4. Testing cache clear...");
     cache_manager.clearCache();
-    std::wcout << L"  Cache cleared. Files in cache: " << cache_manager.getCachedFileCount() << std::endl;
+    Logger::info("  Cache cleared. Files in cache: {}", cache_manager.getCachedFileCount());
 
-    std::wcout << L"\nCache operations test completed!" << std::endl;
+    Logger::info("\nCache operations test completed!");
     return 0;
 }
 
 // Test mode function - runs without WinFsp
 int runTestMode(const ProgramOptions &options)
 {
-    std::wcout << L"[TEST] Running in test mode (no WinFsp mounting)" << std::endl;
-    std::wcout << L"[TEST] Test config only: " << (options.test_config_only ? L"YES" : L"NO") << std::endl;
-    std::wcout << L"[TEST] Test path resolution: " << (options.test_path_resolution ? L"YES" : L"NO") << std::endl;
-    std::wcout << L"[TEST] Test network mapping: " << (options.test_network_mapping ? L"YES" : L"NO") << std::endl;
-    std::wcout << L"[TEST] Test cache operations: " << (options.test_cache_operations ? L"YES" : L"NO") << std::endl;
+    Logger::info("[TEST] Running in test mode (no WinFsp mounting)");
+    Logger::info("[TEST] Test config only: {}", options.test_config_only ? "YES" : "NO");
+    Logger::info("[TEST] Test path resolution: {}", options.test_path_resolution ? "YES" : "NO");
+    Logger::info("[TEST] Test network mapping: {}", options.test_network_mapping ? "YES" : "NO");
+    Logger::info("[TEST] Test cache operations: {}", options.test_cache_operations ? "YES" : "NO");
 
     // Load configuration
-    std::wcout << L"[TEST] Loading config from: " << options.config_file << std::endl;
+    Logger::info("[TEST] Loading config from: {}", StringUtils::wideToUtf8(options.config_file));
     auto config_opt = loadConfigFile(options.config_file);
     if (!config_opt)
     {
-        std::wcerr << L"[TEST ERROR] Failed to load configuration from: " << options.config_file << std::endl;
-        std::wcerr << L"[TEST ERROR] Exiting with code 1" << std::endl;
+        Logger::error("[TEST ERROR] Failed to load configuration from: {}", StringUtils::wideToUtf8(options.config_file));
+        Logger::error("[TEST ERROR] Exiting with code 1");
         return 1;
     }
 
-    std::wcout << L"[TEST] Configuration loaded successfully!" << std::endl;
+    Logger::info("[TEST] Configuration loaded successfully!");
     Config config = *config_opt;
 
     // Run specific tests based on options
     if (options.test_config_only)
     {
-        std::wcout << L"[TEST] Running config-only test..." << std::endl;
+        Logger::info("[TEST] Running config-only test...");
         int result = testConfigOnly(config);
-        std::wcout << L"[TEST] Config test completed with result: " << result << std::endl;
+        Logger::info("[TEST] Config test completed with result: {}", result);
         return result;
     }
     else if (options.test_path_resolution)
@@ -455,7 +545,7 @@ int runTestMode(const ProgramOptions &options)
     else
     {
         // Run all tests
-        std::wcout << L"Running all tests..." << std::endl;
+        Logger::info("Running all tests...");
 
         int result = testConfigOnly(config);
         if (result != 0)
@@ -473,7 +563,7 @@ int runTestMode(const ProgramOptions &options)
         if (result != 0)
             return result;
 
-        std::wcout << L"All tests completed successfully!" << std::endl;
+        Logger::info("All tests completed successfully!");
         return 0;
     }
 }
@@ -490,75 +580,75 @@ class CompilerCacheService : public Fsp::Service
     protected:
     NTSTATUS OnStart(ULONG argc, PWSTR *argv) override
     {
-        std::wcout << L"[SERVICE] OnStart() called with " << argc << L" arguments" << std::endl;
+        Logger::info("[SERVICE] OnStart() called with {} arguments", argc);
         for (ULONG i = 0; i < argc; i++)
         {
-            std::wcout << L"[SERVICE] Arg[" << i << L"]: " << (argv[i] ? argv[i] : L"<null>") << std::endl;
+            std::string arg_str = argv[i] ? StringUtils::wideToUtf8(argv[i]) : "<null>";
+            Logger::info("[SERVICE] Arg[{}]: {}", i, arg_str);
         }
 
         // Load configuration
-        std::wcout << L"[SERVICE] Loading configuration from: " << options_.config_file << std::endl;
+        Logger::info("[SERVICE] Loading configuration from: {}", StringUtils::wideToUtf8(options_.config_file));
         auto config_opt = loadConfigFile(options_.config_file);
         if (!config_opt)
         {
-            std::wcerr << L"[SERVICE] ERROR: Failed to load configuration from: " << options_.config_file << std::endl;
+            Logger::error("[SERVICE] ERROR: Failed to load configuration from: {}", StringUtils::wideToUtf8(options_.config_file));
             return STATUS_UNSUCCESSFUL;
         }
-        std::wcout << L"[SERVICE] Configuration loaded successfully" << std::endl;
+        Logger::info("[SERVICE] Configuration loaded successfully");
 
         Config config = *config_opt;
 
         // Initialize filesystem
-        std::wcout << L"[SERVICE] Initializing filesystem..." << std::endl;
+        Logger::info("[SERVICE] Initializing filesystem...");
         NTSTATUS result = filesystem.Initialize(config);
         if (!NT_SUCCESS(result))
         {
-            std::wcerr << L"[SERVICE] ERROR: Failed to initialize filesystem. Status: 0x" << std::hex << result << std::endl;
+            Logger::error("[SERVICE] ERROR: Failed to initialize filesystem. Status: 0x{:x}", static_cast<unsigned>(result));
             return result;
         }
-        std::wcout << L"[SERVICE] Filesystem initialized successfully" << std::endl;
+        Logger::info("[SERVICE] Filesystem initialized successfully");
 
         // Set up compiler paths (for now, just use the network paths directly)
-        std::wcout << L"[SERVICE] Setting up compiler paths..." << std::endl;
+        Logger::info("[SERVICE] Setting up compiler paths...");
         std::unordered_map<std::wstring, std::wstring> compiler_paths;
         for (const auto &[name, compiler_config] : config.compilers)
         {
-            std::wcout << L"[SERVICE] Adding compiler: " << name << L" -> " << compiler_config.network_path << std::endl;
+            Logger::info("[SERVICE] Adding compiler: {} -> {}", StringUtils::wideToUtf8(name), StringUtils::wideToUtf8(compiler_config.network_path));
             compiler_paths[name] = compiler_config.network_path;
         }
 
         result = filesystem.SetCompilerPaths(compiler_paths);
         if (!NT_SUCCESS(result))
         {
-            std::wcerr << L"[SERVICE] ERROR: Failed to set compiler paths. Status: 0x" << std::hex << result << std::endl;
+            Logger::error("[SERVICE] ERROR: Failed to set compiler paths. Status: 0x{:x}", static_cast<unsigned>(result));
             return result;
         }
-        std::wcout << L"[SERVICE] Compiler paths set successfully" << std::endl;
+        Logger::info("[SERVICE] Compiler paths set successfully");
 
         // Configure host
         if (!options_.volume_prefix.empty())
         {
-            std::wcout << L"[SERVICE] Setting volume prefix: " << options_.volume_prefix << std::endl;
+            Logger::info("[SERVICE] Setting volume prefix: {}", StringUtils::wideToUtf8(options_.volume_prefix));
             std::wstring volume_prefix_copy = options_.volume_prefix;
             host.SetPrefix(volume_prefix_copy.data());
         }
 
         // Mount filesystem
-        std::wcout << L"[SERVICE] Mounting filesystem at: " << options_.mount_point << std::endl;
-        std::wcout << L"[SERVICE] Debug flags: 0x" << std::hex << options_.debug_flags << std::endl;
+        Logger::info("[SERVICE] Mounting filesystem at: {}", StringUtils::wideToUtf8(options_.mount_point));
+        Logger::info("[SERVICE] Debug flags: 0x{:x}", options_.debug_flags);
         std::wstring mount_point_copy = options_.mount_point;
         result = host.Mount(mount_point_copy.data(), nullptr, FALSE, options_.debug_flags);
         if (!NT_SUCCESS(result))
         {
-            std::wcerr << L"[SERVICE] ERROR: Failed to mount filesystem at " << options_.mount_point << L". Status: 0x"
-                       << std::hex << result << std::endl;
+            Logger::error("[SERVICE] ERROR: Failed to mount filesystem at {}. Status: 0x{:x}", StringUtils::wideToUtf8(options_.mount_point), static_cast<unsigned>(result));
             return result;
         }
 
-        std::wcout << L"[SERVICE] SUCCESS: CompilerCacheFS mounted at " << host.MountPoint() << std::endl;
-        std::wcout << L"[SERVICE] Cache directory: " << config.global.cache_directory << std::endl;
-        std::wcout << L"[SERVICE] Total cache size: " << config.global.total_cache_size_mb << L" MB" << std::endl;
-        std::wcout << L"[SERVICE] Filesystem is now ready for access" << std::endl;
+        Logger::info("[SERVICE] SUCCESS: CompilerCacheFS mounted at {}", StringUtils::wideToUtf8(host.MountPoint()));
+        Logger::info("[SERVICE] Cache directory: {}", StringUtils::wideToUtf8(config.global.cache_directory));
+        Logger::info("[SERVICE] Total cache size: {} MB", config.global.total_cache_size_mb);
+        Logger::info("[SERVICE] Filesystem is now ready for access");
 
         return STATUS_SUCCESS;
     }
@@ -566,7 +656,7 @@ class CompilerCacheService : public Fsp::Service
     NTSTATUS OnStop() override
     {
         host.Unmount();
-        std::wcout << L"CeWinFileCacheFS unmounted" << std::endl;
+        Logger::info("CeWinFileCacheFS unmounted");
         return STATUS_SUCCESS;
     }
 
@@ -579,8 +669,18 @@ class CompilerCacheService : public Fsp::Service
 
 int wmain(int argc, wchar_t **argv)
 {
+    // Initialize logger with basic settings for command line parsing
+    Logger::initialize(LogLevel::INFO, LogOutput::CONSOLE);
+
     // Parse command line arguments
     ProgramOptions options = parseCommandLine(argc, argv);
+    
+    // Reconfigure logger with user-specified settings
+    Logger::initialize(options.log_level, options.log_output);
+    if (options.log_output == LogOutput::FILE || options.log_output == LogOutput::BOTH)
+    {
+        Logger::setLogFile(options.log_file);
+    }
 
     if (options.show_help)
     {
@@ -595,15 +695,15 @@ int wmain(int argc, wchar_t **argv)
     }
 
 #ifdef NO_WINFSP
-    std::wcerr << L"Error: WinFsp support was disabled at compile time." << std::endl;
-    std::wcerr << L"Use --test mode or recompile without NO_WINFSP defined." << std::endl;
+    Logger::error("Error: WinFsp support was disabled at compile time.");
+    Logger::error("Use --test mode or recompile without NO_WINFSP defined.");
     return 1;
 #else
     // Initialize WinFsp
     NTSTATUS result = Fsp::Initialize();
     if (!NT_SUCCESS(result))
     {
-        std::wcerr << L"Failed to initialize WinFsp. Status: 0x" << std::hex << result << std::endl;
+        Logger::error("Failed to initialize WinFsp. Status: 0x{:x}", static_cast<unsigned>(result));
         return 1;
     }
 
@@ -616,19 +716,17 @@ int wmain(int argc, wchar_t **argv)
 
 int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow)
 {
-    // std::ios_base::sync_with_stdio(false);
-    // std::locale utf8(std::locale(), new std::codecvt_utf8_utf16<wchar_t>);
-    // std::wcout.imbue(utf8);
-
-
-    std::wcout << L"CeWinFileCacheFS starting?????...\n";
+    // Initialize logger for WinMain entry point
+    Logger::initialize(LogLevel::INFO, LogOutput::CONSOLE);
+    
+    Logger::info("CeWinFileCacheFS starting...");
 
     // call wmain with command line arguments
     int argc;
     wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (!argv)
     {
-        std::wcerr << L"Failed to parse command line arguments." << std::endl;
+        Logger::error("Failed to parse command line arguments.");
         return 1;
     }
     int result = wmain(argc, argv);

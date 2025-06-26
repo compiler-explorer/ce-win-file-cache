@@ -279,4 +279,16 @@ std::string Logger::wstringToString(const std::wstring &wstr)
     return StringUtils::wideToUtf8(wstr);
 }
 
+void Logger::error_fallback(const std::string &message)
+{
+    // Use fmt::format for consistent formatting, output to stderr
+    std::cerr << fmt::format("[FALLBACK ERROR] {}\n", message);
+}
+
+void Logger::warn_fallback(const std::string &message)
+{
+    // Use fmt::format for consistent formatting, output to stderr
+    std::cerr << fmt::format("[FALLBACK WARN] {}\n", message);
+}
+
 } // namespace CeWinFileCache
