@@ -83,9 +83,9 @@ class DirectoryTree
     mutable std::mutex tree_mutex;
 
     // Helper methods
-    std::vector<std::wstring> splitPath(const std::wstring &path);
+    static std::vector<std::wstring> splitPath(const std::wstring &path);
     DirectoryNode *findOrCreatePath(const std::wstring &virtual_path, bool create_missing);
-    void updateNodeMetadata(DirectoryNode *node, const std::wstring &network_path, UINT64 size, const FILETIME *creation_time);
+    static void updateNodeMetadata(DirectoryNode *node, const std::wstring &network_path, UINT64 size, const FILETIME *creation_time);
 };
 
 } // namespace CeWinFileCache

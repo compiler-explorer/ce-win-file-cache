@@ -83,7 +83,7 @@ bool MemoryCacheManager::isFileInMemoryCache(const std::wstring virtual_path)
 
     std::lock_guard<std::mutex> lock(cache_mutex);
 
-    if (memory_cache.size() == 0)
+    if (memory_cache.empty())
         return false;
 
     return memory_cache.find(virtual_path) != memory_cache.end();
