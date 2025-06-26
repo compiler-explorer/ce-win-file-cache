@@ -4,8 +4,8 @@
 #include <fstream>
 #include <memory>
 #include <mutex>
-#include <sstream>
 #include <string>
+#include <fmt/format.h>
 
 namespace CeWinFileCache
 {
@@ -167,22 +167,7 @@ std::string Logger::formatString(const std::string &format, Args &&...args)
     }
     else
     {
-        // Simple placeholder replacement for {} with args
-        std::string result = format;
-        size_t pos = 0;
-        auto replaceNext = [&](const auto &arg)
-        {
-            pos = result.find("{}", pos);
-            if (pos != std::string::npos)
-            {
-                std::ostringstream oss;
-                oss << arg;
-                result.replace(pos, 2, oss.str());
-                pos += oss.str().length();
-            }
-        };
-        (replaceNext(args), ...);
-        return result;
+        return fmt::format(fmt::runtime(format), std::forward<Args>(args)...);
     }
 }
 

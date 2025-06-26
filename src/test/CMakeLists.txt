@@ -51,8 +51,8 @@ foreach(TEST_PROGRAM ${TEST_PROGRAMS})
     # Define NO_WINFSP for test programs
     target_compile_definitions(${TEST_PROGRAM} PRIVATE NO_WINFSP)
     
-    # Link nlohmann_json for all test programs
-    target_link_libraries(${TEST_PROGRAM} nlohmann_json::nlohmann_json)
+    # Link nlohmann_json and fmt for all test programs
+    target_link_libraries(${TEST_PROGRAM} nlohmann_json::nlohmann_json fmt::fmt)
     
     # Add Prometheus definitions and libraries for metrics_test and directory_integration_test
     if(TEST_PROGRAM STREQUAL "metrics_test" OR TEST_PROGRAM STREQUAL "directory_integration_test")

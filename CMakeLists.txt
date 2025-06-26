@@ -167,6 +167,14 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
 )
 
+# fmt for modern formatting
+FetchContent_Declare(
+    fmt
+    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+    GIT_TAG        11.2.0
+    GIT_SHALLOW    TRUE
+)
+
 
 # Configure nlohmann/json options
 set(JSON_BuildTests OFF CACHE INTERNAL "")  # Don't build tests
@@ -177,9 +185,13 @@ set(CATCH_BUILD_TESTING OFF CACHE INTERNAL "")  # Don't build Catch2's own tests
 set(CATCH_INSTALL_DOCS OFF CACHE INTERNAL "")  # Don't install docs
 set(CATCH_INSTALL_EXTRAS OFF CACHE INTERNAL "")  # Don't install extras
 
-FetchContent_MakeAvailable(nlohmann_json Catch2)
+# Configure fmt options
+set(FMT_INSTALL OFF CACHE INTERNAL "")  # Don't install (we're using FetchContent)
+
+FetchContent_MakeAvailable(nlohmann_json Catch2 fmt)
 message(STATUS "nlohmann/json downloaded and configured successfully")
 message(STATUS "Catch2 downloaded and configured successfully")
+message(STATUS "fmt downloaded and configured successfully")
 
 # Prometheus metrics support
 if(ENABLE_METRICS)
@@ -286,6 +298,7 @@ if((WIN32 OR USE_WINE_WINDOWS_API) AND TARGET ${PROJECT_NAME})
                 ${WINFSP_LIBRARY}
                 ${WINE_LIBRARIES}
                 nlohmann_json::nlohmann_json
+                fmt::fmt
             )
         else()
             # Use target_link_libraries for proper ordering instead of LINK_FLAGS
@@ -293,6 +306,7 @@ if((WIN32 OR USE_WINE_WINDOWS_API) AND TARGET ${PROJECT_NAME})
                 ${WINFSP_LIBRARY}
                 kernel32 user32 advapi32 netapi32 mpr shell32 shlwapi ole32 oleaut32
                 nlohmann_json::nlohmann_json
+                fmt::fmt
             )
         endif()
         
@@ -335,6 +349,7 @@ if((WIN32 OR USE_WINE_WINDOWS_API) AND TARGET ${PROJECT_NAME})
             ole32.lib
             oleaut32.lib
             nlohmann_json::nlohmann_json
+            fmt::fmt
         )
         
         # Add Prometheus libraries for native Windows builds

@@ -1,9 +1,8 @@
 #include "../include/ce-win-file-cache/logger.hpp"
 #include "../include/ce-win-file-cache/string_utils.hpp"
 #include <chrono>
-#include <iomanip>
 #include <iostream>
-#include <locale>
+#include <fmt/chrono.h>
 
 // Windows headers for OutputDebugStringA
 #if defined(_WIN32) || defined(WIN32)
@@ -182,12 +181,10 @@ std::string Logger::getCurrentTimestamp()
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
-
-    std::ostringstream oss;
-    oss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
-    oss << '.' << std::setfill('0') << std::setw(3) << ms.count();
-
-    return oss.str();
+    
+    return fmt::format("{:%Y-%m-%d %H:%M:%S}.{:03d}", 
+                      *std::localtime(&time_t), 
+                      ms.count());
 }
 
 Logger &Logger::getInstance()
@@ -234,7 +231,7 @@ void Logger::writeToConsole(LogLevel level, const std::string &message)
     // Use stderr for warnings, errors, and fatal messages
     std::ostream &output = (level >= LogLevel::WARN) ? std::cerr : std::cout;
 
-    output << "[" << timestamp << "] [" << level_str << "] " << message << std::endl;
+    output << fmt::format("[{}] [{}] {}\n", timestamp, level_str, message);
 }
 
 void Logger::writeToFile(LogLevel level, const std::string &message)
@@ -247,7 +244,7 @@ void Logger::writeToFile(LogLevel level, const std::string &message)
     const std::string timestamp = getCurrentTimestamp();
     const std::string level_str = levelToString(level);
 
-    *log_file << "[" << timestamp << "] [" << level_str << "] " << message << std::endl;
+    *log_file << fmt::format("[{}] [{}] {}\n", timestamp, level_str, message);
     log_file->flush(); // Ensure immediate write for important logs
 }
 
@@ -256,7 +253,7 @@ void Logger::writeToDebugOutput(LogLevel level, const std::string &message)
     const std::string timestamp = getCurrentTimestamp();
     const std::string level_str = levelToString(level);
     
-    std::string formatted_message = "[" + timestamp + "] [" + level_str + "] " + message + "\n";
+    std::string formatted_message = fmt::format("[{}] [{}] {}\n", timestamp, level_str, message);
     
 #if defined(_WIN32) || defined(WIN32)
     // Use native Windows OutputDebugStringA
