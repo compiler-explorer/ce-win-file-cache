@@ -79,10 +79,11 @@ struct SECURITY_CAPABILITIES
 };
 
 // File attributes
-enum : std::uint8_t
+enum : std::uint32_t
 {
     FILE_ATTRIBUTE_DIRECTORY = 0x10,
-    FILE_ATTRIBUTE_NORMAL = 0x80
+    FILE_ATTRIBUTE_NORMAL = 0x80,
+    FILE_ATTRIBUTE_OFFLINE = 0x1000
 };
 
 // SDDL constants
