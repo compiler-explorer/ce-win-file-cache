@@ -59,7 +59,7 @@ class DirectoryTree
     // Core operations
     DirectoryNode *findNode(const std::wstring &virtual_path);
     DirectoryNode *createPath(const std::wstring &virtual_path, NodeType type);
-    bool addFile(const std::wstring &virtual_path, const std::wstring &network_path, UINT64 size = 0, const FILETIME *creation_time = nullptr);
+    bool addFile(const std::wstring &virtual_path, const std::wstring &network_path, UINT64 size = 0, const FILETIME *creation_time = nullptr, DWORD file_attributes = FILE_ATTRIBUTE_NORMAL);
     bool addDirectory(const std::wstring &virtual_path, const std::wstring &network_path);
 
     // Directory enumeration
@@ -85,7 +85,7 @@ class DirectoryTree
     // Helper methods
     static std::vector<std::wstring> splitPath(const std::wstring &path);
     DirectoryNode *findOrCreatePath(const std::wstring &virtual_path, bool create_missing);
-    static void updateNodeMetadata(DirectoryNode *node, const std::wstring &network_path, UINT64 size, const FILETIME *creation_time);
+    static void updateNodeMetadata(DirectoryNode *node, const std::wstring &network_path, UINT64 size, const FILETIME *creation_time, DWORD file_attributes = FILE_ATTRIBUTE_NORMAL);
 };
 
 } // namespace CeWinFileCache

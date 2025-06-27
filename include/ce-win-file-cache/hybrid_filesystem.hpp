@@ -32,10 +32,14 @@ class HybridFileSystem : public Fsp::FileSystemBase
     NTSTATUS Init(PVOID Host) override;
     NTSTATUS GetVolumeInfo(VolumeInfo *VolumeInfo) override;
     NTSTATUS GetSecurityByName(PWSTR FileName, PUINT32 PFileAttributes, PSECURITY_DESCRIPTOR SecurityDescriptor, SIZE_T *PSecurityDescriptorSize) override;
+    NTSTATUS GetFileInfoByName(PWSTR FileName, FileInfo *FileInfo);
     NTSTATUS Open(PWSTR FileName, UINT32 CreateOptions, UINT32 GrantedAccess, PVOID *PFileNode, PVOID *PFileDesc, OpenFileInfo *OpenFileInfo) override;
     VOID Close(PVOID FileNode, PVOID FileDesc) override;
     NTSTATUS Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UINT64 Offset, ULONG Length, PULONG PBytesTransferred) override;
     NTSTATUS GetFileInfo(PVOID FileNode, PVOID FileDesc, FileInfo *FileInfo) override;
+    NTSTATUS SetBasicInfo(PVOID FileNode, PVOID FileDesc, UINT32 FileAttributes, UINT64 CreationTime, UINT64 LastAccessTime, UINT64 LastWriteTime, UINT64 ChangeTime, FileInfo *FileInfo) override;
+    NTSTATUS GetSecurity(PVOID FileNode, PVOID FileDesc, PSECURITY_DESCRIPTOR SecurityDescriptor, SIZE_T *PSecurityDescriptorSize) override;
+    NTSTATUS SetSecurity(PVOID FileNode, PVOID FileDesc, SECURITY_INFORMATION SecurityInformation, PSECURITY_DESCRIPTOR ModificationDescriptor) override;
     NTSTATUS ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID Buffer, ULONG Length, PULONG PBytesTransferred) override;
     NTSTATUS ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID *PContext, DirInfo *DirInfo) override;
 

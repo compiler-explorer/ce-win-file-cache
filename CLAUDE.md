@@ -297,28 +297,63 @@ public:
 ### Diagnostic Handling
 
 - **Memory Handling Techniques**:
-  - Any time you encounter "No such file or directory": execute PWD to determine the current directory and fix the problem with that information
+  - When a file or directory cannot be found or executed, check pwd to make sure you're in the right directory
 
 ## Testing
 
 - Prefer writing unit tests for every new function unless there are good reasons not to
 
+## Build and Execution on WSL
+
+### Building the Project
+
+- **Always use build scripts**: Never run raw `cmake`, `make`, or `ninja` commands directly
+- **Use batch files on WSL**: Prefer `.bat` files over shell scripts for build operations
+- **Kill running processes before build**: Ensure the filesystem service isn't running
+  ```bash
+  # Kill any running instance before building
+  cmd.exe /c taskkill /F /IM cewinfilecachefs.exe
+  ```
+- **Build commands**:
+  ```bash
+  # Debug build
+  cmd.exe /c build-msvc.bat
+  ```
+
+### Execution
+
+- **Run from WSL**: Execute the built Windows binary from WSL command line
+  ```bash
+  # Run the built executable
+  ./build/bin/ce-win-file-cache.exe --config config.json
+  
+  # Run with specific logging categories
+  ./build/bin/ce-win-file-cache.exe --config config.json --log-categories filesystem,cache
+  ```
+
+- **Logging**: Use logging categories to control output verbosity and improve performance
+  - Categories: `general`, `filesystem`, `cache`, `network`, `memory`, `access`, `directory`, `security`, `config`, `service`
+  - Use `--log-categories all` for full logging or specific categories for targeted debugging
+
+### Debugging
+
+- **Check working directory**: Always verify `pwd` when encountering file/directory access issues
+- **Build directory structure**: Ensure build outputs are in expected locations
+  - Executable: `build/bin/ce-win-file-cache.exe`
+  - Libraries: `build/lib/`
+  - Tests: `build/bin/test_*.exe`
+
+### Common Issues
+
+- **Generator conflicts**: CMake remembers the last generator used; clean build directory or use different directory names
+- **Path issues**: WSL uses Unix paths but Windows executables expect Windows paths
+- **File locking**: Windows processes may lock files preventing rebuild; close applications before rebuilding
+
 ## Code Quality Tools
 
 ### clang-tidy
 
-clang-tidy is configured to enforce the coding style and catch common issues. Install it with:
-
-```bash
-# macOS
-brew install llvm
-
-# Ubuntu/Debian  
-sudo apt-get install clang-tidy
-
-# Fedora
-sudo dnf install clang-tools-extra
-```
+clang-tidy is configured to enforce the coding style and catch common issues. 
 
 Run clang-tidy checks:
 
@@ -342,3 +377,4 @@ The configuration (`.clang-tidy`) includes:
 - Performance optimizations
 - Bug-prone pattern detection
 - Core Guidelines compliance
+```

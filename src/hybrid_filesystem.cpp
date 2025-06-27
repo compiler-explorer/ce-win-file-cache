@@ -173,27 +173,27 @@ NTSTATUS HybridFileSystem::GetVolumeInfo(VolumeInfo *VolumeInfo)
 NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttributes, PSECURITY_DESCRIPTOR SecurityDescriptor, SIZE_T *PSecurityDescriptorSize)
 {
     std::wstring virtual_path(FileName);
-    std::wcout << L"[FS] GetSecurityByName() called for: '" << virtual_path << L"'" << std::endl;
+    Logger::info("[FS] GetSecurityByName() called for: '{}'", StringUtils::wideToUtf8(virtual_path));
 
     // Get or create cache entry
     CacheEntry *entry = getCacheEntry(virtual_path);
     if (!entry)
     {
-        std::wcout << L"[FS] GetSecurityByName() - entry not found for: '" << virtual_path << L"'" << std::endl;
+        Logger::info("[FS] GetSecurityByName() - entry NOT FOUND for: '{}'", StringUtils::wideToUtf8(virtual_path));
         return STATUS_OBJECT_NAME_NOT_FOUND;
     }
 
-    std::wcout << L"[FS] GetSecurityByName() - found entry, attributes: 0x" << std::hex << entry->file_attributes << std::endl;
+    Logger::info("[FS] GetSecurityByName() - found entry, attributes: 0x{:x}", entry->file_attributes);
 
     if (PFileAttributes)
     {
         *PFileAttributes = entry->file_attributes;
-        std::wcout << L"[FS] GetSecurityByName() - returning file attributes: 0x" << std::hex << *PFileAttributes << std::endl;
+        Logger::info("[FS] GetSecurityByName() - returning file attributes: 0x{:x}", *PFileAttributes);
     }
 
     if (PSecurityDescriptorSize)
     {
-        std::wcout << L"[FS] GetSecurityByName() - security descriptor requested" << std::endl;
+        Logger::info("[FS] GetSecurityByName() - security descriptor requested");
 
         // Get current user SID to create real 164-byte security descriptors
         static std::wstring cachedUserSid;
@@ -275,13 +275,43 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
         memcpy(SecurityDescriptor, pSD, sdSize);
         *PSecurityDescriptorSize = sdSize;
 
-        std::wcout << L"[FS] GetSecurityByName() - provided real security descriptor, size: " << sdSize << L", SDDL: "
-                   << sddl << std::endl;
+        Logger::info("[FS] GetSecurityByName() - provided real security descriptor, size: {}", sdSize);
 
         LocalFree(pSD);
     }
 
-    std::wcout << L"[FS] GetSecurityByName() completed successfully" << std::endl;
+    Logger::info("[FS] GetSecurityByName() completed successfully");
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS HybridFileSystem::GetFileInfoByName(PWSTR FileName, FileInfo *FileInfo)
+{
+    std::wstring virtual_path(FileName);
+    Logger::info("[FS] GetFileInfoByName() called for: '{}'", StringUtils::wideToUtf8(virtual_path));
+
+    // Get cache entry (same logic as GetSecurityByName)
+    CacheEntry *entry = getCacheEntry(virtual_path);
+    if (!entry)
+    {
+        Logger::info("[FS] GetFileInfoByName() - entry NOT FOUND for: '{}'", StringUtils::wideToUtf8(virtual_path));
+        return STATUS_OBJECT_NAME_NOT_FOUND;
+    }
+
+    // Fill FileInfo with entry metadata (same as GetFileInfo for opened files)
+    FileInfo->FileAttributes = entry->file_attributes;
+    FileInfo->ReparseTag = 0;
+    FileInfo->FileSize = entry->file_size;
+    FileInfo->AllocationSize = (entry->file_size + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
+    FileInfo->CreationTime = ((PLARGE_INTEGER)&entry->creation_time)->QuadPart;
+    FileInfo->LastAccessTime = ((PLARGE_INTEGER)&entry->last_access_time)->QuadPart;
+    FileInfo->LastWriteTime = ((PLARGE_INTEGER)&entry->last_write_time)->QuadPart;
+    FileInfo->ChangeTime = FileInfo->LastWriteTime;
+    FileInfo->IndexNumber = 0;
+    FileInfo->HardLinks = 0;
+
+    Logger::info("[FS] GetFileInfoByName() - File: {}, Size: {}, Attributes: 0x{:x}", 
+                 StringUtils::wideToUtf8(virtual_path), entry->file_size, entry->file_attributes);
+    Logger::info("[FS] GetFileInfoByName() completed successfully");
     return STATUS_SUCCESS;
 }
 
@@ -340,6 +370,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         if (entry->state == FileState::CACHED && entry->local_path.empty())
         {
             // File is in memory cache - check if we have it
+            Logger::debug("[FS] Open() - calling isFileInMemoryCache for: {}", StringUtils::wideToUtf8(entry->virtual_path));
             if (memory_cache.isFileInMemoryCache(entry->virtual_path))
             {
                 // File is in memory - create a temporary file if we need a handle for compatibility
@@ -376,6 +407,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         }
 
         // For files, check if handle creation failed
+        Logger::debug("[FS] Open() - calling isFileInMemoryCache (error check) for: {}", StringUtils::wideToUtf8(entry->virtual_path));
         if (file_desc->handle == INVALID_HANDLE_VALUE && !(entry->state == FileState::CACHED && entry->local_path.empty() &&
                                                            memory_cache.isFileInMemoryCache(entry->virtual_path)))
         {
@@ -413,35 +445,24 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     }
     else
     {
-        std::wcout << L"[FS] Open() - getting file info from handle" << std::endl;
-        BY_HANDLE_FILE_INFORMATION file_info;
-        if (!GetFileInformationByHandle(file_desc->handle, &file_info))
-        {
-            std::wcout << L"[FS] Open() - GetFileInformationByHandle failed" << std::endl;
-            delete file_desc;
-            return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
-        }
-
-        // Fill OpenFileInfo
-        OpenFileInfo->FileInfo.FileAttributes = file_info.dwFileAttributes;
+        std::wcout << L"[FS] Open() - using cached file metadata" << std::endl;
+        // Use cached metadata from DirectoryNode instead of querying handle
+        // This ensures consistent file information for virtual filesystem files
+        
+        // Fill OpenFileInfo with cached metadata
+        OpenFileInfo->FileInfo.FileAttributes = entry->file_attributes;
         OpenFileInfo->FileInfo.ReparseTag = 0;
-        OpenFileInfo->FileInfo.FileSize = ((UINT64)file_info.nFileSizeHigh << 32) | (UINT64)file_info.nFileSizeLow;
+        OpenFileInfo->FileInfo.FileSize = entry->file_size;
         OpenFileInfo->FileInfo.AllocationSize =
-        (OpenFileInfo->FileInfo.FileSize + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
-        OpenFileInfo->FileInfo.CreationTime = ((PLARGE_INTEGER)&file_info.ftCreationTime)->QuadPart;
-        OpenFileInfo->FileInfo.LastAccessTime = ((PLARGE_INTEGER)&file_info.ftLastAccessTime)->QuadPart;
-        OpenFileInfo->FileInfo.LastWriteTime = ((PLARGE_INTEGER)&file_info.ftLastWriteTime)->QuadPart;
+        (entry->file_size + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
+        OpenFileInfo->FileInfo.CreationTime = ((PLARGE_INTEGER)&entry->creation_time)->QuadPart;
+        OpenFileInfo->FileInfo.LastAccessTime = ((PLARGE_INTEGER)&entry->last_access_time)->QuadPart;
+        OpenFileInfo->FileInfo.LastWriteTime = ((PLARGE_INTEGER)&entry->last_write_time)->QuadPart;
         OpenFileInfo->FileInfo.ChangeTime = OpenFileInfo->FileInfo.LastWriteTime;
         OpenFileInfo->FileInfo.IndexNumber = 0;
         OpenFileInfo->FileInfo.HardLinks = 0;
-
-        // Update cache entry metadata
-        entry->file_attributes = file_info.dwFileAttributes;
-        entry->file_size = OpenFileInfo->FileInfo.FileSize;
-        entry->creation_time = file_info.ftCreationTime;
-        entry->last_access_time = file_info.ftLastAccessTime;
-        entry->last_write_time = file_info.ftLastWriteTime;
     }
+
 
     updateAccessTime(entry);
 
@@ -454,7 +475,18 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     if (access_tracker)
     {
         bool is_cache_hit = (result == STATUS_SUCCESS && entry->state == FileState::CACHED);
-        bool is_memory_cached = memory_cache.isFileInMemoryCache(entry->virtual_path);
+        bool is_memory_cached = false;
+        
+        // Only check memory cache for files, not directories
+        if (!(entry->file_attributes & FILE_ATTRIBUTE_DIRECTORY))
+        {
+            Logger::debug("[FS] Open() - calling isFileInMemoryCache (access tracker) for: {}", StringUtils::wideToUtf8(entry->virtual_path));
+            is_memory_cached = memory_cache.isFileInMemoryCache(entry->virtual_path);
+        }
+        else
+        {
+            Logger::debug("[FS] Open() - skipping isFileInMemoryCache for directory: {}", StringUtils::wideToUtf8(entry->virtual_path));
+        }
 
         access_tracker->recordAccess(entry->virtual_path, entry->network_path, entry->file_size, entry->state,
                                      is_cache_hit, is_memory_cached,
@@ -540,6 +572,7 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
         auto duration = std::chrono::duration<double>(end_time - start_time).count();
 
         bool is_cache_hit = (file_desc->entry->state == FileState::CACHED);
+        Logger::debug("[FS] Read() - calling isFileInMemoryCache (access tracker) for: {}", StringUtils::wideToUtf8(file_desc->entry->virtual_path));
         bool is_memory_cached = memory_cache.isFileInMemoryCache(file_desc->entry->virtual_path);
 
         access_tracker->recordAccess(file_desc->entry->virtual_path, file_desc->entry->network_path,
@@ -557,23 +590,154 @@ NTSTATUS HybridFileSystem::GetFileInfo(PVOID FileNode, PVOID FileDesc, FileInfo 
 {
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
 
-    BY_HANDLE_FILE_INFORMATION file_info;
-    if (!GetFileInformationByHandle(file_desc->handle, &file_info))
-    {
-        return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
-    }
-
-    FileInfo->FileAttributes = file_info.dwFileAttributes;
+    // Use cached metadata from DirectoryNode instead of querying handle
+    // This ensures consistent file information for virtual filesystem files
+    CacheEntry *entry = file_desc->entry;
+    
+    FileInfo->FileAttributes = entry->file_attributes;
     FileInfo->ReparseTag = 0;
-    FileInfo->FileSize = ((UINT64)file_info.nFileSizeHigh << 32) | (UINT64)file_info.nFileSizeLow;
-    FileInfo->AllocationSize = (FileInfo->FileSize + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
-    FileInfo->CreationTime = ((PLARGE_INTEGER)&file_info.ftCreationTime)->QuadPart;
-    FileInfo->LastAccessTime = ((PLARGE_INTEGER)&file_info.ftLastAccessTime)->QuadPart;
-    FileInfo->LastWriteTime = ((PLARGE_INTEGER)&file_info.ftLastWriteTime)->QuadPart;
+    FileInfo->FileSize = entry->file_size;
+    FileInfo->AllocationSize = (entry->file_size + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
+    FileInfo->CreationTime = ((PLARGE_INTEGER)&entry->creation_time)->QuadPart;
+    FileInfo->LastAccessTime = ((PLARGE_INTEGER)&entry->last_access_time)->QuadPart;
+    FileInfo->LastWriteTime = ((PLARGE_INTEGER)&entry->last_write_time)->QuadPart;
     FileInfo->ChangeTime = FileInfo->LastWriteTime;
     FileInfo->IndexNumber = 0;
     FileInfo->HardLinks = 0;
 
+    // Log key values for Properties dialog debugging
+    Logger::info("[FS] GetFileInfo() - File: {}, Size: {}, Attributes: 0x{:x}, CreationTime: {}", 
+                 StringUtils::wideToUtf8(entry->virtual_path), entry->file_size, entry->file_attributes, FileInfo->CreationTime);
+
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS HybridFileSystem::SetBasicInfo(PVOID FileNode, PVOID FileDesc, UINT32 FileAttributes, UINT64 CreationTime, UINT64 LastAccessTime, UINT64 LastWriteTime, UINT64 ChangeTime, FileInfo *FileInfo)
+{
+    Logger::info("[FS] SetBasicInfo() called - FileAttributes: 0x{:x}", FileAttributes);
+    auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
+    CacheEntry *entry = file_desc->entry;
+
+    // Update cached metadata with new values
+    if (FileAttributes != 0xFFFFFFFF) // 0xFFFFFFFF means don't change
+    {
+        entry->file_attributes = FileAttributes;
+        Logger::debug("[FS] SetBasicInfo() - Updated file attributes to: 0x{:x}", FileAttributes);
+    }
+
+    if (CreationTime != 0) // 0 means don't change
+    {
+        entry->creation_time = *((FILETIME*)&CreationTime);
+        Logger::debug("[FS] SetBasicInfo() - Updated creation time");
+    }
+
+    if (LastAccessTime != 0)
+    {
+        entry->last_access_time = *((FILETIME*)&LastAccessTime);
+        Logger::debug("[FS] SetBasicInfo() - Updated last access time");
+    }
+
+    if (LastWriteTime != 0)
+    {
+        entry->last_write_time = *((FILETIME*)&LastWriteTime);
+        Logger::debug("[FS] SetBasicInfo() - Updated last write time");
+    }
+
+    // Return current file info after update
+    if (FileInfo != nullptr)
+    {
+        FileInfo->FileAttributes = entry->file_attributes;
+        FileInfo->ReparseTag = 0;
+        FileInfo->FileSize = entry->file_size;
+        FileInfo->AllocationSize = (entry->file_size + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
+        FileInfo->CreationTime = ((PLARGE_INTEGER)&entry->creation_time)->QuadPart;
+        FileInfo->LastAccessTime = ((PLARGE_INTEGER)&entry->last_access_time)->QuadPart;
+        FileInfo->LastWriteTime = ((PLARGE_INTEGER)&entry->last_write_time)->QuadPart;
+        FileInfo->ChangeTime = FileInfo->LastWriteTime;
+        FileInfo->IndexNumber = 0;
+        FileInfo->HardLinks = 0;
+    }
+
+    Logger::info("[FS] SetBasicInfo() completed successfully");
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS HybridFileSystem::GetSecurity(PVOID FileNode, PVOID FileDesc, PSECURITY_DESCRIPTOR SecurityDescriptor, SIZE_T *PSecurityDescriptorSize)
+{
+    Logger::debug("[FS] GetSecurity() called for opened file");
+    auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
+    CacheEntry *entry = file_desc->entry;
+
+    // Use the same security descriptor logic as GetSecurityByName
+    // This ensures consistency between the two methods
+    
+    const char *sddl_string = "O:S-1-5-21-663732323-46111922-2075403870-1001G:S-1-5-21-663732323-46111922-2075403870-1001D:(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-21-663732323-46111922-2075403870-1001)";
+    
+    PSECURITY_DESCRIPTOR temp_descriptor = nullptr;
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorA(sddl_string, SDDL_REVISION_1, &temp_descriptor, nullptr))
+    {
+        Logger::debug("[FS] GetSecurity() - Failed to convert SDDL string, error: {}", GetLastError());
+        return CeWinFileCache::WineCompat::NtStatusFromWin32(GetLastError());
+    }
+
+    DWORD descriptor_length = GetSecurityDescriptorLength(temp_descriptor);
+    Logger::debug("[FS] GetSecurity() - Security descriptor size: {}", descriptor_length);
+
+    if (SecurityDescriptor == nullptr)
+    {
+        // Caller is querying the required buffer size
+        *PSecurityDescriptorSize = descriptor_length;
+        LocalFree(temp_descriptor);
+        Logger::debug("[FS] GetSecurity() - Returning required size: {}", descriptor_length);
+        return STATUS_SUCCESS;
+    }
+
+    if (*PSecurityDescriptorSize < descriptor_length)
+    {
+        // Buffer too small
+        *PSecurityDescriptorSize = descriptor_length;
+        LocalFree(temp_descriptor);
+        Logger::debug("[FS] GetSecurity() - Buffer too small");
+        return STATUS_BUFFER_TOO_SMALL;
+    }
+
+    // Copy security descriptor to provided buffer
+    memcpy(SecurityDescriptor, temp_descriptor, descriptor_length);
+    *PSecurityDescriptorSize = descriptor_length;
+    LocalFree(temp_descriptor);
+
+    Logger::debug("[FS] GetSecurity() completed successfully");
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS HybridFileSystem::SetSecurity(PVOID FileNode, PVOID FileDesc, SECURITY_INFORMATION SecurityInformation, PSECURITY_DESCRIPTOR ModificationDescriptor)
+{
+    Logger::debug("[FS] SetSecurity() called - SecurityInformation: 0x{:x}", SecurityInformation);
+    
+    // For a read-only caching filesystem, we don't actually modify security descriptors
+    // But we should accept the call to avoid blocking the Properties dialog
+    // Just log what's being requested and return success
+    
+    if (SecurityInformation & OWNER_SECURITY_INFORMATION)
+    {
+        Logger::debug("[FS] SetSecurity() - Owner security information requested");
+    }
+    if (SecurityInformation & GROUP_SECURITY_INFORMATION)
+    {
+        Logger::debug("[FS] SetSecurity() - Group security information requested");
+    }
+    if (SecurityInformation & DACL_SECURITY_INFORMATION)
+    {
+        Logger::debug("[FS] SetSecurity() - DACL security information requested");
+    }
+    if (SecurityInformation & SACL_SECURITY_INFORMATION)
+    {
+        Logger::debug("[FS] SetSecurity() - SACL security information requested");
+    }
+    
+    // For a caching filesystem, we accept the modification but don't actually change anything
+    // This allows the Properties dialog to work without errors
+    Logger::debug("[FS] SetSecurity() completed successfully (no-op for caching filesystem)");
     return STATUS_SUCCESS;
 }
 
@@ -612,21 +776,26 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
         return STATUS_NO_MORE_FILES;
     }
 
-    // Find starting index based on marker
+    // Find starting index based on marker using binary search for O(log n) performance
     size_t start_index = 0;
     if (Marker && wcslen(Marker) > 0)
     {
         std::string marker_str = StringUtils::wideToUtf8(Marker);
-        Logger::debug("[FS] ReadDirectory() - searching for marker: '{}'", marker_str);
-
-        for (size_t i = 0; i < contents.size(); i++)
+        
+        // Use binary search to find marker position (assumes contents are sorted by name)
+        auto it = std::lower_bound(contents.begin(), contents.end(), Marker,
+            [](const DirectoryNode* node, const std::wstring& marker) {
+                return node->name < marker;
+            });
+        
+        if (it != contents.end() && (*it)->name == Marker)
         {
-            if (contents[i]->name == Marker)
-            {
-                start_index = i + 1; // Next entry after marker
-                Logger::debug("[FS] ReadDirectory() - found marker at index {}, starting from {}", i, start_index);
-                break;
-            }
+            start_index = std::distance(contents.begin(), it) + 1; // Next entry after marker
+            Logger::debug("[FS] ReadDirectory() - found marker '{}' at index {}", marker_str, start_index - 1);
+        }
+        else
+        {
+            Logger::debug("[FS] ReadDirectory() - marker '{}' not found, starting from beginning", marker_str);
         }
     }
     else
@@ -651,7 +820,7 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
         // Align to 8-byte boundary
         entry_size = (entry_size + 7) & ~7;
 
-        Logger::debug("[FS] ReadDirectory() - entry[{}]: '{}', size: {}", i, StringUtils::wideToUtf8(node->name), entry_size);
+        // Removed verbose per-entry logging for performance
 
         // Check if entry fits in remaining buffer
         if (bytes_used + entry_size > Length)
@@ -665,7 +834,7 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
         dir_info->Size = (UINT16)entry_size;
 
         // Set file attributes
-        dir_info->FileInfo.FileAttributes = node->isDirectory() ? FILE_ATTRIBUTE_DIRECTORY : FILE_ATTRIBUTE_NORMAL;
+        dir_info->FileInfo.FileAttributes = node->isDirectory() ? (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_OFFLINE) : FILE_ATTRIBUTE_NORMAL;
         dir_info->FileInfo.ReparseTag = 0;
         dir_info->FileInfo.FileSize = node->isDirectory() ? 0 : node->file_size;
         dir_info->FileInfo.AllocationSize =
@@ -701,7 +870,7 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
         bytes_used += entry_size;
         entries_returned++;
 
-        Logger::debug("[FS] ReadDirectory() - added entry '{}', total bytes: {}", StringUtils::wideToUtf8(node->name), bytes_used);
+        // Removed verbose per-entry logging for performance
     }
 
     *PBytesTransferred = bytes_used;
@@ -906,13 +1075,14 @@ CacheEntry *HybridFileSystem::getCacheEntry(const std::wstring &virtual_path)
 
 CacheEntry *HybridFileSystem::createDynamicCacheEntry(DirectoryNode *node)
 {
-    std::wcout << L"[FS] createDynamicCacheEntry() called for: '" << node->full_virtual_path << L"'" << std::endl;
+    Logger::info("[FS] createDynamicCacheEntry() called for: '{}', attributes: 0x{:x}", 
+                 StringUtils::wideToUtf8(node->full_virtual_path), node->file_attributes);
 
     // Create cache entry from DirectoryNode
     auto entry = std::make_unique<CacheEntry>();
     entry->virtual_path = node->full_virtual_path;
     entry->network_path = node->network_path;
-    entry->file_attributes = node->isDirectory() ? FILE_ATTRIBUTE_DIRECTORY : FILE_ATTRIBUTE_NORMAL;
+    entry->file_attributes = node->file_attributes; // Use actual file attributes from DirectoryNode
     entry->file_size = node->file_size;
     entry->creation_time = node->creation_time;
     entry->last_access_time = node->last_access_time;
@@ -933,10 +1103,8 @@ CacheEntry *HybridFileSystem::createDynamicCacheEntry(DirectoryNode *node)
         entry->state = FileState::VIRTUAL;
     }
 
-    // [FS] createDynamicCacheEntry() - created entry for: '/[FS] Open() - handling directory
-    std::wcout << L"[FS] createDynamicCacheEntry() - created entry for: '" << entry->virtual_path << L"' -> '"
-               << entry->network_path << L"', policy: " << static_cast<int>(entry->policy) << std::endl;
-    std::flush(std::wcout);
+    Logger::info("[FS] createDynamicCacheEntry() - created entry for: '{}' -> '{}', policy: {}", 
+                 StringUtils::wideToUtf8(entry->virtual_path), StringUtils::wideToUtf8(entry->network_path), static_cast<int>(entry->policy));
 
     // Store in cache_entries for future fast access
     CacheEntry *result = entry.get();

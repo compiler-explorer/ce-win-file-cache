@@ -81,7 +81,7 @@ DirectoryNode *DirectoryTree::createPath(const std::wstring &virtual_path, NodeT
     return findOrCreatePath(virtual_path, true);
 }
 
-bool DirectoryTree::addFile(const std::wstring &virtual_path, const std::wstring &network_path, UINT64 size, const FILETIME *creation_time)
+bool DirectoryTree::addFile(const std::wstring &virtual_path, const std::wstring &network_path, UINT64 size, const FILETIME *creation_time, DWORD file_attributes)
 {
     std::lock_guard<std::mutex> tree_lock(tree_mutex);
 
@@ -92,7 +92,7 @@ bool DirectoryTree::addFile(const std::wstring &virtual_path, const std::wstring
     }
 
     node->type = NodeType::FILE;
-    updateNodeMetadata(node, network_path, size, creation_time);
+    updateNodeMetadata(node, network_path, size, creation_time, file_attributes);
 
     return true;
 }
@@ -109,7 +109,7 @@ bool DirectoryTree::addDirectory(const std::wstring &virtual_path, const std::ws
 
     node->type = NodeType::DIRECTORY;
     node->network_path = network_path;
-    node->file_attributes = FILE_ATTRIBUTE_DIRECTORY;
+    node->file_attributes = FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_OFFLINE;
 
     return true;
 }
@@ -277,7 +277,7 @@ DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path,
     return current;
 }
 
-void DirectoryTree::updateNodeMetadata(DirectoryNode *node, const std::wstring &network_path, UINT64 size, const FILETIME *creation_time)
+void DirectoryTree::updateNodeMetadata(DirectoryNode *node, const std::wstring &network_path, UINT64 size, const FILETIME *creation_time, DWORD file_attributes)
 {
     if (node == nullptr)
     {
@@ -303,15 +303,8 @@ void DirectoryTree::updateNodeMetadata(DirectoryNode *node, const std::wstring &
         node->last_write_time = current_time;
     }
 
-    // Set appropriate file attributes
-    if (node->isFile())
-    {
-        node->file_attributes = FILE_ATTRIBUTE_NORMAL;
-    }
-    else
-    {
-        node->file_attributes = FILE_ATTRIBUTE_DIRECTORY;
-    }
+    // Set file attributes from the actual file system
+    node->file_attributes = file_attributes;
 }
 
 void DirectoryTree::lock()

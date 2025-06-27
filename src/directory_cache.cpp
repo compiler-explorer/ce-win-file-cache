@@ -1,6 +1,7 @@
 #include "../include/ce-win-file-cache/directory_cache.hpp"
 #include <filesystem>
 #include <iostream>
+#include <set>
 
 #ifdef NO_WINFSP
 #include <fstream>
@@ -95,20 +96,22 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryWindows(const std::wstring &ne
             // Add directory to tree
             directory_tree.addDirectory(child_virtual_path, child_network_path);
 
-            // Recursively enumerate subdirectory (with depth limit for safety)
-            static thread_local int recursion_depth = 0;
-            // if (recursion_depth < 50) // Prevent infinite recursion
+            // Recursively enumerate subdirectory with cycle detection
+            static thread_local std::set<std::wstring> visited_paths;
+            
+            // Check for circular references (junction points, symbolic links)
+            if (visited_paths.find(child_network_path) == visited_paths.end())
             {
-                recursion_depth++;
+                visited_paths.insert(child_network_path);
                 enumerateNetworkDirectory(child_network_path, child_virtual_path);
-                recursion_depth--;
+                visited_paths.erase(child_network_path);
             }
         }
         else
         {
             // Add file to tree
             UINT64 file_size = ((UINT64)find_data.nFileSizeHigh << 32) | find_data.nFileSizeLow;
-            directory_tree.addFile(child_virtual_path, child_network_path, file_size, &find_data.ftCreationTime);
+            directory_tree.addFile(child_virtual_path, child_network_path, file_size, &find_data.ftCreationTime, find_data.dwFileAttributes);
         }
 
     } while (FindNextFileW(find_handle, &find_data));

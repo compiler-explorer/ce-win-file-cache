@@ -86,6 +86,58 @@ void Logger::setLogFile(const std::string &filename)
     }
 }
 
+void Logger::setCategories(LogCategory categories)
+{
+    Logger &instance = getInstance();
+    std::lock_guard<std::mutex> lock(instance.log_mutex);
+    instance.enabled_categories = categories;
+}
+
+void Logger::setCategoriesFromString(const std::string &categories_str)
+{
+    LogCategory categories = static_cast<LogCategory>(0);
+    
+    if (categories_str == "all" || categories_str == "ALL")
+    {
+        categories = LogCategory::ALL;
+    }
+    else
+    {
+        // Parse comma-separated category names
+        std::string remaining = categories_str;
+        size_t pos = 0;
+        
+        while ((pos = remaining.find(',')) != std::string::npos || !remaining.empty())
+        {
+            std::string category = (pos != std::string::npos) ? remaining.substr(0, pos) : remaining;
+            
+            // Trim whitespace
+            size_t start = category.find_first_not_of(" \t\r\n");
+            size_t end = category.find_last_not_of(" \t\r\n");
+            if (start != std::string::npos)
+            {
+                category = category.substr(start, end - start + 1);
+            }
+            
+            if (category == "general") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::GENERAL));
+            else if (category == "filesystem" || category == "fs") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::FILESYSTEM));
+            else if (category == "cache") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::CACHE));
+            else if (category == "network") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::NETWORK));
+            else if (category == "memory") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::MEMORY));
+            else if (category == "access") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::ACCESS));
+            else if (category == "directory" || category == "dir") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::DIRECTORY));
+            else if (category == "security") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::SECURITY));
+            else if (category == "config") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::CONFIG));
+            else if (category == "service") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::SERVICE));
+            
+            if (pos == std::string::npos) break;
+            remaining = remaining.substr(pos + 1);
+        }
+    }
+    
+    setCategories(categories);
+}
+
 void Logger::shutdown()
 {
     Logger &instance = getInstance();
@@ -99,58 +151,96 @@ void Logger::shutdown()
     instance.initialized = false;
 }
 
+// Category-aware logging methods
+void Logger::trace(LogCategory category, const std::string &message)
+{
+    if (isEnabled(LogLevel::TRACE) && isEnabled(category))
+    {
+        getInstance().writeLog(LogLevel::TRACE, category, message);
+    }
+}
+
+void Logger::debug(LogCategory category, const std::string &message)
+{
+    if (isEnabled(LogLevel::DEBUG) && isEnabled(category))
+    {
+        getInstance().writeLog(LogLevel::DEBUG, category, message);
+    }
+}
+
+void Logger::info(LogCategory category, const std::string &message)
+{
+    if (isEnabled(LogLevel::INFO) && isEnabled(category))
+    {
+        getInstance().writeLog(LogLevel::INFO, category, message);
+    }
+}
+
+void Logger::warn(LogCategory category, const std::string &message)
+{
+    if (isEnabled(LogLevel::WARN) && isEnabled(category))
+    {
+        getInstance().writeLog(LogLevel::WARN, category, message);
+    }
+}
+
+void Logger::error(LogCategory category, const std::string &message)
+{
+    if (isEnabled(LogLevel::ERR) && isEnabled(category))
+    {
+        getInstance().writeLog(LogLevel::ERR, category, message);
+    }
+}
+
+void Logger::fatal(LogCategory category, const std::string &message)
+{
+    if (isEnabled(LogLevel::FATAL) && isEnabled(category))
+    {
+        getInstance().writeLog(LogLevel::FATAL, category, message);
+    }
+}
+
+// Convenience methods (use GENERAL category)
 void Logger::trace(const std::string &message)
 {
-    if (isEnabled(LogLevel::TRACE))
-    {
-        getInstance().writeLog(LogLevel::TRACE, message);
-    }
+    trace(LogCategory::GENERAL, message);
 }
 
 void Logger::debug(const std::string &message)
 {
-    if (isEnabled(LogLevel::DEBUG))
-    {
-        getInstance().writeLog(LogLevel::DEBUG, message);
-    }
+    debug(LogCategory::GENERAL, message);
 }
 
 void Logger::info(const std::string &message)
 {
-    if (isEnabled(LogLevel::INFO))
-    {
-        getInstance().writeLog(LogLevel::INFO, message);
-    }
+    info(LogCategory::GENERAL, message);
 }
 
 void Logger::warn(const std::string &message)
 {
-    if (isEnabled(LogLevel::WARN))
-    {
-        getInstance().writeLog(LogLevel::WARN, message);
-    }
+    warn(LogCategory::GENERAL, message);
 }
 
 void Logger::error(const std::string &message)
 {
-    if (isEnabled(LogLevel::ERR))
-    {
-        getInstance().writeLog(LogLevel::ERR, message);
-    }
+    error(LogCategory::GENERAL, message);
 }
 
 void Logger::fatal(const std::string &message)
 {
-    if (isEnabled(LogLevel::FATAL))
-    {
-        getInstance().writeLog(LogLevel::FATAL, message);
-    }
+    fatal(LogCategory::GENERAL, message);
 }
 
 bool Logger::isEnabled(LogLevel level)
 {
     const Logger &instance = getInstance();
     return instance.initialized && instance.output_type != LogOutput::DISABLED && level >= instance.current_level;
+}
+
+bool Logger::isEnabled(LogCategory category)
+{
+    const Logger &instance = getInstance();
+    return (static_cast<uint32_t>(instance.enabled_categories) & static_cast<uint32_t>(category)) != 0;
 }
 
 std::string Logger::levelToString(LogLevel level)
@@ -176,6 +266,35 @@ std::string Logger::levelToString(LogLevel level)
     }
 }
 
+std::string Logger::categoryToString(LogCategory category)
+{
+    switch (category)
+    {
+    case LogCategory::GENERAL:
+        return "GEN";
+    case LogCategory::FILESYSTEM:
+        return "FS ";
+    case LogCategory::CACHE:
+        return "CAC";
+    case LogCategory::NETWORK:
+        return "NET";
+    case LogCategory::MEMORY:
+        return "MEM";
+    case LogCategory::ACCESS:
+        return "ACC";
+    case LogCategory::DIRECTORY:
+        return "DIR";
+    case LogCategory::SECURITY:
+        return "SEC";
+    case LogCategory::CONFIG:
+        return "CFG";
+    case LogCategory::SERVICE:
+        return "SVC";
+    default:
+        return "UNK";
+    }
+}
+
 std::string Logger::getCurrentTimestamp()
 {
     auto now = std::chrono::system_clock::now();
@@ -198,7 +317,7 @@ Logger &Logger::getInstance()
     return instance;
 }
 
-void Logger::writeLog(LogLevel level, const std::string &message)
+void Logger::writeLog(LogLevel level, LogCategory category, const std::string &message)
 {
     std::lock_guard<std::mutex> lock(log_mutex);
 
@@ -210,17 +329,17 @@ void Logger::writeLog(LogLevel level, const std::string &message)
     switch (output_type)
     {
     case LogOutput::CONSOLE:
-        writeToConsole(level, message);
+        writeToConsole(level, category, message);
         break;
     case LogOutput::FILE:
-        writeToFile(level, message);
+        writeToFile(level, category, message);
         break;
     case LogOutput::BOTH:
-        writeToConsole(level, message);
-        writeToFile(level, message);
+        writeToConsole(level, category, message);
+        writeToFile(level, category, message);
         break;
     case LogOutput::DEBUG_OUTPUT:
-        writeToDebugOutput(level, message);
+        writeToDebugOutput(level, category, message);
         break;
     case LogOutput::DISABLED:
         // Do nothing
@@ -228,18 +347,19 @@ void Logger::writeLog(LogLevel level, const std::string &message)
     }
 }
 
-void Logger::writeToConsole(LogLevel level, const std::string &message)
+void Logger::writeToConsole(LogLevel level, LogCategory category, const std::string &message)
 {
     const std::string timestamp = getCurrentTimestamp();
     const std::string level_str = levelToString(level);
+    const std::string category_str = categoryToString(category);
 
     // Use stderr for warnings, errors, and fatal messages
     std::ostream &output = (level >= LogLevel::WARN) ? std::cerr : std::cout;
 
-    output << fmt::format("[{}] [{}] {}\n", timestamp, level_str, message);
+    output << fmt::format("[{}] [{}] [{}] {}\n", timestamp, level_str, category_str, message);
 }
 
-void Logger::writeToFile(LogLevel level, const std::string &message)
+void Logger::writeToFile(LogLevel level, LogCategory category, const std::string &message)
 {
     if (!log_file || !log_file->is_open())
     {
@@ -248,17 +368,19 @@ void Logger::writeToFile(LogLevel level, const std::string &message)
 
     const std::string timestamp = getCurrentTimestamp();
     const std::string level_str = levelToString(level);
+    const std::string category_str = categoryToString(category);
 
-    *log_file << fmt::format("[{}] [{}] {}\n", timestamp, level_str, message);
+    *log_file << fmt::format("[{}] [{}] [{}] {}\n", timestamp, level_str, category_str, message);
     log_file->flush(); // Ensure immediate write for important logs
 }
 
-void Logger::writeToDebugOutput(LogLevel level, const std::string &message)
+void Logger::writeToDebugOutput(LogLevel level, LogCategory category, const std::string &message)
 {
     const std::string timestamp = getCurrentTimestamp();
     const std::string level_str = levelToString(level);
+    const std::string category_str = categoryToString(category);
 
-    std::string formatted_message = fmt::format("[{}] [{}] {}\n", timestamp, level_str, message);
+    std::string formatted_message = fmt::format("[{}] [{}] [{}] {}\n", timestamp, level_str, category_str, message);
 
 #if defined(_WIN32) || defined(WIN32)
     // Use native Windows OutputDebugStringA
