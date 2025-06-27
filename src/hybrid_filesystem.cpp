@@ -669,8 +669,6 @@ NTSTATUS HybridFileSystem::SetBasicInfo(PVOID FileNode, PVOID FileDesc, UINT32 F
 NTSTATUS HybridFileSystem::GetSecurity(PVOID FileNode, PVOID FileDesc, PSECURITY_DESCRIPTOR SecurityDescriptor, SIZE_T *PSecurityDescriptorSize)
 {
     Logger::debug("[FS] GetSecurity() called for opened file");
-    auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
-    CacheEntry *entry = file_desc->entry;
 
     // Use the same security descriptor logic as GetSecurityByName
     // This ensures consistency between the two methods
@@ -760,18 +758,8 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
     Logger::debug("[FS] ReadDirectory() - enumerating directory: '{}'", StringUtils::wideToUtf8(normalized_path));
 
     // Get directory contents
-    std::vector<DirectoryNode *> contents;
-    if (normalized_path == L"/")
-    {
-        contents = directory_cache.getDirectoryContents(L"/");
-        Logger::debug("[FS] ReadDirectory() - root directory has {} entries", contents.size());
-    }
-    else
-    {
-        contents = directory_cache.getDirectoryContents(dir_path);
-        Logger::debug("[FS] ReadDirectory() - directory '{}' has {} entries", StringUtils::wideToUtf8(dir_path),
-                      contents.size());
-    }
+    std::vector<DirectoryNode *> contents = directory_cache.getDirectoryContents(dir_path);
+    Logger::debug("[FS] ReadDirectory() - directory '{}' has {} entries", StringUtils::wideToUtf8(dir_path), contents.size());
 
     if (contents.empty())
     {
@@ -785,6 +773,8 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
     if (Marker && wcslen(Marker) > 0)
     {
         std::string marker_str = StringUtils::wideToUtf8(Marker);
+
+        // todo: should use hashmap that should already be cached (its not)
         
         // Use binary search to find marker position (assumes contents are sorted by name)
         auto it = std::lower_bound(contents.begin(), contents.end(), Marker,
@@ -809,7 +799,7 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
 
     // Fill buffer with directory entries
     PUCHAR buffer_ptr = (PUCHAR)Buffer;
-    ULONG bytes_used = 0;
+    size_t bytes_used = 0;
     size_t entries_returned = 0;
 
     for (size_t i = start_index; i < contents.size(); i++)
@@ -819,7 +809,7 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
         // Calculate size needed for this entry
         size_t name_chars = node->name.length();
         size_t name_bytes = name_chars * sizeof(WCHAR);
-        ULONG entry_size = sizeof(FSP_FSCTL_DIR_INFO) + name_bytes + sizeof(WCHAR); // +WCHAR for null terminator
+        size_t entry_size = sizeof(FSP_FSCTL_DIR_INFO) + name_bytes + sizeof(WCHAR); // +WCHAR for null terminator
 
         // Align to 8-byte boundary
         entry_size = (entry_size + 7) & ~7;
@@ -845,9 +835,9 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
         node->isDirectory() ? ALLOCATION_UNIT : (dir_info->FileInfo.FileSize + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
 
         // Set timestamps
-        UINT64 creation_ts = ((PLARGE_INTEGER)&node->creation_time)->QuadPart;
-        UINT64 access_ts = ((PLARGE_INTEGER)&node->last_access_time)->QuadPart;
-        UINT64 write_ts = ((PLARGE_INTEGER)&node->last_write_time)->QuadPart;
+        UINT64 creation_ts = std::bit_cast<UINT64>(node->creation_time);
+        UINT64 access_ts = std::bit_cast<UINT64>(node->last_access_time);
+        UINT64 write_ts = std::bit_cast<UINT64>(node->last_write_time);
 
         if (creation_ts == 0)
             creation_ts = creation_time;
@@ -877,7 +867,7 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
         // Removed verbose per-entry logging for performance
     }
 
-    *PBytesTransferred = bytes_used;
+    *PBytesTransferred = static_cast<ULONG>(bytes_used);
 
     Logger::debug("[FS] ReadDirectory() - returning {} entries, {} bytes total", entries_returned, bytes_used);
 

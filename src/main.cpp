@@ -17,7 +17,6 @@
 #endif
 
 #include <ce-win-file-cache/glob_matcher.hpp>
-#include <codecvt>
 
 using namespace CeWinFileCache;
 

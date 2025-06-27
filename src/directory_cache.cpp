@@ -112,7 +112,13 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryWindows(const std::wstring &ne
         {
             // Add file to tree
             UINT64 file_size = ((UINT64)find_data.nFileSizeHigh << 32) | find_data.nFileSizeLow;
-            directory_tree.addFile(child_virtual_path, child_network_path, file_size, &find_data.ftCreationTime, find_data.dwFileAttributes);
+            directory_tree.addFile(child_virtual_path, 
+               child_network_path, 
+               file_size, 
+               find_data.ftCreationTime, 
+               find_data.ftLastAccessTime, 
+               find_data.ftLastWriteTime,
+               find_data.dwFileAttributes);
         }
 
     } while (FindNextFileW(find_handle, &find_data));
@@ -211,7 +217,7 @@ size_t DirectoryCache::getTotalNodes() const
 
 void DirectoryCache::addTestFile(const std::wstring &virtual_path, const std::wstring &network_path, UINT64 size)
 {
-    directory_tree.addFile(virtual_path, network_path, size, nullptr);
+    //directory_tree.addFile(virtual_path, network_path, size, nullptr);
 }
 
 void DirectoryCache::addTestDirectory(const std::wstring &virtual_path, const std::wstring &network_path)

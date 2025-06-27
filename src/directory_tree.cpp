@@ -81,7 +81,13 @@ DirectoryNode *DirectoryTree::createPath(const std::wstring &virtual_path, NodeT
     return findOrCreatePath(virtual_path, true);
 }
 
-bool DirectoryTree::addFile(const std::wstring &virtual_path, const std::wstring &network_path, UINT64 size, const FILETIME *creation_time, DWORD file_attributes)
+bool DirectoryTree::addFile(const std::wstring &virtual_path,
+                            const std::wstring &network_path,
+                            UINT64 size,
+                            FILETIME creation_time,
+                            FILETIME last_access_time,
+                            FILETIME last_write_time,
+                            DWORD file_attributes)
 {
     std::lock_guard<std::mutex> tree_lock(tree_mutex);
 
@@ -92,7 +98,7 @@ bool DirectoryTree::addFile(const std::wstring &virtual_path, const std::wstring
     }
 
     node->type = NodeType::FILE;
-    updateNodeMetadata(node, network_path, size, creation_time, file_attributes);
+    updateNodeMetadata(node, network_path, size, creation_time, last_access_time, last_write_time, file_attributes);
 
     return true;
 }
@@ -108,8 +114,7 @@ bool DirectoryTree::addDirectory(const std::wstring &virtual_path, const std::ws
     }
 
     node->type = NodeType::DIRECTORY;
-    node->network_path = network_path;
-    node->file_attributes = FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_OFFLINE;
+    updateNodeMetadata(node, network_path, 0, { 0, 0 }, { 0, 0 }, { 0, 0 }, FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_OFFLINE);
 
     return true;
 }
@@ -277,7 +282,13 @@ DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path,
     return current;
 }
 
-void DirectoryTree::updateNodeMetadata(DirectoryNode *node, const std::wstring &network_path, UINT64 size, const FILETIME *creation_time, DWORD file_attributes)
+void DirectoryTree::updateNodeMetadata(DirectoryNode *node,
+                                       const std::wstring &network_path,
+                                       UINT64 size,
+                                       FILETIME creation_time,
+                                       FILETIME last_access_time,
+                                       FILETIME last_write_time,
+                                       DWORD file_attributes)
 {
     if (node == nullptr)
     {
@@ -287,23 +298,10 @@ void DirectoryTree::updateNodeMetadata(DirectoryNode *node, const std::wstring &
     node->network_path = network_path;
     node->file_size = size;
 
-    if (creation_time != nullptr)
-    {
-        node->creation_time = *creation_time;
-        node->last_access_time = *creation_time;
-        node->last_write_time = *creation_time;
-    }
-    else
-    {
-        // Use current time
-        FILETIME current_time{};
-        GetSystemTimeAsFileTime(&current_time);
-        node->creation_time = current_time;
-        node->last_access_time = current_time;
-        node->last_write_time = current_time;
-    }
+    node->creation_time = creation_time;
+    node->last_access_time = last_access_time;
+    node->last_write_time = last_write_time;
 
-    // Set file attributes from the actual file system
     node->file_attributes = file_attributes;
 }
 
