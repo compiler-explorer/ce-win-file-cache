@@ -1,12 +1,13 @@
 #include <algorithm>
 #include <ce-win-file-cache/file_access_tracker.hpp>
+#include <ce-win-file-cache/logger.hpp>
+#include <ce-win-file-cache/string_utils.hpp>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
-#include <iostream>
 #include <sstream>
 
 namespace CeWinFileCache
@@ -59,24 +60,24 @@ FileAccessTracker::~FileAccessTracker()
 
 void FileAccessTracker::initialize(const std::wstring &report_directory, std::chrono::minutes report_interval, size_t top_files_count)
 {
-    std::wcout << L"[DEBUG] Setting member variables..." << std::endl;
+    Logger::debug(LogCategory::ACCESS, "Setting member variables...");
     report_directory_ = report_directory;
     report_interval_ = report_interval;
     top_files_count_ = top_files_count;
-    std::wcout << L"[DEBUG] Member variables set" << std::endl;
+    Logger::debug(LogCategory::ACCESS, "Member variables set");
 
     // Create report directory if it doesn't exist (macOS-compatible)
-    std::wcout << L"[DEBUG] About to create directory..." << std::endl;
+    Logger::debug(LogCategory::ACCESS, "About to create directory...");
 #ifdef __APPLE__
     // On macOS, use system() call for directory creation
     std::string narrow_dir(report_directory.begin(), report_directory.end());
     std::string mkdir_cmd = "mkdir -p \"" + narrow_dir + "\"";
-    std::wcout << L"[DEBUG] Running mkdir command..." << std::endl;
+    Logger::debug(LogCategory::ACCESS, "Running mkdir command...");
     int result = std::system(mkdir_cmd.c_str());
-    std::wcout << L"[DEBUG] mkdir command completed with result: " << result << std::endl;
+    Logger::debug(LogCategory::ACCESS, "mkdir command completed with result: {}", result);
     if (result != 0)
     {
-        std::wcerr << L"[FileAccessTracker] Warning: Could not create report directory via system call" << std::endl;
+        Logger::warn(LogCategory::ACCESS, "Could not create report directory via system call");
     }
 #else
     try
@@ -86,11 +87,10 @@ void FileAccessTracker::initialize(const std::wstring &report_directory, std::ch
     }
     catch (const std::exception &e)
     {
-        std::wcerr << L"[FileAccessTracker] Warning: Could not create report directory: "
-                   << std::wstring(e.what(), e.what() + strlen(e.what())) << std::endl;
+        Logger::warn(LogCategory::ACCESS, "Could not create report directory: {}", e.what());
     }
 #endif
-    std::wcout << L"[DEBUG] Directory creation section completed" << std::endl;
+    Logger::debug(LogCategory::ACCESS, "Directory creation section completed");
 }
 
 void FileAccessTracker::recordAccess(const std::wstring virtual_path,
@@ -102,12 +102,11 @@ void FileAccessTracker::recordAccess(const std::wstring virtual_path,
                                      double access_time_ms,
                                      const std::wstring &cache_policy)
 {
-    std::wcout << L"[DEBUG] recordAccess called for: '" << virtual_path << L"'\n";
-    std::flush(std::wcout);
+    Logger::debug(LogCategory::ACCESS, "recordAccess called for: '{}'", StringUtils::wideToUtf8(virtual_path));
     std::lock_guard<std::mutex> lock(mutex_);
-    std::wcout << L"[DEBUG] Mutex acquired" << std::endl;
+    Logger::debug(LogCategory::ACCESS, "Mutex acquired");
 
-    std::wcout << L"Number of items in file_access_map: " << file_access_map_.size() << std::endl;
+    Logger::debug(LogCategory::ACCESS, "Number of items in file_access_map: {}", file_access_map_.size());
 
     // Use helper function to get or create access info safely
     FileAccessInfo *info = getOrCreateAccessInfo(virtual_path, network_path, file_size, cache_policy);
@@ -207,7 +206,8 @@ void FileAccessTracker::generateReport()
     std::wstring summary_filename = report_directory_ + L"/access_summary_" + timestamp + L".txt";
     writeSummaryReport(summary_filename);
 
-    std::wcout << L"[FileAccessTracker] Generated reports: " << csv_filename << L" and " << summary_filename << std::endl;
+    Logger::info(LogCategory::ACCESS, "Generated reports: {} and {}", 
+                 StringUtils::wideToUtf8(csv_filename), StringUtils::wideToUtf8(summary_filename));
 }
 
 void FileAccessTracker::writeCSVReport(const std::wstring &filename)
@@ -228,7 +228,7 @@ void FileAccessTracker::writeCSVReport(const std::wstring &filename)
         std::wofstream file(filepath);
         if (!file.is_open())
         {
-            std::wcerr << L"[FileAccessTracker] Failed to create CSV report: " << filename << std::endl;
+            Logger::error(LogCategory::ACCESS, "Failed to create CSV report: {}", StringUtils::wideToUtf8(filename));
             return;
         }
 
@@ -278,8 +278,7 @@ void FileAccessTracker::writeCSVReport(const std::wstring &filename)
     }
     catch (const std::exception &e)
     {
-        std::wcerr << L"[FileAccessTracker] Error writing CSV report: "
-                   << std::wstring(e.what(), e.what() + strlen(e.what())) << std::endl;
+        Logger::error(LogCategory::ACCESS, "Error writing CSV report: {}", e.what());
     }
 }
 
@@ -301,7 +300,7 @@ void FileAccessTracker::writeSummaryReport(const std::wstring &filename)
         std::wofstream file(filepath);
         if (!file.is_open())
         {
-            std::wcerr << L"[FileAccessTracker] Failed to create summary report: " << filename << std::endl;
+            Logger::error(LogCategory::ACCESS, "Failed to create summary report: {}", StringUtils::wideToUtf8(filename));
             return;
         }
 
@@ -352,8 +351,7 @@ void FileAccessTracker::writeSummaryReport(const std::wstring &filename)
     }
     catch (const std::exception &e)
     {
-        std::wcerr << L"[FileAccessTracker] Error writing summary report: "
-                   << std::wstring(e.what(), e.what() + strlen(e.what())) << std::endl;
+        Logger::error(LogCategory::ACCESS, "Error writing summary report: {}", e.what());
     }
 }
 

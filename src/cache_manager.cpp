@@ -1,7 +1,8 @@
 #include <algorithm>
 #include <ce-win-file-cache/cache_manager.hpp>
+#include <ce-win-file-cache/logger.hpp>
+#include <ce-win-file-cache/string_utils.hpp>
 #include <filesystem>
-#include <iostream>
 
 namespace CeWinFileCache
 {
@@ -23,7 +24,8 @@ NTSTATUS CacheManager::initialize()
     std::filesystem::create_directories(config.cache_directory, ec);
     if (ec)
     {
-        std::wcerr << L"Failed to create cache directory: " << config.cache_directory << std::endl;
+        Logger::error(LogCategory::CACHE, "Failed to create cache directory: {}", 
+                     StringUtils::wideToUtf8(config.cache_directory));
         return STATUS_UNSUCCESSFUL;
     }
 
@@ -40,7 +42,7 @@ NTSTATUS CacheManager::initialize()
     }
     catch (const std::filesystem::filesystem_error &ex)
     {
-        std::wcerr << L"Error scanning cache directory: " << ex.what() << std::endl;
+        Logger::error(LogCategory::CACHE, "Error scanning cache directory: {}", ex.what());
         // Continue anyway - this is not fatal
     }
 
@@ -122,7 +124,8 @@ NTSTATUS CacheManager::evictFile(const std::wstring &local_path)
     std::filesystem::remove(local_path, ec);
     if (ec)
     {
-        std::wcerr << L"Failed to remove cached file: " << local_path << std::endl;
+        Logger::error(LogCategory::CACHE, "Failed to remove cached file: {}", 
+                     StringUtils::wideToUtf8(local_path));
         // Continue anyway to remove from cache tracking
     }
 

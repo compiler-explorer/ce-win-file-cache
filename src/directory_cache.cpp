@@ -1,6 +1,7 @@
 #include "../include/ce-win-file-cache/directory_cache.hpp"
+#include "../include/ce-win-file-cache/logger.hpp"
+#include "../include/ce-win-file-cache/string_utils.hpp"
 #include <filesystem>
-#include <iostream>
 #include <set>
 
 #ifdef NO_WINFSP
@@ -162,7 +163,8 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryMock(const std::wstring &netwo
         }
         catch (const fs::filesystem_error &e)
         {
-            std::wcerr << L"Filesystem error enumerating " << network_path << L": " << e.what() << std::endl;
+            Logger::error(LogCategory::DIRECTORY, "Filesystem error enumerating {}: {}", 
+                         StringUtils::wideToUtf8(network_path), e.what());
         }
     }
     else

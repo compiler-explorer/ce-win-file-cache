@@ -6,7 +6,6 @@
 #include <ce-win-file-cache/windows_compat.hpp>
 #include <chrono>
 #include <iomanip>
-#include <iostream>
 #include <vector>
 
 #ifndef NO_WINFSP
@@ -34,86 +33,89 @@ HybridFileSystem::~HybridFileSystem()
 
 NTSTATUS HybridFileSystem::Initialize(const Config &new_config)
 {
-    std::wcout << L"[FS] Initialize() called" << std::endl;
+    Logger::info(LogCategory::FILESYSTEM, "Initialize() called");
     this->config = new_config;
 
     // Initialize global metrics if enabled
     if (new_config.global.metrics.enabled)
     {
-        std::wcout
-        << L"[FS] Initializing metrics on "
-        << std::wstring(new_config.global.metrics.bind_address.begin(), new_config.global.metrics.bind_address.end())
-        << L":" << new_config.global.metrics.port << std::endl;
+        Logger::info(LogCategory::CONFIG, "Initializing metrics on {}:{}", 
+                     new_config.global.metrics.bind_address, new_config.global.metrics.port);
         GlobalMetrics::initialize(new_config.global.metrics);
     }
 
     // Create cache directory if it doesn't exist
-    std::wcout << L"[FS] Creating cache directory: " << new_config.global.cache_directory << std::endl;
+    Logger::info(LogCategory::FILESYSTEM, "Creating cache directory: {}", 
+                 StringUtils::wideToUtf8(new_config.global.cache_directory));
     if (!CreateDirectoryW(new_config.global.cache_directory.c_str(), nullptr))
     {
         DWORD error = GetLastError();
         if (error != ERROR_ALREADY_EXISTS)
         {
-            std::wcerr << L"[FS] ERROR: Failed to create cache directory, error: " << error << std::endl;
+            Logger::error(LogCategory::FILESYSTEM, "Failed to create cache directory, error: {}", error);
             return CeWinFileCache::WineCompat::NtStatusFromWin32(error);
         }
-        std::wcout << L"[FS] Cache directory already exists" << std::endl;
+        Logger::info(LogCategory::FILESYSTEM, "Cache directory already exists");
     }
     else
     {
-        std::wcout << L"[FS] Cache directory created successfully" << std::endl;
+        Logger::info(LogCategory::FILESYSTEM, "Cache directory created successfully");
     }
 
     // Get creation time for volume
     FILETIME ft;
     GetSystemTimeAsFileTime(&ft);
     creation_time = ((PLARGE_INTEGER)&ft)->QuadPart;
-    std::wcout << L"[FS] Volume creation time set: " << creation_time << std::endl;
+    Logger::info(LogCategory::FILESYSTEM, "Volume creation time set: {}", creation_time);
 
     // Initialize directory cache with configured compiler paths
-    std::wcout << L"[FS] Initializing directory cache with " << new_config.compilers.size() << L" compilers" << std::endl;
+    Logger::info(LogCategory::DIRECTORY, "Initializing directory cache with {} compilers", 
+                 new_config.compilers.size());
     NTSTATUS result = directory_cache.initialize(new_config);
     if (!NT_SUCCESS(result))
     {
-        std::wcerr << L"[FS] ERROR: Directory cache initialization failed: 0x" << std::hex << result << std::endl;
+        Logger::error(LogCategory::DIRECTORY, "Directory cache initialization failed: 0x{:x}", result);
         return result;
     }
-    std::wcout << L"[FS] Directory cache initialized successfully, total nodes: " << directory_cache.getTotalNodes() << std::endl;
+    Logger::info(LogCategory::DIRECTORY, "Directory cache initialized successfully, total nodes: {}", 
+                 directory_cache.getTotalNodes());
 
     // Initialize async download manager with configured number of worker threads
-    std::wcout << L"[FS] Initializing async download manager with " << new_config.global.download_threads << L" threads"
-               << std::endl;
+    Logger::info(LogCategory::NETWORK, "Initializing async download manager with {} threads",
+                 new_config.global.download_threads);
     download_manager = std::make_unique<AsyncDownloadManager>(memory_cache, new_config, new_config.global.download_threads);
 
     // Initialize file access tracker if enabled
     if (new_config.global.file_tracking.enabled)
     {
-        std::wcout << L"[FS] Initializing file access tracker" << std::endl;
+        Logger::info(LogCategory::ACCESS, "Initializing file access tracker");
         access_tracker = std::make_unique<FileAccessTracker>();
         access_tracker->initialize(new_config.global.file_tracking.report_directory,
                                    std::chrono::minutes(new_config.global.file_tracking.report_interval_minutes),
                                    new_config.global.file_tracking.top_files_count);
         access_tracker->startReporting();
-        std::wcout << L"[FS] File access tracker started" << std::endl;
+        Logger::info(LogCategory::ACCESS, "File access tracker started");
     }
 
-    std::wcout << L"[FS] Initialize() completed successfully" << std::endl;
+    Logger::info(LogCategory::FILESYSTEM, "Initialize() completed successfully");
     return STATUS_SUCCESS;
 }
 
 NTSTATUS HybridFileSystem::SetCompilerPaths(const std::unordered_map<std::wstring, std::wstring> &compiler_paths)
 {
-    std::wcout << L"[FS] SetCompilerPaths() called with " << compiler_paths.size() << L" paths" << std::endl;
+    Logger::info(LogCategory::CONFIG, "SetCompilerPaths() called with {} paths", compiler_paths.size());
     std::lock_guard<std::mutex> lock(cache_mutex);
 
     // Initialize cache entries for each compiler
     for (const auto &[compiler_name, base_path] : compiler_paths)
     {
-        std::wcout << L"[FS] Processing compiler: " << compiler_name << L" -> " << base_path << std::endl;
+        Logger::info(LogCategory::CONFIG, "Processing compiler: {} -> {}", 
+                     StringUtils::wideToUtf8(compiler_name), StringUtils::wideToUtf8(base_path));
         auto it = config.compilers.find(compiler_name);
         if (it == config.compilers.end())
         {
-            std::wcout << L"[FS] WARNING: Compiler " << compiler_name << L" not found in config" << std::endl;
+            Logger::warn(LogCategory::CONFIG, "Compiler {} not found in config", 
+                         StringUtils::wideToUtf8(compiler_name));
             continue;
         }
 
@@ -127,20 +129,22 @@ NTSTATUS HybridFileSystem::SetCompilerPaths(const std::unordered_map<std::wstrin
         entry->policy = CachePolicy::ON_DEMAND;
         entry->file_attributes = FILE_ATTRIBUTE_DIRECTORY;
 
-        std::wcout << L"[FS] Created cache entry: " << entry->virtual_path << L" -> " << entry->network_path << std::endl;
+        Logger::info(LogCategory::CACHE, "Created cache entry: {} -> {}", 
+                     StringUtils::wideToUtf8(entry->virtual_path), 
+                     StringUtils::wideToUtf8(entry->network_path));
         cache_entries[entry->virtual_path] = std::move(entry);
     }
 
-    std::wcout << L"[FS] SetCompilerPaths() completed, total entries: " << cache_entries.size() << std::endl;
+    Logger::info(LogCategory::CONFIG, "SetCompilerPaths() completed, total entries: {}", cache_entries.size());
     return STATUS_SUCCESS;
 }
 
 NTSTATUS HybridFileSystem::Init(PVOID Host)
 {
-    std::wcout << L"[FS] Init() called - setting up WinFsp host parameters" << std::endl;
+    Logger::info(LogCategory::FILESYSTEM, "Init() called - setting up WinFsp host parameters");
     auto *host = static_cast<Fsp::FileSystemHost *>(Host);
 
-    std::wcout << L"[FS] Setting sector size: " << ALLOCATION_UNIT << std::endl;
+    Logger::info(LogCategory::FILESYSTEM, "Setting sector size: {}", ALLOCATION_UNIT);
     host->SetSectorSize(ALLOCATION_UNIT);
     host->SetSectorsPerAllocationUnit(1);
     host->SetFileInfoTimeout(1000);
@@ -154,18 +158,18 @@ NTSTATUS HybridFileSystem::Init(PVOID Host)
     host->SetVolumeSerialNumber(0x12345678);
     host->SetFlushAndPurgeOnCleanup(TRUE);
 
-    std::wcout << L"[FS] Init() completed successfully" << std::endl;
+    Logger::info(LogCategory::FILESYSTEM, "Init() completed successfully");
     return STATUS_SUCCESS;
 }
 
 NTSTATUS HybridFileSystem::GetVolumeInfo(VolumeInfo *VolumeInfo)
 {
-    std::wcout << L"[FS] GetVolumeInfo() called" << std::endl;
+    Logger::debug(LogCategory::FILESYSTEM, "GetVolumeInfo() called");
     VolumeInfo->TotalSize = config.global.total_cache_size_mb * 1024ULL * 1024ULL;
     VolumeInfo->FreeSize = VolumeInfo->TotalSize - (current_cache_size * 1024ULL * 1024ULL);
 
-    std::wcout << L"[FS] Volume info - Total: " << VolumeInfo->TotalSize << L" bytes, Free: " << VolumeInfo->FreeSize
-               << L" bytes" << std::endl;
+    Logger::debug(LogCategory::FILESYSTEM, "Volume info - Total: {} bytes, Free: {} bytes",
+                  VolumeInfo->TotalSize, VolumeInfo->FreeSize);
 
     return STATUS_SUCCESS;
 }
@@ -246,7 +250,7 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
         if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1, &pSD, nullptr))
         {
             DWORD err = GetLastError();
-            std::wcout << L"[FS] GetSecurityByName() - ConvertStringSecurityDescriptor failed: " << err << std::endl;
+            Logger::error(LogCategory::SECURITY, "GetSecurityByName() - ConvertStringSecurityDescriptor failed: {}", err);
             return STATUS_UNSUCCESSFUL;
         }
 
@@ -257,7 +261,7 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
         if (!SecurityDescriptor)
         {
             *PSecurityDescriptorSize = sdSize;
-            std::wcout << L"[FS] GetSecurityByName() - returning required size: " << sdSize << std::endl;
+            Logger::debug(LogCategory::SECURITY, "GetSecurityByName() - returning required size: {}", sdSize);
             LocalFree(pSD);
             return STATUS_SUCCESS;
         }
@@ -266,7 +270,7 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
         if (*PSecurityDescriptorSize < sdSize)
         {
             *PSecurityDescriptorSize = sdSize;
-            std::wcout << L"[FS] GetSecurityByName() - buffer too small, need: " << sdSize << std::endl;
+            Logger::debug(LogCategory::SECURITY, "GetSecurityByName() - buffer too small, need: {}", sdSize);
             LocalFree(pSD);
             return STATUS_BUFFER_TOO_SMALL;
         }
@@ -318,7 +322,7 @@ NTSTATUS HybridFileSystem::GetFileInfoByName(PWSTR FileName, FileInfo *FileInfo)
 NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 GrantedAccess, PVOID *PFileNode, PVOID *PFileDesc, OpenFileInfo *OpenFileInfo)
 {
     std::wstring virtual_path(FileName);
-    std::wcout << L"[FS] Open() called for: '" << virtual_path << L"'" << std::endl;
+    Logger::info(LogCategory::FILESYSTEM, "Open() called for: '{}'", StringUtils::wideToUtf8(virtual_path));
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -329,25 +333,25 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     CacheEntry *entry = getCacheEntry(virtual_path);
     if (!entry)
     {
-        std::wcout << L"[FS] Open() - entry not found for: '" << virtual_path << L"'" << std::endl;
+        Logger::info(LogCategory::FILESYSTEM, "Open() - entry not found for: '{}'", StringUtils::wideToUtf8(virtual_path));
         return STATUS_OBJECT_NAME_NOT_FOUND;
     }
-    std::wcout << L"[FS] Open() - entry found" << std::endl;
+    Logger::debug(LogCategory::FILESYSTEM, "Open() - entry found");
 
     // Ensure file is available locally
-    std::wcout << L"[FS] Open() - ensuring file available" << std::endl;
+    Logger::debug(LogCategory::FILESYSTEM, "Open() - ensuring file available");
     NTSTATUS result = ensureFileAvailable(entry);
     if (!NT_SUCCESS(result))
     {
-        std::wcout << L"[FS] Open() - ensureFileAvailable failed: 0x" << std::hex << result << std::endl;
+        Logger::warn(LogCategory::FILESYSTEM, "Open() - ensureFileAvailable failed: 0x{:x}", result);
         // For async downloads, STATUS_PENDING is returned
         // WinFsp will retry the operation when the download completes
         return result;
     }
-    std::wcout << L"[FS] Open() - file available" << std::endl;
+    Logger::debug(LogCategory::FILESYSTEM, "Open() - file available");
 
     // Create file descriptor
-    std::wcout << L"[FS] Open() - creating file descriptor" << std::endl;
+    Logger::debug(LogCategory::FILESYSTEM, "Open() - creating file descriptor");
     auto *file_desc = new FileDescriptor();
 
     DWORD create_flags = FILE_FLAG_BACKUP_SEMANTICS;
@@ -359,13 +363,13 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     // Handle directories separately from files
     if (entry->file_attributes & FILE_ATTRIBUTE_DIRECTORY)
     {
-        std::wcout << L"[FS] Open() - handling directory" << std::endl;
+        Logger::debug(LogCategory::FILESYSTEM, "Open() - handling directory");
         // For directories, we don't need a real file handle
         file_desc->handle = INVALID_HANDLE_VALUE;
     }
     else
     {
-        std::wcout << L"[FS] Open() - handling file" << std::endl;
+        Logger::debug(LogCategory::FILESYSTEM, "Open() - handling file");
         // Check if file is in memory cache first
         if (entry->state == FileState::CACHED && entry->local_path.empty())
         {
@@ -411,7 +415,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         if (file_desc->handle == INVALID_HANDLE_VALUE && !(entry->state == FileState::CACHED && entry->local_path.empty() &&
                                                            memory_cache.isFileInMemoryCache(entry->virtual_path)))
         {
-            std::wcout << L"[FS] Open() - file handle creation failed" << std::endl;
+            Logger::error(LogCategory::FILESYSTEM, "Open() - file handle creation failed");
             delete file_desc;
             return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
         }
@@ -419,12 +423,12 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
 
     file_desc->entry = entry;
 
-    std::wcout << L"[FS] Open() - setting up file info" << std::endl;
+    Logger::debug(LogCategory::FILESYSTEM, "Open() - setting up file info");
 
     // Get file info - handle directories differently
     if (entry->file_attributes & FILE_ATTRIBUTE_DIRECTORY)
     {
-        std::wcout << L"[FS] Open() - using cached directory info" << std::endl;
+        Logger::debug(LogCategory::FILESYSTEM, "Open() - using cached directory info");
         // For directories, use cached/default info since we don't have a real handle
         OpenFileInfo->FileInfo.FileAttributes = entry->file_attributes;
         OpenFileInfo->FileInfo.ReparseTag = 0;
@@ -445,7 +449,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     }
     else
     {
-        std::wcout << L"[FS] Open() - using cached file metadata" << std::endl;
+        Logger::debug(LogCategory::FILESYSTEM, "Open() - using cached file metadata");
         // Use cached metadata from DirectoryNode instead of querying handle
         // This ensures consistent file information for virtual filesystem files
         
@@ -499,7 +503,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     *PFileDesc = file_desc;
     *PFileNode = nullptr;
 
-    std::wcout << L"[FS] Open() completed successfully" << std::endl;
+    Logger::info(LogCategory::FILESYSTEM, "Open() completed successfully");
     return STATUS_SUCCESS;
 }
 
@@ -1047,25 +1051,25 @@ std::wstring HybridFileSystem::resolveVirtualPath(const std::wstring &virtual_pa
 
 CacheEntry *HybridFileSystem::getCacheEntry(const std::wstring &virtual_path)
 {
-    std::wcout << L"[FS] getCacheEntry() called for: '" << virtual_path << L"'" << std::endl;
+    Logger::debug(LogCategory::CACHE, "getCacheEntry() called for: '{}'", StringUtils::wideToUtf8(virtual_path));
     std::lock_guard<std::mutex> lock(cache_mutex);
 
     // 1. Check existing cache_entries first (fast path)
     auto it = cache_entries.find(virtual_path);
     if (it != cache_entries.end())
     {
-        std::wcout << L"[FS] getCacheEntry() - found existing entry for: '" << virtual_path << L"'" << std::endl;
-        std::wcout << L"[FS] getCacheEntry() - entry state: " << static_cast<int>(it->second->state)
-                   << L", attributes: 0x" << std::hex << it->second->file_attributes << std::endl;
+        Logger::debug(LogCategory::CACHE, "getCacheEntry() - found existing entry for: '{}'", StringUtils::wideToUtf8(virtual_path));
+        Logger::debug(LogCategory::CACHE, "getCacheEntry() - entry state: {}, attributes: 0x{:x}", 
+                      static_cast<int>(it->second->state), it->second->file_attributes);
         return it->second.get();
     }
 
     // 2. Check DirectoryCache for path existence
-    std::wcout << L"[FS] getCacheEntry() - checking DirectoryCache for: '" << virtual_path << L"'" << std::endl;
+    Logger::debug(LogCategory::CACHE, "getCacheEntry() - checking DirectoryCache for: '{}'", StringUtils::wideToUtf8(virtual_path));
     DirectoryNode *node = directory_cache.findNode(virtual_path);
     if (node)
     {
-        std::wcout << L"[FS] getCacheEntry() - found node in DirectoryCache, creating dynamic entry" << std::endl;
+        Logger::debug(LogCategory::CACHE, "getCacheEntry() - found node in DirectoryCache, creating dynamic entry");
         // 3. Create dynamic cache entry from DirectoryNode
         return createDynamicCacheEntry(node);
     }
@@ -1156,20 +1160,20 @@ NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
                                             {
                                                 // Download completed successfully
                                                 // The AsyncDownloadManager already updated the cache entry
-                                                std::wcout << L"Download completed: " << entry->virtual_path << std::endl;
+                                                Logger::info(LogCategory::NETWORK, "Download completed: {}", StringUtils::wideToUtf8(entry->virtual_path));
                                             }
                                             else if (download_status == STATUS_PENDING)
                                             {
                                                 // Already downloading
-                                                std::wcout << L"Already downloading: " << entry->virtual_path << std::endl;
+                                                Logger::info(LogCategory::NETWORK, "Already downloading: {}", StringUtils::wideToUtf8(entry->virtual_path));
                                             }
                                             else
                                             {
                                                 // Download failed
                                                 entry->state = FileState::NETWORK_ONLY;
                                                 entry->local_path = entry->network_path;
-                                                std::wcerr << L"Download failed for " << entry->virtual_path << L": "
-                                                           << error << std::endl;
+                                                Logger::error(LogCategory::NETWORK, "Download failed for {}: {}", 
+                                                             StringUtils::wideToUtf8(entry->virtual_path), StringUtils::wideToUtf8(error));
                                             }
                                         });
 
