@@ -324,6 +324,9 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     std::wstring virtual_path(FileName);
     Logger::info(LogCategory::FILESYSTEM, "Open() called for: '{}'", StringUtils::wideToUtf8(virtual_path));
 
+    *PFileNode = nullptr;
+    *PFileDesc = nullptr;
+
     auto start_time = std::chrono::high_resolution_clock::now();
 
     // Record filesystem operation
@@ -459,9 +462,9 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         OpenFileInfo->FileInfo.FileSize = entry->file_size;
         OpenFileInfo->FileInfo.AllocationSize =
         (entry->file_size + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
-        OpenFileInfo->FileInfo.CreationTime = ((PLARGE_INTEGER)&entry->creation_time)->QuadPart;
-        OpenFileInfo->FileInfo.LastAccessTime = ((PLARGE_INTEGER)&entry->last_access_time)->QuadPart;
-        OpenFileInfo->FileInfo.LastWriteTime = ((PLARGE_INTEGER)&entry->last_write_time)->QuadPart;
+        OpenFileInfo->FileInfo.CreationTime = std::bit_cast<UINT64>(entry->creation_time);
+        OpenFileInfo->FileInfo.LastAccessTime = std::bit_cast<UINT64>(entry->last_access_time);
+        OpenFileInfo->FileInfo.LastWriteTime = std::bit_cast<UINT64>(entry->last_write_time);
         OpenFileInfo->FileInfo.ChangeTime = OpenFileInfo->FileInfo.LastWriteTime;
         OpenFileInfo->FileInfo.IndexNumber = 0;
         OpenFileInfo->FileInfo.HardLinks = 0;
@@ -1031,13 +1034,6 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
 }
 
 // Private methods
-
-std::wstring HybridFileSystem::resolveVirtualPath(const std::wstring &virtual_path)
-{
-    std::wstring resolved = L"\\\\127.0.0.1\\efs";
-    resolved.append(virtual_path);
-    return resolved;
-}
 
 CacheEntry *HybridFileSystem::getCacheEntry(const std::wstring &virtual_path)
 {

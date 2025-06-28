@@ -3,6 +3,9 @@
 #include <functional>
 #include <ranges>
 #include <sstream>
+#include <optional>
+#include <cassert>
+#include <filesystem>
 
 namespace CeWinFileCache
 {
@@ -63,22 +66,93 @@ std::vector<DirectoryNode *> DirectoryNode::getChildNodes() const
     return nodes;
 }
 
+std::wstring DirectoryNode::normalizePath(const std::wstring &path)
+{
+    if (path.empty())
+    {
+        return L"/";
+    }
+
+    std::wstring normalized = path;
+
+    // Convert backslashes to forward slashes for consistent storage
+    for (auto &ch : normalized)
+    {
+        if (ch == L'\\')
+        {
+            ch = L'/';
+        }
+    }
+
+    // Ensure path starts with /
+    if (normalized[0] != L'/')
+    {
+        normalized = L"/" + normalized;
+    }
+
+    // Handle root path specially
+    if (normalized == L"/" || normalized == L"\\")
+    {
+        return L"/";
+    }
+
+    // Remove trailing slash (except for root)
+    if (normalized.length() > 1 && normalized.back() == L'/')
+    {
+        normalized.pop_back();
+    }
+
+    return normalized;
+}
+
+std::wstring DirectoryNode::normalizeUNCPath(const std::wstring &path)
+{
+    assert(!path.empty());
+
+    std::wstring normalized = path;
+
+    // Convert backslashes to forward slashes for consistent storage
+    for (auto &ch : normalized)
+    {
+        if (ch == L'/')
+        {
+            ch = L'\\';
+        }
+    }
+
+    // Remove trailing slash (except for root)
+    if (normalized.length() > 1 && normalized.back() == L'\\')
+    {
+        normalized.pop_back();
+    }
+
+    return normalized;
+}
+
 // DirectoryTree implementations
-DirectoryTree::DirectoryTree() : root(std::make_unique<DirectoryNode>(L"", NodeType::DIRECTORY))
+DirectoryTree::DirectoryTree()
+: root(std::make_unique<DirectoryNode>(L"", NodeType::DIRECTORY))
 {
     root->full_virtual_path = L"/";
+    root->file_attributes = FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_OFFLINE;
+}
+
+void DirectoryTree::init(const std::wstring& base_network_path)
+{
+    if (this->base_network_path.empty())
+    {
+        this->base_network_path = base_network_path;
+    }
+    else
+    {
+        assert(base_network_path == this->base_network_path);
+    }
 }
 
 DirectoryNode *DirectoryTree::findNode(const std::wstring &virtual_path)
 {
     std::lock_guard<std::mutex> tree_lock(tree_mutex);
-    return findOrCreatePath(virtual_path, false);
-}
-
-DirectoryNode *DirectoryTree::createPath(const std::wstring &virtual_path, NodeType /*type*/)
-{
-    std::lock_guard<std::mutex> tree_lock(tree_mutex);
-    return findOrCreatePath(virtual_path, true);
+    return findOrCreatePath(virtual_path, NodeType::UNKNOWN, false);
 }
 
 bool DirectoryTree::addFile(const std::wstring &virtual_path,
@@ -91,13 +165,12 @@ bool DirectoryTree::addFile(const std::wstring &virtual_path,
 {
     std::lock_guard<std::mutex> tree_lock(tree_mutex);
 
-    DirectoryNode *node = findOrCreatePath(virtual_path, true);
+    DirectoryNode *node = findOrCreatePath(virtual_path, NodeType::FILE, true);
     if (node == nullptr)
     {
         return false;
     }
 
-    node->type = NodeType::FILE;
     updateNodeMetadata(node, network_path, size, creation_time, last_access_time, last_write_time, file_attributes);
 
     return true;
@@ -107,13 +180,12 @@ bool DirectoryTree::addDirectory(const std::wstring &virtual_path, const std::ws
 {
     std::lock_guard<std::mutex> tree_lock(tree_mutex);
 
-    DirectoryNode *node = findOrCreatePath(virtual_path, true);
+    DirectoryNode *node = findOrCreatePath(virtual_path, NodeType::DIRECTORY, true);
     if (node == nullptr)
     {
         return false;
     }
 
-    node->type = NodeType::DIRECTORY;
     updateNodeMetadata(node, network_path, 0, { 0, 0 }, { 0, 0 }, { 0, 0 }, FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_OFFLINE);
 
     return true;
@@ -123,7 +195,7 @@ std::vector<DirectoryNode *> DirectoryTree::getDirectoryContents(const std::wstr
 {
     std::lock_guard<std::mutex> tree_lock(tree_mutex);
 
-    DirectoryNode *dir_node = findOrCreatePath(virtual_path, false);
+    DirectoryNode *dir_node = findOrCreatePath(virtual_path, NodeType::DIRECTORY, false);
     if ((dir_node == nullptr) || !dir_node->isDirectory())
     {
         return {};
@@ -195,6 +267,7 @@ void DirectoryTree::reset()
     std::lock_guard<std::mutex> tree_lock(tree_mutex);
     root = std::make_unique<DirectoryNode>(L"", NodeType::DIRECTORY);
     root->full_virtual_path = L"/";
+    root->file_attributes = FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_OFFLINE;
 }
 
 std::vector<std::wstring> DirectoryTree::splitPath(const std::wstring &path)
@@ -242,7 +315,7 @@ std::vector<std::wstring> DirectoryTree::splitPath(const std::wstring &path)
     return components;
 }
 
-DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path, bool create_missing)
+DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path, NodeType node_type, bool create_missing)
 {
     if (virtual_path.empty() || virtual_path == L"/")
     {
@@ -251,11 +324,20 @@ DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path,
 
     auto components = splitPath(virtual_path);
     DirectoryNode *current = root.get();
-    std::wstring current_path = L"/";
+    std::wstring current_path = L"";
+    current_path.reserve(virtual_path.length());
 
+    int len = components.size() - 1;
+    int idx = 0;
     for (const auto &component : components)
     {
         DirectoryNode *child = current->findChild(component);
+
+        if (!current_path.empty())
+        {
+            current_path += L"/";
+        }
+        current_path += component;
 
         if (child == nullptr)
         {
@@ -264,19 +346,26 @@ DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path,
                 return nullptr; // Path doesn't exist and we're not creating
             }
 
-            // Create missing node as directory by default
-            child = current->addChild(component, NodeType::DIRECTORY);
-        }
+            if ((idx < len) || (node_type == NodeType::DIRECTORY))
+            {
+                child = current->addChild(component, NodeType::DIRECTORY);
+                child->file_attributes = FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_OFFLINE;
+            }
+            else
+            {
+                child = current->addChild(component, node_type);
+                child->file_attributes = FILE_ATTRIBUTE_NORMAL;
+            }
 
-        // Update full virtual path
-        if (current_path != L"/")
-        {
-            current_path += L"/";
+            std::filesystem::path fs_path = std::filesystem::path(base_network_path) / current_path;
+            const auto combined = fs_path.generic_wstring();
+            child->network_path = DirectoryNode::normalizeUNCPath(combined);
+
+            child->full_virtual_path = L"/" + current_path;
         }
-        current_path += component;
-        child->full_virtual_path = current_path;
 
         current = child;
+        ++idx;
     }
 
     return current;

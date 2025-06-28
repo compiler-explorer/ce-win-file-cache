@@ -13,6 +13,7 @@ namespace CeWinFileCache
 
 enum class NodeType : std::uint8_t
 {
+    UNKNOWN,
     DIRECTORY,
     FILE
 };
@@ -48,6 +49,10 @@ struct DirectoryNode
     DirectoryNode *addChild(const std::wstring &child_name, NodeType child_type);
     std::vector<std::wstring> getChildNames() const;
     std::vector<DirectoryNode *> getChildNodes() const;
+
+    // Path normalization for Windows
+    static std::wstring normalizePath(const std::wstring &path);
+    static std::wstring normalizeUNCPath(const std::wstring &path);
 };
 
 class DirectoryTree
@@ -56,9 +61,10 @@ class DirectoryTree
     DirectoryTree();
     ~DirectoryTree() = default;
 
+    void init(const std::wstring &base_network_path);
+
     // Core operations
     DirectoryNode *findNode(const std::wstring &virtual_path);
-    DirectoryNode *createPath(const std::wstring &virtual_path, NodeType type);
     bool addFile(const std::wstring &virtual_path,
                  const std::wstring &network_path,
                  UINT64 size,
@@ -87,10 +93,11 @@ class DirectoryTree
     private:
     std::unique_ptr<DirectoryNode> root;
     mutable std::mutex tree_mutex;
+    std::wstring base_network_path;
 
     // Helper methods
     static std::vector<std::wstring> splitPath(const std::wstring &path);
-    DirectoryNode *findOrCreatePath(const std::wstring &virtual_path, bool create_missing);
+    DirectoryNode *findOrCreatePath(const std::wstring &virtual_path, NodeType node_type, bool create_missing);
     static void updateNodeMetadata(DirectoryNode *node,
                                    const std::wstring &network_path,
                                    UINT64 size,

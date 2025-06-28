@@ -45,7 +45,6 @@ class HybridFileSystem : public Fsp::FileSystemBase
 
     private:
     // Internal methods
-    std::wstring resolveVirtualPath(const std::wstring &virtual_path);
     CacheEntry *getCacheEntry(const std::wstring &virtual_path);
     CacheEntry *createDynamicCacheEntry(DirectoryNode *node);
     NTSTATUS ensureFileAvailable(CacheEntry *entry);

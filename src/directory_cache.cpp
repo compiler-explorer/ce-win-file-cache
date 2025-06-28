@@ -29,20 +29,19 @@ std::vector<DirectoryNode *> DirectoryCache::getDirectoryContents(const std::wst
 
 DirectoryNode *DirectoryCache::findNode(const std::wstring &virtual_path)
 {
-    std::wstring normalized_path = normalizePath(virtual_path);
+    std::wstring normalized_path = DirectoryNode::normalizePath(virtual_path);
     return directory_tree.findNode(normalized_path);
 }
 
 NTSTATUS DirectoryCache::buildDirectoryTreeFromConfig(const Config &config)
 {
-    // Add root directory entry to handle requests for "\" or "/"
-    directory_tree.addDirectory(L"/", L"");
-
     // Build directory tree from all configured compilers
     for (const auto &[compiler_name, compiler_config] : config.compilers)
     {
+        directory_tree.init(compiler_config.root_path);
+
         std::wstring virtual_root = std::filesystem::relative(compiler_config.network_path, compiler_config.root_path).wstring();
-        virtual_root = normalizePath(L"/" + virtual_root);
+        virtual_root = DirectoryNode::normalizePath(L"/" + virtual_root);
 
         // Add compiler root directory
         directory_tree.addDirectory(virtual_root, compiler_config.network_path);
@@ -89,7 +88,7 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryWindows(const std::wstring &ne
         }
 
         std::wstring child_name = find_data.cFileName;
-        std::wstring child_virtual_path = normalizePath(virtual_path + L"/" + child_name);
+        std::wstring child_virtual_path = DirectoryNode::normalizePath(virtual_path + L"/" + child_name);
         std::wstring child_network_path = network_path + L"\\" + child_name;
 
         if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
@@ -230,43 +229,5 @@ void DirectoryCache::clearTree()
     directory_tree.reset();
 }
 
-std::wstring DirectoryCache::normalizePath(const std::wstring &path)
-{
-    if (path.empty())
-    {
-        return L"/";
-    }
-
-    std::wstring normalized = path;
-
-    // Convert backslashes to forward slashes for consistent storage
-    for (auto &ch : normalized)
-    {
-        if (ch == L'\\')
-        {
-            ch = L'/';
-        }
-    }
-
-    // Ensure path starts with /
-    if (normalized[0] != L'/')
-    {
-        normalized = L"/" + normalized;
-    }
-
-    // Handle root path specially
-    if (normalized == L"/" || normalized == L"\\")
-    {
-        return L"/";
-    }
-
-    // Remove trailing slash (except for root)
-    if (normalized.length() > 1 && normalized.back() == L'/')
-    {
-        normalized.pop_back();
-    }
-
-    return normalized;
-}
 
 } // namespace CeWinFileCache

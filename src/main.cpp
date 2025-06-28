@@ -344,7 +344,7 @@ int testPathResolution(const Config &config)
             if (!relative_path.empty())
             {
                 // Convert forward slashes to backslashes for Windows
-                std::wstring windows_relative = DirectoryCache::normalizePath(relative_path);
+                std::wstring windows_relative = DirectoryNode::normalizePath(relative_path);
                 // std::replace(windows_relative.begin(), windows_relative.end(), L'/', L'\\');
                 // windows_relative);
                 resolved_path += L"\\" + windows_relative;
