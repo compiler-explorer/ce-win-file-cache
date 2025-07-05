@@ -14,8 +14,8 @@ enum class FileState
 
 enum class CachePolicy
 {
-    ALWAYS_CACHE, // Always cache locally
     ON_DEMAND, // Cache only after first access
+    ALWAYS_CACHE, // Always cache locally
     NEVER_CACHE // Never cache, always fetch from network
 };
 

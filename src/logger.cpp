@@ -96,7 +96,7 @@ void Logger::setCategories(LogCategory categories)
 void Logger::setCategoriesFromString(const std::string &categories_str)
 {
     LogCategory categories = static_cast<LogCategory>(0);
-    
+
     if (categories_str == "all" || categories_str == "ALL")
     {
         categories = LogCategory::ALL;
@@ -106,11 +106,11 @@ void Logger::setCategoriesFromString(const std::string &categories_str)
         // Parse comma-separated category names
         std::string remaining = categories_str;
         size_t pos = 0;
-        
+
         while ((pos = remaining.find(',')) != std::string::npos || !remaining.empty())
         {
             std::string category = (pos != std::string::npos) ? remaining.substr(0, pos) : remaining;
-            
+
             // Trim whitespace
             size_t start = category.find_first_not_of(" \t\r\n");
             size_t end = category.find_last_not_of(" \t\r\n");
@@ -118,23 +118,44 @@ void Logger::setCategoriesFromString(const std::string &categories_str)
             {
                 category = category.substr(start, end - start + 1);
             }
-            
-            if (category == "general") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::GENERAL));
-            else if (category == "filesystem" || category == "fs") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::FILESYSTEM));
-            else if (category == "cache") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::CACHE));
-            else if (category == "network") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::NETWORK));
-            else if (category == "memory") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::MEMORY));
-            else if (category == "access") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::ACCESS));
-            else if (category == "directory" || category == "dir") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::DIRECTORY));
-            else if (category == "security") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::SECURITY));
-            else if (category == "config") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::CONFIG));
-            else if (category == "service") categories = static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::SERVICE));
-            
-            if (pos == std::string::npos) break;
+
+            if (category == "general")
+                categories =
+                static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::GENERAL));
+            else if (category == "filesystem" || category == "fs")
+                categories =
+                static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::FILESYSTEM));
+            else if (category == "cache")
+                categories =
+                static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::CACHE));
+            else if (category == "network")
+                categories =
+                static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::NETWORK));
+            else if (category == "memory")
+                categories =
+                static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::MEMORY));
+            else if (category == "access")
+                categories =
+                static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::ACCESS));
+            else if (category == "directory" || category == "dir")
+                categories =
+                static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::DIRECTORY));
+            else if (category == "security")
+                categories =
+                static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::SECURITY));
+            else if (category == "config")
+                categories =
+                static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::CONFIG));
+            else if (category == "service")
+                categories =
+                static_cast<LogCategory>(static_cast<uint32_t>(categories) | static_cast<uint32_t>(LogCategory::SERVICE));
+
+            if (pos == std::string::npos)
+                break;
             remaining = remaining.substr(pos + 1);
         }
     }
-    
+
     setCategories(categories);
 }
 

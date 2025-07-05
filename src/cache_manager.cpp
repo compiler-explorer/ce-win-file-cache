@@ -24,8 +24,7 @@ NTSTATUS CacheManager::initialize()
     std::filesystem::create_directories(config.cache_directory, ec);
     if (ec)
     {
-        Logger::error(LogCategory::CACHE, "Failed to create cache directory: {}", 
-                     StringUtils::wideToUtf8(config.cache_directory));
+        Logger::error(LogCategory::CACHE, "Failed to create cache directory: {}", StringUtils::wideToUtf8(config.cache_directory));
         return STATUS_UNSUCCESSFUL;
     }
 
@@ -124,8 +123,7 @@ NTSTATUS CacheManager::evictFile(const std::wstring &local_path)
     std::filesystem::remove(local_path, ec);
     if (ec)
     {
-        Logger::error(LogCategory::CACHE, "Failed to remove cached file: {}", 
-                     StringUtils::wideToUtf8(local_path));
+        Logger::error(LogCategory::CACHE, "Failed to remove cached file: {}", StringUtils::wideToUtf8(local_path));
         // Continue anyway to remove from cache tracking
     }
 

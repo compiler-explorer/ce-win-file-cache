@@ -1,7 +1,7 @@
-#include <ce-win-file-cache/network_client.hpp>
-#include <ce-win-file-cache/windows_compat.hpp>
 #include <ce-win-file-cache/logger.hpp>
+#include <ce-win-file-cache/network_client.hpp>
 #include <ce-win-file-cache/string_utils.hpp>
+#include <ce-win-file-cache/windows_compat.hpp>
 
 #ifndef WINE_CROSS_COMPILE
 #pragma comment(lib, "mpr.lib")
@@ -121,8 +121,7 @@ NTSTATUS NetworkClient::establishConnection(const std::wstring &share_path)
         DWORD result = WNetAddConnection2W(&net_resource, nullptr, nullptr, 0);
         if (result != NO_ERROR && result != ERROR_ALREADY_ASSIGNED)
         {
-            Logger::error(LogCategory::NETWORK, "Failed to connect to {}. Error: {}", 
-                         StringUtils::wideToUtf8(share_path), result);
+            Logger::error(LogCategory::NETWORK, "Failed to connect to {}. Error: {}", StringUtils::wideToUtf8(share_path), result);
             return CeWinFileCache::WineCompat::NtStatusFromWin32(result);
         }
 

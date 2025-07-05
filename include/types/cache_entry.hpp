@@ -5,6 +5,7 @@
 #include <chrono>
 #include <string>
 #include <types/file_state.hpp>
+#include <iostream>
 
 namespace CeWinFileCache
 {
@@ -23,6 +24,8 @@ struct CacheEntry
     FILETIME creation_time{};
     FILETIME last_access_time{};
     FILETIME last_write_time{};
+
+    PSECURITY_DESCRIPTOR SecDesc = nullptr;
 
     // Cache metadata
     std::chrono::steady_clock::time_point last_used = std::chrono::steady_clock::now();

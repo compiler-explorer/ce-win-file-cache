@@ -53,6 +53,8 @@ class HybridFileSystem : public Fsp::FileSystemBase
     CachePolicy determineCachePolicy(const std::wstring &virtual_path);
     std::wstring createTemporaryFileForMemoryCached(CacheEntry *entry);
 
+    void copyFileInfo(CacheEntry *source, FileInfo *dest) const;
+
     // Path normalization for Windows (handle both / and \ as separators)
     std::wstring normalizePath(const std::wstring &path);
 

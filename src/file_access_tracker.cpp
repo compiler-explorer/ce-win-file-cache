@@ -206,8 +206,8 @@ void FileAccessTracker::generateReport()
     std::wstring summary_filename = report_directory_ + L"/access_summary_" + timestamp + L".txt";
     writeSummaryReport(summary_filename);
 
-    Logger::info(LogCategory::ACCESS, "Generated reports: {} and {}", 
-                 StringUtils::wideToUtf8(csv_filename), StringUtils::wideToUtf8(summary_filename));
+    Logger::info(LogCategory::ACCESS, "Generated reports: {} and {}", StringUtils::wideToUtf8(csv_filename),
+                 StringUtils::wideToUtf8(summary_filename));
 }
 
 void FileAccessTracker::writeCSVReport(const std::wstring &filename)

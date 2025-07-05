@@ -98,7 +98,7 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryWindows(const std::wstring &ne
 
             // Recursively enumerate subdirectory with cycle detection
             static thread_local std::set<std::wstring> visited_paths;
-            
+
             // Check for circular references (junction points, symbolic links)
             if (visited_paths.find(child_network_path) == visited_paths.end())
             {
@@ -111,13 +111,8 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryWindows(const std::wstring &ne
         {
             // Add file to tree
             UINT64 file_size = ((UINT64)find_data.nFileSizeHigh << 32) | find_data.nFileSizeLow;
-            directory_tree.addFile(child_virtual_path, 
-               child_network_path, 
-               file_size, 
-               find_data.ftCreationTime, 
-               find_data.ftLastAccessTime, 
-               find_data.ftLastWriteTime,
-               find_data.dwFileAttributes);
+            directory_tree.addFile(child_virtual_path, child_network_path, file_size, find_data.ftCreationTime,
+                                   find_data.ftLastAccessTime, find_data.ftLastWriteTime, find_data.dwFileAttributes);
         }
 
     } while (FindNextFileW(find_handle, &find_data));
@@ -168,8 +163,8 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryMock(const std::wstring &netwo
         }
         catch (const fs::filesystem_error &e)
         {
-            Logger::error(LogCategory::DIRECTORY, "Filesystem error enumerating {}: {}", 
-                         StringUtils::wideToUtf8(network_path), e.what());
+            Logger::error(LogCategory::DIRECTORY, "Filesystem error enumerating {}: {}",
+                          StringUtils::wideToUtf8(network_path), e.what());
         }
     }
     else
@@ -216,7 +211,7 @@ size_t DirectoryCache::getTotalNodes() const
 
 void DirectoryCache::addTestFile(const std::wstring &virtual_path, const std::wstring &network_path, UINT64 size)
 {
-    //directory_tree.addFile(virtual_path, network_path, size, nullptr);
+    // directory_tree.addFile(virtual_path, network_path, size, nullptr);
 }
 
 void DirectoryCache::addTestDirectory(const std::wstring &virtual_path, const std::wstring &network_path)

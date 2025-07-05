@@ -1,11 +1,11 @@
 #include "../include/types/directory_tree.hpp"
 #include <algorithm>
-#include <functional>
-#include <ranges>
-#include <sstream>
-#include <optional>
 #include <cassert>
 #include <filesystem>
+#include <functional>
+#include <optional>
+#include <ranges>
+#include <sstream>
 
 namespace CeWinFileCache
 {
@@ -130,14 +130,12 @@ std::wstring DirectoryNode::normalizeUNCPath(const std::wstring &path)
 }
 
 // DirectoryTree implementations
-DirectoryTree::DirectoryTree()
-: root(std::make_unique<DirectoryNode>(L"", NodeType::DIRECTORY))
+DirectoryTree::DirectoryTree() : root(std::make_unique<DirectoryNode>(L"", NodeType::DIRECTORY))
 {
-    root->full_virtual_path = L"/";
-    root->file_attributes = FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_OFFLINE;
+    this->reset();
 }
 
-void DirectoryTree::init(const std::wstring& base_network_path)
+void DirectoryTree::init(const std::wstring &base_network_path)
 {
     if (this->base_network_path.empty())
     {
@@ -319,6 +317,29 @@ DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path,
 {
     if (virtual_path.empty() || virtual_path == L"/")
     {
+        if (root->SecDesc == nullptr)
+        {
+            std::filesystem::path fs_path = std::filesystem::path(base_network_path);
+            const auto combined = fs_path.generic_wstring();
+            root->network_path = DirectoryNode::normalizeUNCPath(combined);
+
+            root->full_virtual_path = L"/";
+
+            PSECURITY_DESCRIPTOR LocalSecDesc = nullptr;
+            DWORD ret = GetNamedSecurityInfo(root->network_path.c_str(), SE_FILE_OBJECT,
+                                             OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+                                             nullptr, nullptr, nullptr, nullptr, &LocalSecDesc);
+            if (ret == ERROR_SUCCESS)
+            {
+                size_t len = GetSecurityDescriptorLength(LocalSecDesc);
+                root->SecDesc = malloc(len);
+                if (root->SecDesc != nullptr)
+                {
+                    memcpy(root->SecDesc, LocalSecDesc, len);
+                }
+                LocalFree(LocalSecDesc);
+            }
+        }
         return root.get();
     }
 
@@ -362,6 +383,21 @@ DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path,
             child->network_path = DirectoryNode::normalizeUNCPath(combined);
 
             child->full_virtual_path = L"/" + current_path;
+
+            PSECURITY_DESCRIPTOR LocalSecDesc = nullptr;
+            DWORD ret = GetNamedSecurityInfo(child->network_path.c_str(), SE_FILE_OBJECT,
+                                             OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+                                             nullptr, nullptr, nullptr, nullptr, &LocalSecDesc);
+            if (ret == ERROR_SUCCESS)
+            {
+                size_t len = GetSecurityDescriptorLength(LocalSecDesc);
+                child->SecDesc = malloc(len);
+                if (child->SecDesc != nullptr)
+                {
+                    memcpy(child->SecDesc, LocalSecDesc, len);
+                }
+                LocalFree(LocalSecDesc);
+            }
         }
 
         current = child;

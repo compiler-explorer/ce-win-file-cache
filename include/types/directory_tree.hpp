@@ -32,6 +32,8 @@ struct DirectoryNode
     FILETIME last_write_time;
     DWORD file_attributes = 0;
 
+    PSECURITY_DESCRIPTOR SecDesc = nullptr;
+
     // Directory structure
     std::unordered_map<std::wstring, std::unique_ptr<DirectoryNode>> children;
     DirectoryNode *parent;

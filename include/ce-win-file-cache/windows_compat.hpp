@@ -23,6 +23,7 @@
 #include <strsafe.h>
 #include <winnetwk.h>
 #include <winternl.h>
+#include <AclAPI.h>
 
 // Define PNTSTATUS if not already defined
 #ifndef PNTSTATUS
