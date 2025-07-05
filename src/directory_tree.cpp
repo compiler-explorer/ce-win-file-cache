@@ -348,7 +348,7 @@ DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path,
     std::wstring current_path = L"";
     current_path.reserve(virtual_path.length());
 
-    int len = components.size() - 1;
+    size_t len = components.size() - 1;
     int idx = 0;
     for (const auto &component : components)
     {
