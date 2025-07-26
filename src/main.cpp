@@ -354,7 +354,7 @@ int testPathResolution(const Config &config)
         }
         else
         {
-            Logger::error("  -> ERROR: Compiler '{}' not found in config", StringUtils::wideToUtf8(compiler_name));
+            Logger::error("  -> ERROR: Path '{}' not found in config", StringUtils::wideToUtf8(compiler_name));
         }
         // Empty line for readability
     }
@@ -648,19 +648,20 @@ int runDiagnostics(const ProgramOptions &options)
     auto config_opt = loadConfigFile(options.config_file);
     if (config_opt)
     {
-        Config config = *config_opt;
+        loaded_config = *config_opt;
         Logger::info("   Configuration loaded successfully");
-        Logger::info("   Cache directory: {}", StringUtils::wideToUtf8(config.global.cache_directory));
+        Logger::info("   Cache directory: {}", StringUtils::wideToUtf8(loaded_config.global.cache_directory));
 
         // Check cache directory accessibility
-        DWORD attrs = GetFileAttributesW(config.global.cache_directory.c_str());
+        DWORD attrs = GetFileAttributesW(loaded_config.global.cache_directory.c_str());
         if (attrs == INVALID_FILE_ATTRIBUTES)
         {
-            Logger::warn("   Cache directory does not exist: {}", StringUtils::wideToUtf8(config.global.cache_directory));
+            Logger::warn("   Cache directory does not exist: {}", StringUtils::wideToUtf8(loaded_config.global.cache_directory));
         }
         else if (!(attrs & FILE_ATTRIBUTE_DIRECTORY))
         {
-            Logger::error("   Cache path exists but is not a directory: {}", StringUtils::wideToUtf8(config.global.cache_directory));
+            Logger::error("   Cache path exists but is not a directory: {}",
+                          StringUtils::wideToUtf8(loaded_config.global.cache_directory));
         }
         else
         {
@@ -669,7 +670,7 @@ int runDiagnostics(const ProgramOptions &options)
 
         // Check network paths
         Logger::info("   Checking compiler network paths...");
-        for (const auto &[name, compiler_config] : config.compilers)
+        for (const auto &[name, compiler_config] : loaded_config.compilers)
         {
             Logger::info("   Testing {}: {}", StringUtils::wideToUtf8(name), StringUtils::wideToUtf8(compiler_config.network_path));
             DWORD net_attrs = GetFileAttributesW(compiler_config.network_path.c_str());
@@ -733,27 +734,27 @@ class CompilerCacheService : public Fsp::Service
     protected:
     NTSTATUS OnStart(ULONG argc, PWSTR *argv) override
     {
-        Logger::info("[SERVICE] OnStart() called with {} arguments", argc);
+        Logger::info(LogCategory::SERVICE, "OnStart() called with {} arguments", argc);
         for (ULONG i = 0; i < argc; i++)
         {
             std::string arg_str = argv[i] ? StringUtils::wideToUtf8(argv[i]) : "<null>";
-            Logger::info("[SERVICE] Arg[{}]: {}", i, arg_str);
+            Logger::info(LogCategory::SERVICE, "Arg[{}]: {}", i, arg_str);
         }
 
         // Load configuration
-        Logger::info("[SERVICE] Loading configuration from: {}", StringUtils::wideToUtf8(options_.config_file));
+        Logger::info(LogCategory::SERVICE, "Loading configuration from: {}", StringUtils::wideToUtf8(options_.config_file));
         auto config_opt = loadConfigFile(options_.config_file);
         if (!config_opt)
         {
-            Logger::error("[SERVICE] ERROR: Failed to load configuration from: {}", StringUtils::wideToUtf8(options_.config_file));
+            Logger::error(LogCategory::SERVICE, "ERROR: Failed to load configuration from: {}", StringUtils::wideToUtf8(options_.config_file));
             return STATUS_UNSUCCESSFUL;
         }
-        Logger::info("[SERVICE] Configuration loaded successfully");
+        Logger::info(LogCategory::SERVICE, "Configuration loaded successfully");
 
         Config config = *config_opt;
 
         // Initialize filesystem
-        Logger::info("[SERVICE] Initializing filesystem...");
+        Logger::info(LogCategory::SERVICE, "Initializing filesystem...");
         NTSTATUS result = STATUS_SUCCESS;
 
         try
@@ -761,50 +762,50 @@ class CompilerCacheService : public Fsp::Service
             result = filesystem.Initialize(config);
             if (!NT_SUCCESS(result))
             {
-                Logger::error("[SERVICE] ERROR: Failed to initialize filesystem. Status: 0x{:x}", static_cast<unsigned>(result));
+                Logger::error(LogCategory::SERVICE, "ERROR: Failed to initialize filesystem. Status: 0x{:x}", static_cast<unsigned>(result));
                 return result;
             }
-            Logger::info("[SERVICE] Filesystem initialized successfully");
+            Logger::info(LogCategory::SERVICE, "Filesystem initialized successfully");
         }
         catch (const std::exception &e)
         {
-            Logger::error("[SERVICE] EXCEPTION during filesystem initialization: {}", e.what());
+            Logger::error(LogCategory::SERVICE, "EXCEPTION during filesystem initialization: {}", e.what());
             return STATUS_UNSUCCESSFUL;
         }
         catch (...)
         {
-            Logger::error("[SERVICE] UNKNOWN EXCEPTION during filesystem initialization");
+            Logger::error(LogCategory::SERVICE, "UNKNOWN EXCEPTION during filesystem initialization");
             return STATUS_UNSUCCESSFUL;
         }
 
         // Set up compiler paths (for now, just use the network paths directly)
-        Logger::info("[SERVICE] Setting up compiler paths...");
+        Logger::info(LogCategory::SERVICE, "Setting up paths...");
         try
         {
             std::unordered_map<std::wstring, std::wstring> compiler_paths;
             for (const auto &[name, compiler_config] : config.compilers)
             {
-                Logger::info("[SERVICE] Adding compiler: {} -> {}", StringUtils::wideToUtf8(name),
+                Logger::info(LogCategory::SERVICE, "Adding path: {} -> {}", StringUtils::wideToUtf8(name),
                              StringUtils::wideToUtf8(compiler_config.network_path));
                 compiler_paths[name] = compiler_config.network_path;
             }
 
-            result = filesystem.SetCompilerPaths(compiler_paths);
+            result = filesystem.SetPaths(compiler_paths);
             if (!NT_SUCCESS(result))
             {
-                Logger::error("[SERVICE] ERROR: Failed to set compiler paths. Status: 0x{:x}", static_cast<unsigned>(result));
+                Logger::error(LogCategory::SERVICE, "ERROR: Failed to set compiler paths. Status: 0x{:x}", static_cast<unsigned>(result));
                 return result;
             }
-            Logger::info("[SERVICE] Compiler paths set successfully");
+            Logger::debug(LogCategory::SERVICE, "Compiler paths set successfully");
         }
         catch (const std::exception &e)
         {
-            Logger::error("[SERVICE] EXCEPTION during compiler paths setup: {}", e.what());
+            Logger::error(LogCategory::SERVICE, "EXCEPTION during compiler paths setup: {}", e.what());
             return STATUS_UNSUCCESSFUL;
         }
         catch (...)
         {
-            Logger::error("[SERVICE] UNKNOWN EXCEPTION during compiler paths setup");
+            Logger::error(LogCategory::SERVICE, "UNKNOWN EXCEPTION during compiler paths setup");
             return STATUS_UNSUCCESSFUL;
         }
 
@@ -813,16 +814,16 @@ class CompilerCacheService : public Fsp::Service
         {
             if (!options_.volume_prefix.empty())
             {
-                Logger::info("[SERVICE] Setting volume prefix: {}", StringUtils::wideToUtf8(options_.volume_prefix));
+                Logger::debug(LogCategory::SERVICE, "Setting volume prefix: {}", StringUtils::wideToUtf8(options_.volume_prefix));
                 std::wstring volume_prefix_copy = options_.volume_prefix;
                 host.SetPrefix(volume_prefix_copy.data());
             }
 
             // Pre-mount diagnostics
-            Logger::info("[SERVICE] Pre-mount diagnostics:");
-            Logger::info("[SERVICE]   Mount point: {}", StringUtils::wideToUtf8(options_.mount_point));
-            Logger::info("[SERVICE]   Debug flags: 0x{:x}", options_.debug_flags);
-            Logger::info("[SERVICE]   Cache directory: {}", StringUtils::wideToUtf8(config.global.cache_directory));
+            Logger::debug(LogCategory::SERVICE, "Pre-mount diagnostics:");
+            Logger::debug(LogCategory::SERVICE, "  Mount point: {}", StringUtils::wideToUtf8(options_.mount_point));
+            Logger::debug(LogCategory::SERVICE, "  Debug flags: 0x{:x}", options_.debug_flags);
+            Logger::debug(LogCategory::SERVICE, "  Cache directory: {}", StringUtils::wideToUtf8(config.global.cache_directory));
 
             // Check if mount point is available
             if (options_.mount_point.length() == 2 && options_.mount_point[1] == L':')
@@ -830,45 +831,46 @@ class CompilerCacheService : public Fsp::Service
                 // Drive letter mount - check if already in use
                 std::wstring drive_root = options_.mount_point + L"\\";
                 UINT drive_type = GetDriveTypeW(drive_root.c_str());
-                Logger::info("[SERVICE]   Drive type check: {} (1=unknown, 2=removable, 3=fixed, 4=remote, 5=cdrom, "
+                Logger::debug(LogCategory::SERVICE,
+                              "  Drive type check: {} (1=unknown, 2=removable, 3=fixed, 4=remote, 5=cdrom, "
                              "6=ramdisk)",
                              drive_type);
             }
 
             // Mount filesystem
-            Logger::info("[SERVICE] Attempting to mount filesystem...");
+            Logger::debug(LogCategory::SERVICE, "Attempting to mount filesystem...");
             std::wstring mount_point_copy = options_.mount_point;
             result = host.Mount(mount_point_copy.data(), nullptr, FALSE, options_.debug_flags);
 
             if (!NT_SUCCESS(result))
             {
-                Logger::error("[SERVICE] ERROR: Failed to mount filesystem at {}. Status: 0x{:x}",
+                Logger::error(LogCategory::SERVICE, "ERROR: Failed to mount filesystem at {}. Status: 0x{:x}",
                               StringUtils::wideToUtf8(options_.mount_point), static_cast<unsigned>(result));
 
                 // Additional error diagnostics
                 DWORD last_error = GetLastError();
-                Logger::error("[SERVICE] Last Windows error: 0x{:x} ({})", last_error, last_error);
+                Logger::error(LogCategory::SERVICE, "Last Windows error: 0x{:x} ({})", last_error, last_error);
 
                 return result;
             }
 
-            Logger::info("[SERVICE] SUCCESS: CompilerCacheFS mounted at {}", StringUtils::wideToUtf8(host.MountPoint()));
-            Logger::info("[SERVICE] Cache directory: {}", StringUtils::wideToUtf8(config.global.cache_directory));
-            Logger::info("[SERVICE] Total cache size: {} MB", config.global.total_cache_size_mb);
-            Logger::info("[SERVICE] Filesystem is now ready for access");
+            Logger::info(LogCategory::SERVICE, "SUCCESS: CompilerCacheFS mounted at {}", StringUtils::wideToUtf8(host.MountPoint()));
+            Logger::info(LogCategory::SERVICE, "Cache directory: {}", StringUtils::wideToUtf8(config.global.cache_directory));
+            Logger::info(LogCategory::SERVICE, "Total cache size: {} MB", config.global.total_cache_size_mb);
+            Logger::info(LogCategory::SERVICE, "Filesystem is now ready for access");
         }
         catch (const std::exception &e)
         {
-            Logger::error("[SERVICE] EXCEPTION during filesystem mounting: {}", e.what());
+            Logger::error(LogCategory::SERVICE, "EXCEPTION during filesystem mounting: {}", e.what());
             DWORD last_error = GetLastError();
-            Logger::error("[SERVICE] Last Windows error: 0x{:x} ({})", last_error, last_error);
+            Logger::error(LogCategory::SERVICE, "Last Windows error: 0x{:x} ({})", last_error, last_error);
             return STATUS_UNSUCCESSFUL;
         }
         catch (...)
         {
-            Logger::error("[SERVICE] UNKNOWN EXCEPTION during filesystem mounting");
+            Logger::error(LogCategory::SERVICE, "UNKNOWN EXCEPTION during filesystem mounting");
             DWORD last_error = GetLastError();
-            Logger::error("[SERVICE] Last Windows error: 0x{:x} ({})", last_error, last_error);
+            Logger::error(LogCategory::SERVICE, "Last Windows error: 0x{:x} ({})", last_error, last_error);
             return STATUS_UNSUCCESSFUL;
         }
 

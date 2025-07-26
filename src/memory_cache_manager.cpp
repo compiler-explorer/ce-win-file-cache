@@ -211,7 +211,14 @@ std::wstring MemoryCacheManager::resolveVirtualToNetworkPath(const std::wstring 
 
     std::replace(relative_path.begin(), relative_path.end(), L'/', L'\\');
 
-    return network_path + relative_path;
+    auto fullpath = network_path + relative_path;
+
+    if (!loaded_config.global.case_sensitive)
+    {
+        StringUtils::toLower(fullpath);
+    }
+
+    return fullpath;
 }
 
 } // namespace CeWinFileCache

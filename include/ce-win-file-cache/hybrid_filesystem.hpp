@@ -25,7 +25,7 @@ class HybridFileSystem : public Fsp::FileSystemBase
     ~HybridFileSystem();
 
     NTSTATUS Initialize(const Config &new_config);
-    NTSTATUS SetCompilerPaths(const std::unordered_map<std::wstring, std::wstring> &compiler_paths);
+    NTSTATUS SetPaths(const std::unordered_map<std::wstring, std::wstring> &compiler_paths);
 
     protected:
     // WinFsp callbacks

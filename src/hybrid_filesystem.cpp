@@ -8,6 +8,7 @@
 #include <chrono>
 #include <iomanip>
 #include <vector>
+#include <cwctype>
 
 #ifndef NO_WINFSP
 #include <sddl.h>
@@ -22,7 +23,8 @@ constexpr ULONG ALLOCATION_UNIT = 4096;
 constexpr ULONG FULLPATH_SIZE = MAX_PATH + FSP_FSCTL_TRANSACT_PATH_SIZEMAX / sizeof(WCHAR);
 
 
-HybridFileSystem::HybridFileSystem() : Fsp::FileSystemBase(), current_cache_size(0), creation_time(0)
+HybridFileSystem::HybridFileSystem()
+: Fsp::FileSystemBase(), current_cache_size(0), creation_time(0)
 {
 }
 
@@ -34,8 +36,8 @@ HybridFileSystem::~HybridFileSystem()
 
 NTSTATUS HybridFileSystem::Initialize(const Config &new_config)
 {
-    Logger::info(LogCategory::FILESYSTEM, "Initialize() called");
     this->config = new_config;
+    Logger::debug(LogCategory::FILESYSTEM, "Initialize() called");
 
     // Initialize global metrics if enabled
     if (new_config.global.metrics.enabled)
@@ -55,11 +57,11 @@ NTSTATUS HybridFileSystem::Initialize(const Config &new_config)
             Logger::error(LogCategory::FILESYSTEM, "Failed to create cache directory, error: {}", error);
             return CeWinFileCache::WineCompat::NtStatusFromWin32(error);
         }
-        Logger::info(LogCategory::FILESYSTEM, "Cache directory already exists");
+        Logger::debug(LogCategory::FILESYSTEM, "Cache directory already exists");
     }
     else
     {
-        Logger::info(LogCategory::FILESYSTEM, "Cache directory created successfully");
+        Logger::debug(LogCategory::FILESYSTEM, "Cache directory created successfully");
     }
 
     // Get creation time for volume
@@ -86,7 +88,7 @@ NTSTATUS HybridFileSystem::Initialize(const Config &new_config)
     // Initialize file access tracker if enabled
     if (new_config.global.file_tracking.enabled)
     {
-        Logger::info(LogCategory::ACCESS, "Initializing file access tracker");
+        Logger::debug(LogCategory::ACCESS, "Initializing file access tracker");
         access_tracker = std::make_unique<FileAccessTracker>();
         access_tracker->initialize(new_config.global.file_tracking.report_directory,
                                    std::chrono::minutes(new_config.global.file_tracking.report_interval_minutes),
@@ -95,24 +97,24 @@ NTSTATUS HybridFileSystem::Initialize(const Config &new_config)
         Logger::info(LogCategory::ACCESS, "File access tracker started");
     }
 
-    Logger::info(LogCategory::FILESYSTEM, "Initialize() completed successfully");
+    Logger::debug(LogCategory::FILESYSTEM, "Initialize() completed successfully");
     return STATUS_SUCCESS;
 }
 
-NTSTATUS HybridFileSystem::SetCompilerPaths(const std::unordered_map<std::wstring, std::wstring> &compiler_paths)
+NTSTATUS HybridFileSystem::SetPaths(const std::unordered_map<std::wstring, std::wstring> &compiler_paths)
 {
-    Logger::info(LogCategory::CONFIG, "SetCompilerPaths() called with {} paths", compiler_paths.size());
+    Logger::debug(LogCategory::CONFIG, "SetCompilerPaths() called with {} paths", compiler_paths.size());
     std::lock_guard<std::mutex> lock(cache_mutex);
 
     // Initialize cache entries for each compiler
     for (const auto &[compiler_name, base_path] : compiler_paths)
     {
-        Logger::info(LogCategory::CONFIG, "Processing compiler: {} -> {}", StringUtils::wideToUtf8(compiler_name),
+        Logger::info(LogCategory::CONFIG, "Processing path: {} -> {}", StringUtils::wideToUtf8(compiler_name),
                      StringUtils::wideToUtf8(base_path));
-        auto it = config.compilers.find(compiler_name);
-        if (it == config.compilers.end())
+        auto it = this->config.compilers.find(compiler_name);
+        if (it == this->config.compilers.end())
         {
-            Logger::warn(LogCategory::CONFIG, "Compiler {} not found in config", StringUtils::wideToUtf8(compiler_name));
+            Logger::warn(LogCategory::CONFIG, "Path {} not found in config", StringUtils::wideToUtf8(compiler_name));
             continue;
         }
 
@@ -137,7 +139,7 @@ NTSTATUS HybridFileSystem::SetCompilerPaths(const std::unordered_map<std::wstrin
 
 NTSTATUS HybridFileSystem::Init(PVOID Host)
 {
-    Logger::info(LogCategory::FILESYSTEM, "Init() called - setting up WinFsp host parameters");
+    Logger::debug(LogCategory::FILESYSTEM, "Init() called - setting up WinFsp host parameters");
     auto *host = static_cast<Fsp::FileSystemHost *>(Host);
 
     Logger::info(LogCategory::FILESYSTEM, "Setting sector size: {}", ALLOCATION_UNIT);
@@ -154,7 +156,7 @@ NTSTATUS HybridFileSystem::Init(PVOID Host)
     host->SetVolumeSerialNumber(0x12345678);
     host->SetFlushAndPurgeOnCleanup(TRUE);
 
-    Logger::info(LogCategory::FILESYSTEM, "Init() completed successfully");
+    Logger::debug(LogCategory::FILESYSTEM, "Init() completed successfully");
     return STATUS_SUCCESS;
 }
 
@@ -173,13 +175,13 @@ NTSTATUS HybridFileSystem::GetVolumeInfo(VolumeInfo *VolumeInfo)
 NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttributes, PSECURITY_DESCRIPTOR SecurityDescriptor, SIZE_T *PSecurityDescriptorSize)
 {
     std::wstring virtual_path(FileName);
-    Logger::info(LogCategory::SECURITY, "GetSecurityByName() called for: '{}'", StringUtils::wideToUtf8(virtual_path));
+    Logger::debug(LogCategory::SECURITY, "GetSecurityByName() called for: '{}'", StringUtils::wideToUtf8(virtual_path));
 
     // Get or create cache entry
     CacheEntry *entry = getCacheEntry(virtual_path);
     if (!entry)
     {
-        Logger::info(LogCategory::SECURITY, "GetSecurityByName() - entry NOT FOUND for: '{}'", StringUtils::wideToUtf8(virtual_path));
+        Logger::warn(LogCategory::SECURITY, "GetSecurityByName() - entry NOT FOUND for: '{}'", StringUtils::wideToUtf8(virtual_path));
         return STATUS_OBJECT_NAME_NOT_FOUND;
     }
 
@@ -225,7 +227,7 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
         throw new std::runtime_error("Unexpected error: Cached entry does not have a security descriptor!");
     }
 
-    Logger::info(LogCategory::SECURITY, "GetSecurityByName() completed successfully");
+    Logger::debug(LogCategory::SECURITY, "GetSecurityByName() completed successfully");
     return STATUS_SUCCESS;
 }
 
@@ -249,28 +251,28 @@ void HybridFileSystem::copyFileInfo(CacheEntry *source, FileInfo *dest) const
 NTSTATUS HybridFileSystem::GetFileInfoByName(PWSTR FileName, FileInfo *FileInfo)
 {
     std::wstring virtual_path(FileName);
-    Logger::info("[FS] GetFileInfoByName() called for: '{}'", StringUtils::wideToUtf8(virtual_path));
+    Logger::debug(LogCategory::FILESYSTEM, "GetFileInfoByName() called for: '{}'", StringUtils::wideToUtf8(virtual_path));
 
     // Get cache entry (same logic as GetSecurityByName)
     CacheEntry *entry = getCacheEntry(virtual_path);
     if (!entry)
     {
-        Logger::info("[FS] GetFileInfoByName() - entry NOT FOUND for: '{}'", StringUtils::wideToUtf8(virtual_path));
+        Logger::warn(LogCategory::FILESYSTEM, "GetFileInfoByName() - entry NOT FOUND for: '{}'", StringUtils::wideToUtf8(virtual_path));
         return STATUS_OBJECT_NAME_NOT_FOUND;
     }
 
     copyFileInfo(entry, FileInfo);
 
-    Logger::info("[FS] GetFileInfoByName() - File: {}, Size: {}, Attributes: 0x{:x}",
+    Logger::debug(LogCategory::FILESYSTEM, "GetFileInfoByName() - File: {}, Size: {}, Attributes: 0x{:x}",
                  StringUtils::wideToUtf8(virtual_path), entry->file_size, entry->file_attributes);
-    Logger::info("[FS] GetFileInfoByName() completed successfully");
+    Logger::debug(LogCategory::FILESYSTEM, "GetFileInfoByName() completed successfully");
     return STATUS_SUCCESS;
 }
 
 NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 GrantedAccess, PVOID *PFileNode, PVOID *PFileDesc, OpenFileInfo *OpenFileInfo)
 {
     std::wstring virtual_path(FileName);
-    Logger::info(LogCategory::FILESYSTEM, "Open() called for: '{}'", StringUtils::wideToUtf8(virtual_path));
+    Logger::debug(LogCategory::FILESYSTEM, "Open() called for: '{}'", StringUtils::wideToUtf8(virtual_path));
 
     *PFileNode = nullptr;
     *PFileDesc = nullptr;
@@ -284,7 +286,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     CacheEntry *entry = getCacheEntry(virtual_path);
     if (!entry)
     {
-        Logger::info(LogCategory::FILESYSTEM, "Open() - entry not found for: '{}'", StringUtils::wideToUtf8(virtual_path));
+        Logger::warn(LogCategory::FILESYSTEM, "Open() - entry not found for: '{}'", StringUtils::wideToUtf8(virtual_path));
         return STATUS_OBJECT_NAME_NOT_FOUND;
     }
     Logger::debug(LogCategory::FILESYSTEM, "Open() - entry found");
@@ -325,7 +327,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         if (entry->state == FileState::CACHED && entry->local_path.empty())
         {
             // File is in memory cache - check if we have it
-            Logger::debug("[FS] Open() - calling isFileInMemoryCache for: {}", StringUtils::wideToUtf8(entry->virtual_path));
+            Logger::debug(LogCategory::FILESYSTEM, "Open() - calling isFileInMemoryCache for: {}", StringUtils::wideToUtf8(entry->virtual_path));
             if (memory_cache.isFileInMemoryCache(entry->virtual_path))
             {
                 // File is in memory - create a temporary file if we need a handle for compatibility
@@ -362,7 +364,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         }
 
         // For files, check if handle creation failed
-        Logger::debug("[FS] Open() - calling isFileInMemoryCache (error check) for: {}", StringUtils::wideToUtf8(entry->virtual_path));
+        Logger::debug(LogCategory::FILESYSTEM, "Open() - calling isFileInMemoryCache (error check) for: {}", StringUtils::wideToUtf8(entry->virtual_path));
         if (file_desc->handle == INVALID_HANDLE_VALUE && !(entry->state == FileState::CACHED && entry->local_path.empty() &&
                                                            memory_cache.isFileInMemoryCache(entry->virtual_path)))
         {
@@ -424,13 +426,13 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         // Only check memory cache for files, not directories
         if (!(entry->file_attributes & FILE_ATTRIBUTE_DIRECTORY))
         {
-            Logger::debug("[FS] Open() - calling isFileInMemoryCache (access tracker) for: {}",
+            Logger::debug(LogCategory::FILESYSTEM, "Open() - calling isFileInMemoryCache (access tracker) for: {}",
                           StringUtils::wideToUtf8(entry->virtual_path));
             is_memory_cached = memory_cache.isFileInMemoryCache(entry->virtual_path);
         }
         else
         {
-            Logger::debug("[FS] Open() - skipping isFileInMemoryCache for directory: {}",
+            Logger::debug(LogCategory::FILESYSTEM, "Open() - skipping isFileInMemoryCache for directory: {}",
                           StringUtils::wideToUtf8(entry->virtual_path));
         }
 
@@ -445,7 +447,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     *PFileDesc = file_desc;
     *PFileNode = nullptr;
 
-    Logger::info(LogCategory::FILESYSTEM, "Open() completed successfully");
+    Logger::debug(LogCategory::FILESYSTEM, "Open() completed successfully");
     return STATUS_SUCCESS;
 }
 
@@ -518,7 +520,7 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
         auto duration = std::chrono::duration<double>(end_time - start_time).count();
 
         bool is_cache_hit = (file_desc->entry->state == FileState::CACHED);
-        Logger::debug("[FS] Read() - calling isFileInMemoryCache (access tracker) for: {}",
+        Logger::debug(LogCategory::FILESYSTEM, "Read() - calling isFileInMemoryCache (access tracker) for: {}",
                       StringUtils::wideToUtf8(file_desc->entry->virtual_path));
         bool is_memory_cached = memory_cache.isFileInMemoryCache(file_desc->entry->virtual_path);
 
@@ -544,7 +546,7 @@ NTSTATUS HybridFileSystem::GetFileInfo(PVOID FileNode, PVOID FileDesc, FileInfo 
     copyFileInfo(entry, FileInfo);
 
     // Log key values for Properties dialog debugging
-    Logger::info("[FS] GetFileInfo() - File: {}, Size: {}, Attributes: 0x{:x}, CreationTime: {}",
+    Logger::debug(LogCategory::FILESYSTEM, "GetFileInfo() - File: {}, Size: {}, Attributes: 0x{:x}, CreationTime: {}",
                  StringUtils::wideToUtf8(entry->virtual_path), entry->file_size, entry->file_attributes, FileInfo->CreationTime);
 
     return STATUS_SUCCESS;
@@ -559,7 +561,7 @@ NTSTATUS HybridFileSystem::SetBasicInfo(PVOID FileNode,
                                         UINT64 ChangeTime,
                                         FileInfo *FileInfo)
 {
-    Logger::info("[FS] SetBasicInfo() called - FileAttributes: 0x{:x}", FileAttributes);
+    Logger::info(LogCategory::FILESYSTEM, "SetBasicInfo() called - FileAttributes: 0x{:x}", FileAttributes);
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
     CacheEntry *entry = file_desc->entry;
 
@@ -567,25 +569,25 @@ NTSTATUS HybridFileSystem::SetBasicInfo(PVOID FileNode,
     if (FileAttributes != 0xFFFFFFFF) // 0xFFFFFFFF means don't change
     {
         entry->file_attributes = FileAttributes;
-        Logger::debug("[FS] SetBasicInfo() - Updated file attributes to: 0x{:x}", FileAttributes);
+        Logger::debug(LogCategory::FILESYSTEM, "SetBasicInfo() - Updated file attributes to: 0x{:x}", FileAttributes);
     }
 
     if (CreationTime != 0) // 0 means don't change
     {
         entry->creation_time = *((FILETIME *)&CreationTime);
-        Logger::debug("[FS] SetBasicInfo() - Updated creation time");
+        Logger::debug(LogCategory::FILESYSTEM, "SetBasicInfo() - Updated creation time");
     }
 
     if (LastAccessTime != 0)
     {
         entry->last_access_time = *((FILETIME *)&LastAccessTime);
-        Logger::debug("[FS] SetBasicInfo() - Updated last access time");
+        Logger::debug(LogCategory::FILESYSTEM, "SetBasicInfo() - Updated last access time");
     }
 
     if (LastWriteTime != 0)
     {
         entry->last_write_time = *((FILETIME *)&LastWriteTime);
-        Logger::debug("[FS] SetBasicInfo() - Updated last write time");
+        Logger::debug(LogCategory::FILESYSTEM, "SetBasicInfo() - Updated last write time");
     }
 
     // Return current file info after update
@@ -594,13 +596,13 @@ NTSTATUS HybridFileSystem::SetBasicInfo(PVOID FileNode,
         copyFileInfo(entry, FileInfo);
     }
 
-    Logger::info("[FS] SetBasicInfo() completed successfully");
+    Logger::info(LogCategory::FILESYSTEM, "SetBasicInfo() completed successfully");
     return STATUS_SUCCESS;
 }
 
 NTSTATUS HybridFileSystem::GetSecurity(PVOID FileNode, PVOID FileDesc, PSECURITY_DESCRIPTOR SecurityDescriptor, SIZE_T *PSecurityDescriptorSize)
 {
-    Logger::debug("[FS] GetSecurity() called for opened file");
+    Logger::debug(LogCategory::FILESYSTEM, "GetSecurity() called for opened file");
 
     // Use the same security descriptor logic as GetSecurityByName
     // This ensures consistency between the two methods
@@ -612,19 +614,19 @@ NTSTATUS HybridFileSystem::GetSecurity(PVOID FileNode, PVOID FileDesc, PSECURITY
     PSECURITY_DESCRIPTOR temp_descriptor = nullptr;
     if (!ConvertStringSecurityDescriptorToSecurityDescriptorA(sddl_string, SDDL_REVISION_1, &temp_descriptor, nullptr))
     {
-        Logger::debug("[FS] GetSecurity() - Failed to convert SDDL string, error: {}", GetLastError());
+        Logger::debug(LogCategory::FILESYSTEM, "GetSecurity() - Failed to convert SDDL string, error: {}", GetLastError());
         return CeWinFileCache::WineCompat::NtStatusFromWin32(GetLastError());
     }
 
     DWORD descriptor_length = GetSecurityDescriptorLength(temp_descriptor);
-    Logger::debug("[FS] GetSecurity() - Security descriptor size: {}", descriptor_length);
+    Logger::debug(LogCategory::FILESYSTEM, "GetSecurity() - Security descriptor size: {}", descriptor_length);
 
     if (SecurityDescriptor == nullptr)
     {
         // Caller is querying the required buffer size
         *PSecurityDescriptorSize = descriptor_length;
         LocalFree(temp_descriptor);
-        Logger::debug("[FS] GetSecurity() - Returning required size: {}", descriptor_length);
+        Logger::debug(LogCategory::FILESYSTEM, "GetSecurity() - Returning required size: {}", descriptor_length);
         return STATUS_SUCCESS;
     }
 
@@ -633,7 +635,7 @@ NTSTATUS HybridFileSystem::GetSecurity(PVOID FileNode, PVOID FileDesc, PSECURITY
         // Buffer too small
         *PSecurityDescriptorSize = descriptor_length;
         LocalFree(temp_descriptor);
-        Logger::debug("[FS] GetSecurity() - Buffer too small");
+        Logger::debug(LogCategory::FILESYSTEM, "GetSecurity() - Buffer too small");
         return STATUS_BUFFER_TOO_SMALL;
     }
 
@@ -642,13 +644,13 @@ NTSTATUS HybridFileSystem::GetSecurity(PVOID FileNode, PVOID FileDesc, PSECURITY
     *PSecurityDescriptorSize = descriptor_length;
     LocalFree(temp_descriptor);
 
-    Logger::debug("[FS] GetSecurity() completed successfully");
+    Logger::debug(LogCategory::FILESYSTEM, "GetSecurity() completed successfully");
     return STATUS_SUCCESS;
 }
 
 NTSTATUS HybridFileSystem::SetSecurity(PVOID FileNode, PVOID FileDesc, SECURITY_INFORMATION SecurityInformation, PSECURITY_DESCRIPTOR ModificationDescriptor)
 {
-    Logger::debug("[FS] SetSecurity() called - SecurityInformation: 0x{:x}", SecurityInformation);
+    Logger::debug(LogCategory::FILESYSTEM, "SetSecurity() called - SecurityInformation: 0x{:x}", SecurityInformation);
 
     // For a read-only caching filesystem, we don't actually modify security descriptors
     // But we should accept the call to avoid blocking the Properties dialog
@@ -656,30 +658,30 @@ NTSTATUS HybridFileSystem::SetSecurity(PVOID FileNode, PVOID FileDesc, SECURITY_
 
     if (SecurityInformation & OWNER_SECURITY_INFORMATION)
     {
-        Logger::debug("[FS] SetSecurity() - Owner security information requested");
+        Logger::debug(LogCategory::FILESYSTEM, "SetSecurity() - Owner security information requested");
     }
     if (SecurityInformation & GROUP_SECURITY_INFORMATION)
     {
-        Logger::debug("[FS] SetSecurity() - Group security information requested");
+        Logger::debug(LogCategory::FILESYSTEM, "SetSecurity() - Group security information requested");
     }
     if (SecurityInformation & DACL_SECURITY_INFORMATION)
     {
-        Logger::debug("[FS] SetSecurity() - DACL security information requested");
+        Logger::debug(LogCategory::FILESYSTEM, "SetSecurity() - DACL security information requested");
     }
     if (SecurityInformation & SACL_SECURITY_INFORMATION)
     {
-        Logger::debug("[FS] SetSecurity() - SACL security information requested");
+        Logger::debug(LogCategory::FILESYSTEM, "SetSecurity() - SACL security information requested");
     }
 
     // For a caching filesystem, we accept the modification but don't actually change anything
     // This allows the Properties dialog to work without errors
-    Logger::debug("[FS] SetSecurity() completed successfully (no-op for caching filesystem)");
+    Logger::debug(LogCategory::FILESYSTEM, "SetSecurity() completed successfully (no-op for caching filesystem)");
     return STATUS_SUCCESS;
 }
 
 NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID Buffer, ULONG Length, PULONG PBytesTransferred)
 {
-    Logger::debug("[FS] ReadDirectory() called - Length: {}, Marker: {}", Length, Marker ? StringUtils::wideToUtf8(Marker) : "null");
+    Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() called - Length: {}, Marker: {}", Length, Marker ? StringUtils::wideToUtf8(Marker) : "null");
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
 
     // Instead of using BufferedReadDirectory, implement directory enumeration directly
@@ -689,15 +691,15 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
     std::wstring dir_path = file_desc->entry->virtual_path;
     std::wstring normalized_path = normalizePath(dir_path);
 
-    Logger::debug("[FS] ReadDirectory() - enumerating directory: '{}'", StringUtils::wideToUtf8(normalized_path));
+    Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - enumerating directory: '{}'", StringUtils::wideToUtf8(normalized_path));
 
     // Get directory contents
     std::vector<DirectoryNode *> contents = directory_cache.getDirectoryContents(dir_path);
-    Logger::debug("[FS] ReadDirectory() - directory '{}' has {} entries", StringUtils::wideToUtf8(dir_path), contents.size());
+    Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - directory '{}' has {} entries", StringUtils::wideToUtf8(dir_path), contents.size());
 
     if (contents.empty())
     {
-        Logger::debug("[FS] ReadDirectory() - no entries found");
+        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - no entries found");
         *PBytesTransferred = 0;
         return STATUS_NO_MORE_FILES;
     }
@@ -720,16 +722,16 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
         if (it != contents.end() && (*it)->name == Marker)
         {
             start_index = std::distance(contents.begin(), it) + 1; // Next entry after marker
-            Logger::debug("[FS] ReadDirectory() - found marker '{}' at index {}", marker_str, start_index - 1);
+            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - found marker '{}' at index {}", marker_str, start_index - 1);
         }
         else
         {
-            Logger::debug("[FS] ReadDirectory() - marker '{}' not found, starting from beginning", marker_str);
+            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - marker '{}' not found, starting from beginning", marker_str);
         }
     }
     else
     {
-        Logger::debug("[FS] ReadDirectory() - no marker, starting from beginning");
+        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - no marker, starting from beginning");
     }
 
     // Fill buffer with directory entries
@@ -754,7 +756,7 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
         // Check if entry fits in remaining buffer
         if (bytes_used + entry_size > Length)
         {
-            Logger::debug("[FS] ReadDirectory() - buffer full, stopping at index {}", i);
+            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - buffer full, stopping at index {}", i);
             break;
         }
 
@@ -805,58 +807,58 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
 
     *PBytesTransferred = static_cast<ULONG>(bytes_used);
 
-    Logger::debug("[FS] ReadDirectory() - returning {} entries, {} bytes total", entries_returned, bytes_used);
+    Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - returning {} entries, {} bytes total", entries_returned, bytes_used);
 
     if (start_index + entries_returned >= contents.size())
     {
-        Logger::debug("[FS] ReadDirectory() - enumeration complete");
+        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - enumeration complete");
         return STATUS_SUCCESS; // End of directory
     }
     else
     {
-        Logger::debug("[FS] ReadDirectory() - more entries available");
+        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - more entries available");
         return STATUS_SUCCESS; // More entries available
     }
 }
 
 NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID *PContext, DirInfo *DirInfo)
 {
-    Logger::debug("[FS] ReadDirectoryEntry() called - Context: {}, Marker: {}", *PContext ? "exists" : "null",
+    Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() called - Context: {}, Marker: {}", *PContext ? "exists" : "null",
                   Marker ? StringUtils::wideToUtf8(Marker) : "null");
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
 
     if (!file_desc->entry)
     {
-        Logger::debug("[FS] ReadDirectoryEntry() - no entry");
+        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - no entry");
         return STATUS_INVALID_PARAMETER;
     }
 
-    Logger::debug("[FS] ReadDirectoryEntry() - path: '{}'", StringUtils::wideToUtf8(file_desc->entry->virtual_path));
+    Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - path: '{}'", StringUtils::wideToUtf8(file_desc->entry->virtual_path));
 
     if (*PContext == nullptr)
     {
-        Logger::debug("[FS] ReadDirectoryEntry() - starting enumeration");
+        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - starting enumeration");
 
         // Handle root directory specially - return compiler directories
         // Normalize path for comparison (both \ and / should be treated as root)
         std::wstring normalized_path = normalizePath(file_desc->entry->virtual_path);
         if (normalized_path == L"/")
         {
-            Logger::debug("[FS] ReadDirectoryEntry() - enumerating root directory");
+            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - enumerating root directory");
 
             // Use DirectoryCache to get all contents in root directory
             std::vector<DirectoryNode *> root_contents = directory_cache.getDirectoryContents(L"/");
 
             if (root_contents.empty())
             {
-                Logger::debug("[FS] ReadDirectoryEntry() - no contents from DirectoryCache for root");
+                Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - no contents from DirectoryCache for root");
                 return STATUS_NO_MORE_FILES;
             }
 
-            Logger::debug("[FS] ReadDirectoryEntry() - found {} entries in root directory", root_contents.size());
+            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - found {} entries in root directory", root_contents.size());
             for (size_t i = 0; i < root_contents.size(); i++)
             {
-                Logger::debug("[FS] ReadDirectoryEntry() - root entry[{}]: '{}'", i,
+                Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - root entry[{}]: '{}'", i,
                               StringUtils::wideToUtf8(root_contents[i]->name));
             }
 
@@ -868,20 +870,20 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
             auto *first_entry = (*context)[0];
             fillDirInfo(DirInfo, first_entry);
 
-            Logger::debug("[FS] ReadDirectoryEntry() - returning first root entry: '{}' (name: '{}')",
+            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - returning first root entry: '{}' (name: '{}')",
                           StringUtils::wideToUtf8(first_entry->full_virtual_path), StringUtils::wideToUtf8(first_entry->name));
             return STATUS_SUCCESS;
         }
         else
         {
-            Logger::debug("[FS] ReadDirectoryEntry() - enumerating non-root directory");
+            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - enumerating non-root directory");
 
             // For non-root directories, use directory cache
             std::vector<DirectoryNode *> contents = directory_cache.getDirectoryContents(file_desc->entry->virtual_path);
 
             if (contents.empty())
             {
-                Logger::debug("[FS] ReadDirectoryEntry() - no contents from directory cache");
+                Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - no contents from directory cache");
                 return STATUS_NO_MORE_FILES;
             }
 
@@ -893,22 +895,22 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
             auto *first_entry = (*context_data)[0];
             fillDirInfo(DirInfo, first_entry);
 
-            Logger::debug("[FS] ReadDirectoryEntry() - returning first non-root entry: '{}'",
+            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - returning first non-root entry: '{}'",
                           StringUtils::wideToUtf8(first_entry->full_virtual_path));
             return STATUS_SUCCESS;
         }
     }
     else
     {
-        Logger::debug("[FS] ReadDirectoryEntry() - continuing enumeration");
+        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - continuing enumeration");
 
         // Continue enumeration using stored context
         auto *context_data = static_cast<std::vector<DirectoryNode *> *>(*PContext);
 
-        Logger::debug("[FS] ReadDirectoryEntry() - context has {} entries", context_data->size());
+        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - context has {} entries", context_data->size());
         for (size_t i = 0; i < context_data->size() && i < 5; i++) // Show first 5 entries
         {
-            Logger::debug("[FS] ReadDirectoryEntry() - context entry[{}]: '{}'", i,
+            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - context entry[{}]: '{}'", i,
                           StringUtils::wideToUtf8((*context_data)[i]->name));
         }
 
@@ -919,7 +921,7 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
         if (Marker && wcslen(Marker) > 0)
         {
             std::string marker_str = StringUtils::wideToUtf8(Marker);
-            Logger::debug("[FS] ReadDirectoryEntry() - searching for marker: '{}'", marker_str);
+            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - searching for marker: '{}'", marker_str);
 
             // Find marker in the list - marker is the name of the last returned entry
             for (size_t i = 0; i < context_data->size(); i++)
@@ -928,27 +930,27 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
                 {
                     current_index = i + 1; // Next entry after the marker
                     found_marker = true;
-                    Logger::debug("[FS] ReadDirectoryEntry() - found marker at index {}, next index: {}", i, current_index);
+                    Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - found marker at index {}, next index: {}", i, current_index);
                     break;
                 }
             }
 
             if (!found_marker)
             {
-                Logger::debug("[FS] ReadDirectoryEntry() - marker '{}' not found, starting from index 1", marker_str);
+                Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - marker '{}' not found, starting from index 1", marker_str);
                 current_index = 1; // Fallback to second entry
             }
         }
         else
         {
-            Logger::debug("[FS] ReadDirectoryEntry() - no marker, continuing from index 1");
+            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - no marker, continuing from index 1");
             current_index = 1; // Next after first
         }
 
         if (current_index >= context_data->size())
         {
             // End of enumeration
-            Logger::debug("[FS] ReadDirectoryEntry() - end of enumeration at index {} (total: {})", current_index,
+            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - end of enumeration at index {} (total: {})", current_index,
                           context_data->size());
             delete context_data;
             *PContext = nullptr;
@@ -959,7 +961,7 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
         auto *next_entry = (*context_data)[current_index];
         fillDirInfo(DirInfo, next_entry);
 
-        Logger::debug("[FS] ReadDirectoryEntry() - returning entry: '{}' (full path: '{}', index {})",
+        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectoryEntry() - returning entry: '{}' (full path: '{}', index {})",
                       StringUtils::wideToUtf8(next_entry->name), StringUtils::wideToUtf8(next_entry->full_virtual_path),
                       current_index);
         return STATUS_SUCCESS;
@@ -1000,7 +1002,7 @@ CacheEntry *HybridFileSystem::getCacheEntry(const std::wstring &virtual_path)
 
 CacheEntry *HybridFileSystem::createDynamicCacheEntry(DirectoryNode *node)
 {
-    Logger::info("[FS] createDynamicCacheEntry() called for: '{}', attributes: 0x{:x}",
+    Logger::debug(LogCategory::FILESYSTEM, "createDynamicCacheEntry() called for: '{}', attributes: 0x{:x}",
                  StringUtils::wideToUtf8(node->full_virtual_path), node->file_attributes);
 
     assert(!cache_entries.contains(node->full_virtual_path));
@@ -1031,13 +1033,20 @@ CacheEntry *HybridFileSystem::createDynamicCacheEntry(DirectoryNode *node)
         entry->state = FileState::VIRTUAL;
     }
 
-    Logger::info("[FS] createDynamicCacheEntry() - created entry for: '{}' -> '{}', policy: {}",
+    Logger::debug(LogCategory::FILESYSTEM, "createDynamicCacheEntry() - created entry for: '{}' -> '{}', policy: {}",
                  StringUtils::wideToUtf8(entry->virtual_path), StringUtils::wideToUtf8(entry->network_path),
                  static_cast<int>(entry->policy));
 
     // Store in cache_entries for future fast access
-    cache_entries[node->full_virtual_path] = std::move(entry);
+    if (!config.global.case_sensitive)
+    {
+        std::wstring lowered = entry->virtual_path;
+        StringUtils::toLower(lowered);
+        cache_entries[lowered] = std::move(entry);
+        return cache_entries[lowered].get();
+    }
 
+    cache_entries[node->full_virtual_path] = std::move(entry);
     return cache_entries[node->full_virtual_path].get();
 }
 
@@ -1084,12 +1093,12 @@ NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
             {
                 // Download completed successfully
                 // The AsyncDownloadManager already updated the cache entry
-                Logger::info(LogCategory::NETWORK, "Download completed: {}", StringUtils::wideToUtf8(entry->virtual_path));
+                Logger::debug(LogCategory::NETWORK, "Download completed: {}", StringUtils::wideToUtf8(entry->virtual_path));
             }
             else if (download_status == STATUS_PENDING)
             {
                 // Already downloading
-                Logger::info(LogCategory::NETWORK, "Already downloading: {}", StringUtils::wideToUtf8(entry->virtual_path));
+                Logger::debug(LogCategory::NETWORK, "Already downloading: {}", StringUtils::wideToUtf8(entry->virtual_path));
             }
             else
             {
@@ -1281,6 +1290,11 @@ std::wstring HybridFileSystem::normalizePath(const std::wstring &path)
         normalized.pop_back();
     }
 
+    if (!loaded_config.global.case_sensitive)
+    {
+        StringUtils::toLower(normalized);
+    }
+
     return normalized;
 }
 
@@ -1299,7 +1313,7 @@ void HybridFileSystem::fillDirInfo(DirInfo *dir_info, DirectoryNode *node)
     // Size includes the structure + filename + null terminator
     dir_info->Size = (UINT16)(sizeof(FSP_FSCTL_DIR_INFO) + name_size_bytes + sizeof(WCHAR));
 
-    Logger::debug("[FS] fillDirInfo() - filling entry for: '{}', size: {}", StringUtils::wideToUtf8(name), dir_info->Size);
+    Logger::debug(LogCategory::FILESYSTEM, "fillDirInfo() - filling entry for: '{}', size: {}", StringUtils::wideToUtf8(name), dir_info->Size);
 
     // Set file attributes based on node type
     dir_info->FileInfo.FileAttributes = node->isDirectory() ? FILE_ATTRIBUTE_DIRECTORY : FILE_ATTRIBUTE_NORMAL;
@@ -1337,7 +1351,7 @@ void HybridFileSystem::fillDirInfo(DirInfo *dir_info, DirectoryNode *node)
     WCHAR *filename_end = (WCHAR *)((char *)dir_info->FileNameBuf + name_size_bytes);
     *filename_end = L'\0';
 
-    Logger::debug("[FS] fillDirInfo() - completed for: '{}', filename set in buffer", StringUtils::wideToUtf8(name));
+    Logger::debug(LogCategory::FILESYSTEM, "fillDirInfo() - completed for: '{}', filename set in buffer", StringUtils::wideToUtf8(name));
 }
 
 NTSTATUS HybridFileSystem::evictIfNeeded()

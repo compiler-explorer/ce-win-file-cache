@@ -63,7 +63,7 @@ class DirectoryTree
     DirectoryTree();
     ~DirectoryTree() = default;
 
-    void init(const std::wstring &base_network_path);
+    void init(const std::wstring &network_path);
 
     // Core operations
     DirectoryNode *findNode(const std::wstring &virtual_path);
@@ -88,8 +88,6 @@ class DirectoryTree
     void reset();
 
     // Thread safety
-    void lock();
-    void unlock();
     std::lock_guard<std::mutex> getLock();
 
     private:

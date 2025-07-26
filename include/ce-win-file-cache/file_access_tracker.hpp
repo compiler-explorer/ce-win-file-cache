@@ -56,8 +56,6 @@ class FileAccessTracker
                                           const std::wstring &cache_policy);
 
     std::wstring formatFileSize(uint64_t bytes) const;
-    std::wstring formatDuration(std::chrono::system_clock::duration duration) const;
-    std::wstring getCurrentTimestamp() const;
 
     mutable std::mutex mutex_{};
     std::unordered_map<std::wstring, std::unique_ptr<FileAccessInfo>> file_access_map_;

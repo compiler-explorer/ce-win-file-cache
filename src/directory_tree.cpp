@@ -6,6 +6,8 @@
 #include <optional>
 #include <ranges>
 #include <sstream>
+#include "../include/types/config.hpp"
+#include "../include/ce-win-file-cache/string_utils.hpp"
 
 namespace CeWinFileCache
 {
@@ -28,18 +30,30 @@ bool DirectoryNode::isFile() const
 
 DirectoryNode *DirectoryNode::findChild(const std::wstring &child_name)
 {
+    std::wstring name = child_name;
+    if (!loaded_config.global.case_sensitive)
+    {
+        StringUtils::toLower(name);
+    }
+
     std::lock_guard<std::mutex> lock(children_mutex);
-    auto child_it = children.find(child_name);
+    auto child_it = children.find(name);
     return (child_it != children.end()) ? child_it->second.get() : nullptr;
 }
 
 DirectoryNode *DirectoryNode::addChild(const std::wstring &child_name, NodeType child_type)
 {
+    std::wstring name = child_name;
+    if (!loaded_config.global.case_sensitive)
+    {
+        StringUtils::toLower(name);
+    }
+
     std::lock_guard<std::mutex> lock(children_mutex);
     auto child = std::make_unique<DirectoryNode>(child_name, child_type, this);
-    DirectoryNode *result = child.get();
-    children[child_name] = std::move(child);
-    return result;
+
+    children[name] = std::move(child);
+    return children[name].get();
 }
 
 std::vector<std::wstring> DirectoryNode::getChildNames() const
@@ -135,22 +149,28 @@ DirectoryTree::DirectoryTree() : root(std::make_unique<DirectoryNode>(L"", NodeT
     this->reset();
 }
 
-void DirectoryTree::init(const std::wstring &base_network_path)
+void DirectoryTree::init(const std::wstring &network_path)
 {
     if (this->base_network_path.empty())
     {
-        this->base_network_path = base_network_path;
+        this->base_network_path = network_path;
     }
     else
     {
-        assert(base_network_path == this->base_network_path);
+        assert(network_path == this->base_network_path);
     }
 }
 
 DirectoryNode *DirectoryTree::findNode(const std::wstring &virtual_path)
 {
+    std::wstring path = virtual_path;
+    if (!loaded_config.global.case_sensitive)
+    {
+        StringUtils::toLower(path);
+    }
+
     std::lock_guard<std::mutex> tree_lock(tree_mutex);
-    return findOrCreatePath(virtual_path, NodeType::UNKNOWN, false);
+    return findOrCreatePath(path, NodeType::UNKNOWN, false);
 }
 
 bool DirectoryTree::addFile(const std::wstring &virtual_path,
@@ -390,11 +410,11 @@ DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path,
                                              nullptr, nullptr, nullptr, nullptr, &LocalSecDesc);
             if (ret == ERROR_SUCCESS)
             {
-                size_t len = GetSecurityDescriptorLength(LocalSecDesc);
-                child->SecDesc = malloc(len);
+                size_t desc_len = GetSecurityDescriptorLength(LocalSecDesc);
+                child->SecDesc = malloc(desc_len);
                 if (child->SecDesc != nullptr)
                 {
-                    memcpy(child->SecDesc, LocalSecDesc, len);
+                    memcpy(child->SecDesc, LocalSecDesc, desc_len);
                 }
                 LocalFree(LocalSecDesc);
             }
@@ -428,16 +448,6 @@ void DirectoryTree::updateNodeMetadata(DirectoryNode *node,
     node->last_write_time = last_write_time;
 
     node->file_attributes = file_attributes;
-}
-
-void DirectoryTree::lock()
-{
-    tree_mutex.lock();
-}
-
-void DirectoryTree::unlock()
-{
-    tree_mutex.unlock();
 }
 
 std::lock_guard<std::mutex> DirectoryTree::getLock()

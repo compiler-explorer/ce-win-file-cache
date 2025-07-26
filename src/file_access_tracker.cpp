@@ -2,6 +2,7 @@
 #include <ce-win-file-cache/file_access_tracker.hpp>
 #include <ce-win-file-cache/logger.hpp>
 #include <ce-win-file-cache/string_utils.hpp>
+#include <ce-win-file-cache/time_utils.hpp>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -12,23 +13,6 @@
 
 namespace CeWinFileCache
 {
-
-// Helper functions for formatting
-static std::wstring formatTimestamp(std::chrono::system_clock::time_point tp)
-{
-    auto time_t = std::chrono::system_clock::to_time_t(tp);
-
-    std::tm tm;
-#ifdef _WIN32
-    localtime_s(&tm, &time_t);
-#else
-    localtime_r(&time_t, &tm);
-#endif
-
-    std::wostringstream oss;
-    oss << std::put_time(&tm, L"%Y-%m-%d %H:%M:%S");
-    return oss.str();
-}
 
 static std::wstring fileStateToString(FileState state)
 {
@@ -196,7 +180,7 @@ void FileAccessTracker::reportingThreadFunc()
 
 void FileAccessTracker::generateReport()
 {
-    auto timestamp = getCurrentTimestamp();
+    auto timestamp = TimeUtils::getCurrentTimestamp();
 
     // Generate detailed CSV report
     std::wstring csv_filename = report_directory_ + L"/file_access_" + timestamp + L".csv";
@@ -270,8 +254,9 @@ void FileAccessTracker::writeCSVReport(const std::wstring &filename)
                  << L"," << hits << L"," << misses << L"," << std::fixed << std::setprecision(1) << hit_rate << L","
                  << fileStateToString(info->current_state) << L"," << (info->is_memory_cached ? L"Yes" : L"No") << L","
                  << std::fixed << std::setprecision(2) << info->average_access_time_ms << L","
-                 << formatTimestamp(info->first_access) << L"," << formatTimestamp(info->last_access) << L","
-                 << formatDuration(time_since_first) << L"," << info->cache_policy << L"\n";
+                 << TimeUtils::formatTimestamp(info->first_access) << L","
+                 << TimeUtils::formatTimestamp(info->last_access) << L","
+                 << TimeUtils::formatDuration(time_since_first) << L"," << info->cache_policy << L"\n";
         }
 
         file.close();
@@ -310,8 +295,8 @@ void FileAccessTracker::writeSummaryReport(const std::wstring &filename)
 
         file << L"CE Win File Cache - File Access Summary Report\n";
         file << L"==============================================\n\n";
-        file << L"Report Generated: " << formatTimestamp(now) << L"\n";
-        file << L"Tracking Duration: " << formatDuration(tracking_duration) << L"\n\n";
+        file << L"Report Generated: " << TimeUtils::formatTimestamp(now) << L"\n";
+        file << L"Tracking Duration: " << TimeUtils::formatDuration(tracking_duration) << L"\n\n";
 
         file << L"Overall Statistics\n";
         file << L"------------------\n";
@@ -445,37 +430,6 @@ std::wstring FileAccessTracker::formatFileSize(uint64_t bytes) const
 
     std::wostringstream oss;
     oss << std::fixed << std::setprecision(2) << size << L" " << units[unit_index];
-    return oss.str();
-}
-
-std::wstring FileAccessTracker::formatDuration(std::chrono::system_clock::duration duration) const
-{
-    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
-
-    if (seconds < 60)
-        return std::to_wstring(seconds) + L" seconds";
-    else if (seconds < 3600)
-        return std::to_wstring(seconds / 60) + L" minutes";
-    else if (seconds < 86400)
-        return std::to_wstring(seconds / 3600) + L" hours";
-    else
-        return std::to_wstring(seconds / 86400) + L" days";
-}
-
-std::wstring FileAccessTracker::getCurrentTimestamp() const
-{
-    auto now = std::chrono::system_clock::now();
-    auto time_t = std::chrono::system_clock::to_time_t(now);
-
-    std::tm tm;
-#ifdef _WIN32
-    localtime_s(&tm, &time_t);
-#else
-    localtime_r(&time_t, &tm);
-#endif
-
-    std::wostringstream oss;
-    oss << std::put_time(&tm, L"%Y%m%d_%H%M%S");
     return oss.str();
 }
 

@@ -11,6 +11,8 @@
 #include <locale>
 #endif
 
+#include <algorithm>
+
 namespace CeWinFileCache
 {
 
@@ -197,6 +199,16 @@ const wchar_t *StringUtils::getNextArg(wchar_t *argv[], int &index, int argc)
         return argv[++index];
     }
     return nullptr;
+}
+
+void StringUtils::toLower(std::wstring &str)
+{
+   std::transform(str.begin(), str.end(), str.begin(), ::towlower);
+}
+
+void StringUtils::toLower(std::string &str)
+{
+    std::transform(str.begin(), str.end(), str.begin(), ::towlower);
 }
 
 } // namespace CeWinFileCache

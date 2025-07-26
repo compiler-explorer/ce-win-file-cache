@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <chrono>
 
 namespace CeWinFileCache
 {
@@ -42,6 +43,9 @@ class StringUtils
      * @return Next argument as wide string, or nullptr if no more arguments
      */
     static const wchar_t *getNextArg(wchar_t *argv[], int &index, int argc);
+
+    static void toLower(std::wstring &str);
+    static void toLower(std::string &str);
 
     private:
     /**

@@ -8,11 +8,6 @@
 // Forward declaration for metrics config
 namespace CeWinFileCache
 {
-struct MetricsConfig;
-}
-
-namespace CeWinFileCache
-{
 
 struct CompilerConfig
 {
@@ -47,6 +42,7 @@ struct GlobalConfig
     size_t download_threads = 4; // Default to 4 threads
     MetricsConfig metrics; // Metrics configuration
     FileTrackingConfig file_tracking; // File access tracking configuration
+    bool case_sensitive = false; // Default to case-insensitive
 };
 
 struct Config
@@ -54,5 +50,7 @@ struct Config
     std::unordered_map<std::wstring, CompilerConfig> compilers;
     GlobalConfig global;
 };
+
+static Config loaded_config;
 
 } // namespace CeWinFileCache
