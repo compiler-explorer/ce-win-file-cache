@@ -71,6 +71,7 @@ _deps/
 CompilerCache/
 Cache/
 gen/
+build/
 
 # IDE files
 *.swp
