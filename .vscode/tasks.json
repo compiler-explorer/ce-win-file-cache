@@ -77,6 +77,57 @@
             "detail": "Clean Wine build directory"
         },
         {
+            "label": "Build with MSVC (build-msvc.bat)",
+            "type": "shell",
+            "command": "cmd.exe",
+            "args": ["/c", "build-msvc.bat"],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "detail": "Build using MSVC toolchain (matches build-msvc.bat exactly)"
+        },
+        {
+            "label": "Clean MSVC Build",
+            "type": "shell",
+            "command": "cmd.exe",
+            "args": ["/c", "if exist build-msvc rmdir /s /q build-msvc"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "detail": "Clean MSVC build directory"
+        },
+        {
+            "label": "Run MSVC Build",
+            "type": "shell",
+            "command": "build-msvc/bin/CeWinFileCacheFS.exe",
+            "args": ["--help"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "dependsOn": "Build with MSVC (build-msvc.bat)",
+            "detail": "Run the MSVC compiled executable"
+        },
+        {
             "label": "Run with Wine",
             "type": "shell",
             "command": "wine",

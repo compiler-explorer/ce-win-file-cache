@@ -30,30 +30,30 @@ bool DirectoryNode::isFile() const
 
 DirectoryNode *DirectoryNode::findChild(const std::wstring &child_name)
 {
-    std::wstring name = child_name;
+    std::wstring name_copy = child_name;
     if (!loaded_config.global.case_sensitive)
     {
-        StringUtils::toLower(name);
+        StringUtils::toLower(name_copy);
     }
 
     std::lock_guard<std::mutex> lock(children_mutex);
-    auto child_it = children.find(name);
+    auto child_it = children.find(name_copy);
     return (child_it != children.end()) ? child_it->second.get() : nullptr;
 }
 
 DirectoryNode *DirectoryNode::addChild(const std::wstring &child_name, NodeType child_type)
 {
-    std::wstring name = child_name;
+    std::wstring name_copy = child_name;
     if (!loaded_config.global.case_sensitive)
     {
-        StringUtils::toLower(name);
+        StringUtils::toLower(name_copy);
     }
 
     std::lock_guard<std::mutex> lock(children_mutex);
-    auto child = std::make_unique<DirectoryNode>(child_name, child_type, this);
+    auto child = std::make_unique<DirectoryNode>(name_copy, child_type, this);
 
-    children[name] = std::move(child);
-    return children[name].get();
+    children[name_copy] = std::move(child);
+    return children[name_copy].get();
 }
 
 std::vector<std::wstring> DirectoryNode::getChildNames() const
@@ -346,9 +346,9 @@ DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path,
             root->full_virtual_path = L"/";
 
             PSECURITY_DESCRIPTOR LocalSecDesc = nullptr;
-            DWORD ret = GetNamedSecurityInfo(root->network_path.c_str(), SE_FILE_OBJECT,
-                                             OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
-                                             nullptr, nullptr, nullptr, nullptr, &LocalSecDesc);
+            DWORD ret = GetNamedSecurityInfoW(root->network_path.c_str(), SE_FILE_OBJECT,
+                                              OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+                                              nullptr, nullptr, nullptr, nullptr, &LocalSecDesc);
             if (ret == ERROR_SUCCESS)
             {
                 size_t len = GetSecurityDescriptorLength(LocalSecDesc);
@@ -405,9 +405,9 @@ DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path,
             child->full_virtual_path = L"/" + current_path;
 
             PSECURITY_DESCRIPTOR LocalSecDesc = nullptr;
-            DWORD ret = GetNamedSecurityInfo(child->network_path.c_str(), SE_FILE_OBJECT,
-                                             OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
-                                             nullptr, nullptr, nullptr, nullptr, &LocalSecDesc);
+            DWORD ret = GetNamedSecurityInfoW(child->network_path.c_str(), SE_FILE_OBJECT,
+                                              OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+                                              nullptr, nullptr, nullptr, nullptr, &LocalSecDesc);
             if (ret == ERROR_SUCCESS)
             {
                 size_t desc_len = GetSecurityDescriptorLength(LocalSecDesc);

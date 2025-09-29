@@ -75,7 +75,7 @@ std::optional<Config> loadConfigFile(const std::wstring &config_file)
 struct ProgramOptions
 {
     std::wstring config_file = L"compilers.json";
-    std::wstring mount_point = L"M:";
+    std::wstring mount_point = L"Z:";
     std::wstring volume_prefix;
     ULONG debug_flags = 0;
     bool show_help = false;
@@ -100,7 +100,7 @@ void printUsage()
     "\n"
     "Options:\n"
     "  -c, --config FILE      Configuration file (default: compilers.json)\n"
-    "  -m, --mount POINT      Mount point (default: M:)\n"
+    "  -m, --mount POINT      Mount point (default: Z:)\n"
     "  -u, --volume-prefix    Volume prefix for UNC paths\n"
     "  -d, --debug [LEVEL]    WinFsp debug flags (0=off, -1=all, bitmask)\n"
     "  -t, --test             Test mode (no WinFsp mounting)\n"
@@ -117,10 +117,10 @@ void printUsage()
     "      --diagnose         Run system diagnostics and environment checks\n"
     "\n"
     "Examples:\n"
-    "  CeWinFileCacheFS --config compilers.json --mount M:\n"
+    "  CeWinFileCacheFS --config compilers.json --mount Z:\n"
     "  CeWinFileCacheFS --mount C:\\compilers --debug\n"
     "  CeWinFileCacheFS --test --config test.json\n"
-    "  CeWinFileCacheFS --diagnose --config compilers.json --mount M:\n"
+    "  CeWinFileCacheFS --diagnose --config compilers.json --mount Z:\n"
     "  CeWinFileCacheFS --log-level debug --log-output both --log-file debug.log\n"
     "  CeWinFileCacheFS --log-level trace --log-output file";
 
@@ -221,6 +221,7 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
             {
                 std::string level_str = StringUtils::wideToUtf8(log_level);
                 options.log_level = parseLogLevel(level_str);
+                i += 1;
             }
             else
             {

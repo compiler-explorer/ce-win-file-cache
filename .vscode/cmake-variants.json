@@ -1,0 +1,43 @@
+{
+    "buildType": {
+        "default": "Release",
+        "description": "Build type",
+        "choices": {
+            "Release": {
+                "short": "Release",
+                "long": "Release build (matches build-msvc.bat)",
+                "buildType": "Release",
+                "settings": {
+                    "CMAKE_BUILD_TYPE": "Release",
+                    "CMAKE_TOOLCHAIN_FILE": "D:/opt/ce-win-file-cache/msvc-toolchain.cmake",
+                    "CMAKE_MAKE_PROGRAM": "D:/efs/compilers/ninja/ninja.exe"
+                }
+            },
+            "Debug": {
+                "short": "Debug",
+                "long": "Debug build with MSVC toolchain",
+                "buildType": "Debug",
+                "settings": {
+                    "CMAKE_BUILD_TYPE": "Debug",
+                    "CMAKE_TOOLCHAIN_FILE": "D:/opt/ce-win-file-cache/msvc-toolchain.cmake",
+                    "CMAKE_MAKE_PROGRAM": "D:/efs/compilers/ninja/ninja.exe"
+                }
+            }
+        }
+    },
+    "toolchain": {
+        "default": "msvc",
+        "description": "Toolchain selection",
+        "choices": {
+            "msvc": {
+                "short": "MSVC",
+                "long": "Microsoft Visual C++ (matches build-msvc.bat)",
+                "settings": {
+                    "CMAKE_TOOLCHAIN_FILE": "D:/opt/ce-win-file-cache/msvc-toolchain.cmake",
+                    "CMAKE_GENERATOR": "Ninja",
+                    "CMAKE_MAKE_PROGRAM": "D:/efs/compilers/ninja/ninja.exe"
+                }
+            }
+        }
+    }
+}

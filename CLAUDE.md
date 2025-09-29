@@ -296,8 +296,7 @@ public:
 
 ### Diagnostic Handling
 
-- **Memory Handling Techniques**:
-  - When a file or directory cannot be found or executed, check pwd to make sure you're in the right directory
+- When a file or directory cannot be found or executed, check pwd to make sure you're in the right directory
 
 ## Testing
 

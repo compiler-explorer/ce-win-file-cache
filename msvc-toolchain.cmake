@@ -4,15 +4,17 @@ set(CMAKE_SYSTEM_VERSION 10.0)
 set(CMAKE_SYSTEM_PROCESSOR AMD64)
 
 # Direct MSVC compiler paths
-set(CMAKE_C_COMPILER "D:/efs/compilers/msvc/14.40.33807-14.40.33811.0/bin/Hostx64/x64/cl.exe")
-set(CMAKE_CXX_COMPILER "D:/efs/compilers/msvc/14.40.33807-14.40.33811.0/bin/Hostx64/x64/cl.exe")
-set(CMAKE_RC_COMPILER "D:/efs/compilers/msvc/14.40.33807-14.40.33811.0/bin/Hostx64/x64/rc.exe")
-set(CMAKE_LINKER "D:/efs/compilers/msvc/14.40.33807-14.40.33811.0/bin/Hostx64/x64/link.exe")
-set(CMAKE_AR "D:/efs/compilers/msvc/14.40.33807-14.40.33811.0/bin/Hostx64/x64/lib.exe")
+set(CMAKE_C_COMPILER "D:/efs/compilers/msvc/14.40.33807-14.40.33811.0/bin/Hostx64/x64/cl.exe" CACHE FILEPATH "C compiler" FORCE)
+set(CMAKE_CXX_COMPILER "D:/efs/compilers/msvc/14.40.33807-14.40.33811.0/bin/Hostx64/x64/cl.exe" CACHE FILEPATH "CXX compiler" FORCE)
+set(CMAKE_LINKER "D:/efs/compilers/msvc/14.40.33807-14.40.33811.0/bin/Hostx64/x64/link.exe" CACHE FILEPATH "Linker" FORCE)
+set(CMAKE_AR "D:/efs/compilers/msvc/14.40.33807-14.40.33811.0/bin/Hostx64/x64/lib.exe" CACHE FILEPATH "Archiver" FORCE)
 
 # Windows SDK paths - USE WINDOWS PATHS ONLY
 set(WINDOWS_SDK_PATH "D:/efs/compilers/windows-kits-10")
 set(WINDOWS_SDK_VERSION "10.0.22621.0")  # Adjust if needed
+
+set(CMAKE_RC_COMPILER "${WINDOWS_SDK_PATH}/bin/rc.exe" CACHE FILEPATH "Resource compiler" FORCE)
+set(CMAKE_MT "${WINDOWS_SDK_PATH}/bin/mt.exe" CACHE FILEPATH "Manifest tool" FORCE)
 
 # Include directories - USE WINDOWS PATHS ONLY
 set(MSVC_INCLUDE_PATH "D:/efs/compilers/msvc/14.40.33807-14.40.33811.0/include")
@@ -30,6 +32,8 @@ set(CMAKE_C_FLAGS_INIT "/nologo /MD /I\"${MSVC_INCLUDE_PATH}\" /I\"${SDK_INCLUDE
 set(CMAKE_EXE_LINKER_FLAGS_INIT "/LIBPATH:\"${MSVC_LIB_PATH}\" /LIBPATH:\"${SDK_LIB_PATH}/ucrt/x64\" /LIBPATH:\"${SDK_LIB_PATH}/um/x64\" /NOLOGO")
 set(CMAKE_MODULE_LINKER_FLAGS_INIT "/LIBPATH:\"${MSVC_LIB_PATH}\" /LIBPATH:\"${SDK_LIB_PATH}/ucrt/x64\" /LIBPATH:\"${SDK_LIB_PATH}/um/x64\" /NOLOGO")
 set(CMAKE_SHARED_LINKER_FLAGS_INIT "/LIBPATH:\"${MSVC_LIB_PATH}\" /LIBPATH:\"${SDK_LIB_PATH}/ucrt/x64\" /LIBPATH:\"${SDK_LIB_PATH}/um/x64\" /NOLOGO")
+
+set(CMAKE_RC_FLAGS "-nologo")
 
 # Tell CMake to use response files (important for long command lines in WSL)
 set(CMAKE_C_USE_RESPONSE_FILE_FOR_OBJECTS 1)

@@ -1,0 +1,23 @@
+[
+  {
+    "name": "MSVC 14.40 (build-msvc.bat equivalent)",
+    "description": "MSVC toolchain matching build-msvc.bat configuration",
+    "compilers": {
+      "C": "D:/efs/compilers/msvc/14.40.33807-14.40.33811.0/bin/Hostx64/x64/cl.exe",
+      "CXX": "D:/efs/compilers/msvc/14.40.33807-14.40.33811.0/bin/Hostx64/x64/cl.exe"
+    },
+    "preferredGenerator": {
+      "name": "Ninja",
+      "platform": "x64"
+    },
+    "environmentVariables": {
+      "TMP": "H:/tmp",
+      "TEMP": "H:/tmp",
+      "PATH": "D:/efs/compilers/msvc/14.40.33807-14.40.33811.0/bin/Hostx64/x64;D:/efs/compilers/windows-kits-10/bin/10.0.22621.0/x64;D:/efs/compilers/windows-kits-10/bin/x64;D:/efs/compilers/ninja;D:/efs/cmake-3.31.7/bin;C:/PROGRA~2/WinFsp/bin;${env:PATH}",
+      "INCLUDE": "D:/efs/compilers/msvc/14.40.33807-14.40.33811.0/include;D:/efs/compilers/windows-kits-10/Include/10.0.22621.0/ucrt;D:/efs/compilers/windows-kits-10/Include/10.0.22621.0/shared;D:/efs/compilers/windows-kits-10/Include/10.0.22621.0/um;D:/efs/compilers/windows-kits-10/Include/10.0.22621.0/winrt;D:/efs/compilers/windows-kits-10/Include/10.0.22621.0/cppwinrt",
+      "LIB": "D:/efs/compilers/msvc/14.40.33807-14.40.33811.0/lib/x64;D:/efs/compilers/windows-kits-10/Lib/10.0.22621.0/ucrt/x64;D:/efs/compilers/windows-kits-10/Lib/10.0.22621.0/um/x64",
+      "LIBPATH": "D:/efs/compilers/msvc/14.40.33807-14.40.33811.0/lib/x64;D:/efs/compilers/windows-kits-10/Lib/10.0.22621.0/ucrt/x64;D:/efs/compilers/windows-kits-10/Lib/10.0.22621.0/um/x64"
+    },
+    "toolchainFile": "D:/opt/ce-win-file-cache/msvc-toolchain.cmake"
+  }
+]

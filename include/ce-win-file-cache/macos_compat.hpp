@@ -1,7 +1,12 @@
 #pragma once
 
-// Minimal Windows type definitions for macOS compilation
-// This file provides just enough Windows types to compile the code
+// Minimal Windows type definitions for non-Windows compilation
+// This file provides just enough Windows types to compile the code on macOS/Linux
+// IMPORTANT: This file should NEVER be included on Windows platforms
+
+#ifdef _WIN32
+#error "macos_compat.hpp should not be included on Windows platforms. Use windows_compat.hpp instead."
+#endif
 
 #ifndef _WIN32
 
@@ -10,7 +15,7 @@
 #include <iostream>
 #include <string>
 
-// Basic Windows types
+// Basic Windows types for macOS compilation
 using DWORD = uint32_t;
 using BOOL = int32_t;
 using HANDLE = void *;
@@ -24,7 +29,6 @@ using UINT64 = uint64_t;
 using PVOID = void *;
 using PSECURITY_DESCRIPTOR = void *;
 using LPWSTR = wchar_t *;
-
 // File time structure
 struct FILETIME
 {
@@ -47,7 +51,6 @@ enum : std::uint16_t
 {
     MAX_PATH = 260
 };
-
 // Status codes
 #define STATUS_SUCCESS ((NTSTATUS)0x00000000L)
 #define STATUS_UNSUCCESSFUL ((NTSTATUS)0xC0000001L)
@@ -62,6 +65,16 @@ enum : std::uint16_t
 #define STATUS_CANCELLED ((NTSTATUS)0xC0000120L)
 #define NT_SUCCESS(Status) ((NTSTATUS)(Status) >= 0)
 
+// Win32 error codes
+#define ERROR_SUCCESS 0L
+#define ERROR_FILE_NOT_FOUND 2L
+#define ERROR_ACCESS_DENIED 5L
+
+// Security constants
+#define SE_FILE_OBJECT 1
+#define OWNER_SECURITY_INFORMATION 0x00000001
+#define GROUP_SECURITY_INFORMATION 0x00000002
+#define DACL_SECURITY_INFORMATION 0x00000004
 // Fake security structures
 struct SECURITY_ATTRIBUTES
 {
@@ -91,8 +104,7 @@ enum : std::uint8_t
 {
     SDDL_REVISION_1 = 1
 };
-
-// Function stubs
+// Function stubs (only for non-Windows platforms)
 inline void CloseHandle(HANDLE /*unused*/)
 {
 }
@@ -145,4 +157,34 @@ inline void OutputDebugStringA(const char *lpOutputString)
     }
 }
 
-#endif // !_WIN32
+// Security API stubs
+inline DWORD GetNamedSecurityInfoW(PWSTR /*pObjectName*/, DWORD /*ObjectType*/, DWORD /*SecurityInfo*/,
+                                   PVOID *ppSidOwner, PVOID *ppSidGroup, PVOID *ppDacl, PVOID *ppSacl, PVOID *ppSecurityDescriptor)
+{
+    // Mock implementation - return fake pointers
+    static int fakeSid = 0;
+    static int fakeSD = 0;
+
+    if (ppSidOwner) *ppSidOwner = &fakeSid;
+    if (ppSidGroup) *ppSidGroup = &fakeSid;
+    if (ppDacl) *ppDacl = &fakeSid;
+    if (ppSacl) *ppSacl = &fakeSid;
+    if (ppSecurityDescriptor) *ppSecurityDescriptor = &fakeSD;
+
+    return ERROR_SUCCESS;
+}
+
+inline DWORD GetSecurityDescriptorLength(PSECURITY_DESCRIPTOR /*pSecurityDescriptor*/)
+{
+    // Mock implementation - return a fake length
+    return 64;
+}
+
+// Alias for ANSI version
+inline DWORD GetNamedSecurityInfo(PWSTR pObjectName, DWORD ObjectType, DWORD SecurityInfo,
+                                  PVOID *ppSidOwner, PVOID *ppSidGroup, PVOID *ppDacl, PVOID *ppSacl, PVOID *ppSecurityDescriptor)
+{
+    return GetNamedSecurityInfoW(pObjectName, ObjectType, SecurityInfo, ppSidOwner, ppSidGroup, ppDacl, ppSacl, ppSecurityDescriptor);
+}
+
+#endif // !defined(_WIN32)

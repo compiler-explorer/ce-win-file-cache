@@ -23,6 +23,15 @@
         "-j8"
     ],
     "cmake.parallelJobs": 8,
+    "cmake.buildDirectory": "${workspaceFolder}/build-msvc",
+    "cmake.generator": "Ninja",
+    "cmake.preferredGenerators": [
+        "Ninja"
+    ],
+    "cmake.configureEnvironment": {
+        "TMP": "H:/tmp",
+        "TEMP": "H:/tmp"
+    },
     "files.associations": {
         "*.hpp": "cpp",
         "*.h": "c",
@@ -99,7 +108,39 @@
         "format": "cpp",
         "forward_list": "cpp",
         "version": "cpp",
-        "*.inc": "cpp"
+        "*.inc": "cpp",
+        "any": "cpp",
+        "cfenv": "cpp",
+        "complex": "cpp",
+        "coroutine": "cpp",
+        "csignal": "cpp",
+        "expected": "cpp",
+        "filesystem": "cpp",
+        "future": "cpp",
+        "ios": "cpp",
+        "list": "cpp",
+        "locale": "cpp",
+        "queue": "cpp",
+        "ranges": "cpp",
+        "source_location": "cpp",
+        "stack": "cpp",
+        "typeindex": "cpp",
+        "valarray": "cpp",
+        "xfacet": "cpp",
+        "xhash": "cpp",
+        "xiosbase": "cpp",
+        "xlocale": "cpp",
+        "xlocbuf": "cpp",
+        "xlocinfo": "cpp",
+        "xlocmes": "cpp",
+        "xlocmon": "cpp",
+        "xlocnum": "cpp",
+        "xloctime": "cpp",
+        "xmemory": "cpp",
+        "xstring": "cpp",
+        "xtr1common": "cpp",
+        "xtree": "cpp",
+        "xutility": "cpp"
     },
     "files.exclude": {
         "**/.cache/": true

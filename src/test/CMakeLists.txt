@@ -6,22 +6,8 @@ include(CTest)
 
 # Test program sources and targets
 set(TEST_PROGRAMS
-    cache_test
-    cache_demo
-    directory_test
-    async_test
-    filesystem_async_test
-    config_threads_test
-    config_async_test
-    single_thread_test
-    edge_cases_test
-    metrics_test
-    json_config_test
     glob_test
-    file_access_tracker_test
-    directory_integration_test
-    debug_directory_cache_test
-    logging_test
+    glob_matcher_unit_test
 )
 
 # Define test program configurations
@@ -37,6 +23,7 @@ set(edge_cases_test_SOURCES test_edge_cases.cpp ../async_download_manager.cpp ..
 set(metrics_test_SOURCES test_metrics.cpp ../config_parser.cpp ../string_utils.cpp ../metrics_collector.cpp ../prometheus_metrics_impl.cpp ../logger.cpp)
 set(json_config_test_SOURCES test_json_config.cpp ../config_parser.cpp ../string_utils.cpp ../logger.cpp)
 set(glob_test_SOURCES glob_test.cpp ../glob_matcher.cpp)
+set(glob_matcher_unit_test_SOURCES glob_matcher_test.cpp ../glob_matcher.cpp)
 set(file_access_tracker_test_SOURCES test_file_access_tracker.cpp ../file_access_tracker.cpp ../string_utils.cpp ../logger.cpp)
 set(directory_integration_test_SOURCES ../../test_directory_integration.cpp ../hybrid_filesystem.cpp ../directory_cache.cpp ../directory_tree.cpp ../memory_cache_manager.cpp ../async_download_manager.cpp ../config_parser.cpp ../file_access_tracker.cpp ../glob_matcher.cpp ../string_utils.cpp ../metrics_collector.cpp ../prometheus_metrics_impl.cpp ../logger.cpp)
 set(debug_directory_cache_test_SOURCES ../../debug_directory_cache.cpp ../directory_cache.cpp ../directory_tree.cpp ../config_parser.cpp ../string_utils.cpp ../logger.cpp)
@@ -53,6 +40,11 @@ foreach(TEST_PROGRAM ${TEST_PROGRAMS})
     
     # Link nlohmann_json and fmt for all test programs
     target_link_libraries(${TEST_PROGRAM} nlohmann_json::nlohmann_json fmt::fmt)
+
+    # Link Catch2 for unit test programs
+    if(TEST_PROGRAM STREQUAL "glob_matcher_unit_test")
+        target_link_libraries(${TEST_PROGRAM} Catch2::Catch2WithMain)
+    endif()
     
     # Add Prometheus definitions and libraries for metrics_test and directory_integration_test
     if(TEST_PROGRAM STREQUAL "metrics_test" OR TEST_PROGRAM STREQUAL "directory_integration_test")
@@ -81,24 +73,6 @@ foreach(TEST_PROGRAM ${TEST_PROGRAMS})
         target_compile_options(${TEST_PROGRAM} PRIVATE -Wall -Wextra)
     endif()
 endforeach()
-
-# Catch2 unit tests
-add_executable(glob_matcher_unit_test 
-    glob_matcher_test.cpp 
-    ../glob_matcher.cpp
-)
-
-target_compile_definitions(glob_matcher_unit_test PRIVATE NO_WINFSP)
-target_link_libraries(glob_matcher_unit_test PRIVATE Catch2::Catch2WithMain)
-target_include_directories(glob_matcher_unit_test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../include
-)
-
-set_target_properties(glob_matcher_unit_test PROPERTIES
-    CXX_STANDARD 20
-    CXX_STANDARD_REQUIRED ON
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-)
 
 # Register the test with CTest
 add_test(NAME GlobMatcherTests COMMAND glob_matcher_unit_test)

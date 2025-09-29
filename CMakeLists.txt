@@ -256,6 +256,7 @@ set(SOURCES
     src/string_utils.cpp
     src/logger.cpp
     src/main.cpp
+    src/time_utils.cpp
 )
 
 # Add metrics source if prometheus is available

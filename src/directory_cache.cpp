@@ -157,7 +157,13 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryMock(const std::wstring &netwo
                 else if (entry.is_regular_file())
                 {
                     UINT64 file_size = fs::file_size(entry);
-                    directory_tree.addFile(child_virtual_path, child_network_path, file_size, nullptr);
+
+                    // Create default FILETIME structures (set to zero)
+                    FILETIME default_time = {0, 0};
+
+                    directory_tree.addFile(child_virtual_path, child_network_path, file_size,
+                                         default_time, default_time, default_time,
+                                         FILE_ATTRIBUTE_NORMAL);
                 }
             }
         }

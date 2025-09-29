@@ -1,4 +1,4 @@
-# CompilerCacheFS
+# CeWinFileCacheFS
 
 [![Tests](https://github.com/compiler-explorer/ce-win-file-cache/actions/workflows/test.yml/badge.svg)](https://github.com/compiler-explorer/ce-win-file-cache/actions/workflows/test.yml)
 [![Code Quality](https://github.com/compiler-explorer/ce-win-file-cache/actions/workflows/code-quality.yml/badge.svg)](https://github.com/compiler-explorer/ce-win-file-cache/actions/workflows/code-quality.yml)
@@ -298,7 +298,7 @@ CeWinFileCacheFS.exe --test-paths --config compilers.json
 
 Enable debug logging for troubleshooting:
 ```cmd
-CompilerCacheFS.exe --debug 1 --mount M:
+CeWinFileCacheFS.exe --debug 1 --mount M:
 ```
 
 ### Cache Management

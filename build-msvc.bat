@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 REM Set up MSVC environment and build with CMake
 
 echo Setting up MSVC environment...
@@ -23,18 +24,18 @@ set "LIB=%MSVC_ROOT%\lib\x64;%WINDOWS_SDK_ROOT%\Lib\%WINDOWS_SDK_VERSION%\ucrt\x
 set "LIBPATH=%MSVC_ROOT%\lib\x64;%WINDOWS_SDK_ROOT%\Lib\%WINDOWS_SDK_VERSION%\ucrt\x64;%WINDOWS_SDK_ROOT%\Lib\%WINDOWS_SDK_VERSION%\um\x64"
 
 REM Clean and configure
-echo Cleaning build directory...
-if exist build-msvc rmdir /s /q build-msvc
-mkdir build-msvc
+REM echo Cleaning build directory...
+REM if exist build-msvc rmdir /s /q build-msvc
+REM mkdir build-msvc
 
 echo Configuring with CMake...
 cmake.exe . -B build-msvc ^
-    -DCMAKE_TOOLCHAIN_FILE=D:/opt/ce-win-file-cache/msvc-toolchain.cmake ^
+    -DCMAKE_TOOLCHAIN_FILE=H:/opt/ce-win-file-cache/msvc-toolchain.cmake ^
     -DCMAKE_BUILD_TYPE=Release ^
     -G "Ninja" ^
     -DCMAKE_MAKE_PROGRAM=ninja.exe
 
-if %errorlevel% neq 0 (
+if !errorlevel! neq 0 (
     echo Configuration failed!
     exit /b 1
 )
@@ -42,7 +43,7 @@ if %errorlevel% neq 0 (
 echo Building...
 cmake.exe --build build-msvc --config Release
 
-if %errorlevel% neq 0 (
+if !errorlevel! neq 0 (
     echo Build failed!
     exit /b 1
 )
@@ -56,3 +57,8 @@ echo Copying config file to executable directory...
 copy "compilers.json" "build-msvc\bin\"
 
 echo Setup complete!
+
+
+echo Running
+cd build-msvc\bin
+.\CeWinFileCacheFS.exe -d 1 --mount "M:" --log-level debug

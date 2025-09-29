@@ -32,7 +32,6 @@ class HybridFileSystem : public Fsp::FileSystemBase
     NTSTATUS Init(PVOID Host) override;
     NTSTATUS GetVolumeInfo(VolumeInfo *VolumeInfo) override;
     NTSTATUS GetSecurityByName(PWSTR FileName, PUINT32 PFileAttributes, PSECURITY_DESCRIPTOR SecurityDescriptor, SIZE_T *PSecurityDescriptorSize) override;
-    NTSTATUS GetFileInfoByName(PWSTR FileName, FileInfo *FileInfo);
     NTSTATUS Open(PWSTR FileName, UINT32 CreateOptions, UINT32 GrantedAccess, PVOID *PFileNode, PVOID *PFileDesc, OpenFileInfo *OpenFileInfo) override;
     VOID Close(PVOID FileNode, PVOID FileDesc) override;
     NTSTATUS Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UINT64 Offset, ULONG Length, PULONG PBytesTransferred) override;
@@ -42,6 +41,9 @@ class HybridFileSystem : public Fsp::FileSystemBase
     NTSTATUS SetSecurity(PVOID FileNode, PVOID FileDesc, SECURITY_INFORMATION SecurityInformation, PSECURITY_DESCRIPTOR ModificationDescriptor) override;
     NTSTATUS ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID Buffer, ULONG Length, PULONG PBytesTransferred) override;
     NTSTATUS ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID *PContext, DirInfo *DirInfo) override;
+    NTSTATUS GetStreamInfo(PVOID FileNode, PVOID FileDesc, PVOID Buffer, ULONG Length, PULONG PBytesTransferred) override;
+    // NTSTATUS GetEa(PVOID FileNode, PVOID FileDesc, PFILE_FULL_EA_INFORMATION Ea, ULONG EaLength, PULONG PBytesTransferred) override;
+    // NTSTATUS SetEa(PVOID FileNode, PVOID FileDesc, PFILE_FULL_EA_INFORMATION Ea, ULONG EaLength, FileInfo *FileInfo) override;
 
     private:
     // Internal methods
@@ -53,6 +55,7 @@ class HybridFileSystem : public Fsp::FileSystemBase
     CachePolicy determineCachePolicy(const std::wstring &virtual_path);
     std::wstring createTemporaryFileForMemoryCached(CacheEntry *entry);
 
+    NTSTATUS GetFileInfoByName(PWSTR FileName, FileInfo *FileInfo);
     void copyFileInfo(CacheEntry *source, FileInfo *dest) const;
 
     // Path normalization for Windows (handle both / and \ as separators)
@@ -60,6 +63,8 @@ class HybridFileSystem : public Fsp::FileSystemBase
 
     // Directory tree management
     void fillDirInfo(DirInfo *dir_info, DirectoryNode *node);
+    std::vector<DirectoryNode *> filterDirectoryContents(const std::vector<DirectoryNode *> &contents, PWSTR pattern, const char *context);
+    NTSTATUS handleFileAsDirectoryEntry(CacheEntry *entry, PWSTR Pattern, PWSTR Marker, PVOID Buffer, ULONG Length, PULONG PBytesTransferred);
 
     // Cache management
     NTSTATUS evictIfNeeded();

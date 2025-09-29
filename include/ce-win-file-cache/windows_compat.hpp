@@ -3,11 +3,79 @@
 // Unified Windows compatibility header
 // Handles Wine cross-compilation and native Windows compilation
 
-#ifdef NO_WINFSP
-// macOS/Linux compatibility mode
+#if defined(NO_WINFSP) && !defined(_WIN32)
+// Compatibility mode for non-Windows platforms (macOS/Linux)
 #include "macos_compat.hpp"
 #elif defined(WINE_CROSS_COMPILE)
 #include "wine_compat.hpp"
+#elif defined(NO_WINFSP) && defined(_WIN32)
+// Windows unit tests - use native Windows headers but without WinFsp
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#define WIN32_NO_STATUS  // Prevent status code conflicts
+#include "alfaheader.h"
+#undef WIN32_NO_STATUS   // Allow ntstatus.h to define them
+#include <ntstatus.h>
+#include <shellapi.h>
+#include <shlobj.h>
+#include <strsafe.h>
+#include <winnetwk.h>
+#include <winternl.h>
+#include <AclAPI.h>
+
+// Define PNTSTATUS if not already defined
+#ifndef PNTSTATUS
+typedef NTSTATUS *PNTSTATUS;
+#endif
+
+// Windows unit test compatibility namespace
+namespace CeWinFileCache
+{
+namespace WineCompat
+{
+
+// Helper function to convert Win32 errors to NTSTATUS for Windows unit tests
+inline NTSTATUS NtStatusFromWin32(DWORD error)
+{
+    if (error == ERROR_SUCCESS)
+        return STATUS_SUCCESS;
+
+    // Map common Win32 errors to NTSTATUS
+    switch (error)
+    {
+    case ERROR_FILE_NOT_FOUND:
+    case ERROR_PATH_NOT_FOUND:
+        return STATUS_OBJECT_NAME_NOT_FOUND;
+    case ERROR_INVALID_NAME:
+        return STATUS_OBJECT_NAME_INVALID;
+    case ERROR_ACCESS_DENIED:
+        return STATUS_ACCESS_DENIED;
+    case ERROR_INSUFFICIENT_BUFFER:
+        return STATUS_BUFFER_TOO_SMALL;
+    case ERROR_NO_MORE_FILES:
+        return STATUS_NO_MORE_FILES;
+    case ERROR_DISK_FULL:
+        return STATUS_DISK_FULL;
+    case ERROR_INVALID_HANDLE:
+        return STATUS_INVALID_HANDLE;
+    default:
+        return HRESULT_FROM_WIN32(error);
+    }
+}
+
+// Helper for converting GetLastError() to NTSTATUS on Windows unit tests
+inline NTSTATUS GetLastErrorAsNtStatus()
+{
+    return NtStatusFromWin32(GetLastError());
+}
+
+} // namespace WineCompat
+} // namespace CeWinFileCache
+
 #else
 // Native Windows includes
 #ifndef NOMINMAX
@@ -16,7 +84,9 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+#define WIN32_NO_STATUS  // Prevent status code conflicts
 #include "alfaheader.h"
+#undef WIN32_NO_STATUS   // Allow ntstatus.h to define them
 #include <ntstatus.h>
 #include <shellapi.h>
 #include <shlobj.h>
