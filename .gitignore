@@ -70,6 +70,7 @@ _deps/
 # Cache directories
 CompilerCache/
 Cache/
+gen/
 
 # IDE files
 *.swp
