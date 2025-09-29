@@ -1,5 +1,0 @@
-if(EXISTS "/Users/patrickquist/Documents/ce-win-file-cache/build/src/test/glob_matcher_unit_test-b12d07c_tests.cmake")
-  include("/Users/patrickquist/Documents/ce-win-file-cache/build/src/test/glob_matcher_unit_test-b12d07c_tests.cmake")
-else()
-  add_test(glob_matcher_unit_test_NOT_BUILT-b12d07c glob_matcher_unit_test_NOT_BUILT-b12d07c)
-endif()
