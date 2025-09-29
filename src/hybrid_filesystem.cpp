@@ -6,9 +6,7 @@
 #include <ce-win-file-cache/string_utils.hpp>
 #include <ce-win-file-cache/windows_compat.hpp>
 #include <chrono>
-#include <iomanip>
 #include <vector>
-#include <cwctype>
 
 #ifndef NO_WINFSP
 #include <sddl.h>
