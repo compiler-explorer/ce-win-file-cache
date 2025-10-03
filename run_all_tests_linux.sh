@@ -122,10 +122,10 @@ for exe in "$BUILD_DIR/bin"/*; do
 done
 echo "Found $TESTS_FOUND test executables"
 
-# Expected test programs
-EXPECTED_TESTS=("cache_test" "cache_demo" "directory_test" "async_test" "filesystem_async_test" 
-                "config_threads_test" "config_async_test" "single_thread_test" "edge_cases_test" 
-                "metrics_test" "json_config_test" "glob_test" "glob_matcher_unit_test")
+# Expected test programs (directory_test excluded - depends on Windows-specific directory_tree code)
+EXPECTED_TESTS=("cache_test" "cache_demo" "async_test" "filesystem_async_test"
+                "config_threads_test" "config_async_test" "single_thread_test" "edge_cases_test"
+                "metrics_test" "json_config_test" "glob_test" "glob_matcher_unit_test" "file_access_tracker_test")
 
 echo "Expected ${#EXPECTED_TESTS[@]} test programs, but found $TESTS_FOUND"
 
@@ -203,7 +203,7 @@ echo
 # Run all tests with their specific arguments
 run_test "cache_test" "--test-cache"
 run_test "cache_demo" ""
-run_test "directory_test" ""
+# directory_test skipped - depends on Windows-specific directory_tree code
 run_test "async_test" ""
 run_test "filesystem_async_test" ""
 run_test "config_threads_test" ""
@@ -211,8 +211,10 @@ run_test "config_async_test" ""
 run_test "single_thread_test" ""
 run_test "edge_cases_test" ""
 run_test "metrics_test" ""
+run_test "json_config_test" ""
 run_test "glob_test" ""
 run_test "glob_matcher_unit_test" ""
+run_test "file_access_tracker_test" ""
 
 # Run CTest unit tests if available
 echo -e "${BLUE}--- Running CTest unit tests ---${NC}"
