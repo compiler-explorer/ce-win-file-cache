@@ -1,13 +1,14 @@
 {
   "compilers": {
-    "msvc-14.40": {
+    "compilers/msvc/14.40.33807-14.40.33811.0": {
       "network_path": "\\\\127.0.0.1\\efs\\compilers\\msvc\\14.40.33807-14.40.33811.0",
-	  "root_path": "\\\\127.0.0.1\\efs",
+      "root_path": "\\\\127.0.0.1\\efs",
       "cache_size_mb": 2048,
       "cache_always": [
-        "bin/Hostx64/x64/*.exe",
-        "bin/Hostx64/x64/*.dll",
-        "include/**/*.h",
+        "bin/**/*.exe",
+        "bin/**/*.dll",
+        "bin/**/*.config",
+        "include/**",
         "lib/x64/*.lib"
       ],
       "prefetch_patterns": [
@@ -15,14 +16,53 @@
         "include/**/*.hpp"
       ]
     },
-    "windows-kits-10": {
-      "network_path": "\\\\127.0.0.1\\efs\\compilers\\windows-kits-10",
-	  "root_path": "\\\\127.0.0.1\\efs",
+    "compilers/msvc/14.38.33130-14.38.33133.0": {
+      "network_path": "\\\\127.0.0.1\\efs\\compilers\\msvc\\14.38.33130-14.38.33133.0",
+      "root_path": "\\\\127.0.0.1\\efs",
+      "cache_size_mb": 2048,
+      "cache_always": [
+        "bin/**/*.exe",
+        "bin/**/*.dll",
+        "bin/**/*.config",
+        "include/**",
+        "lib/x64/*.lib"
+      ],
+      "prefetch_patterns": [
+        "include/**"
+      ]
+    },
+    "compilers/mingw-w64-12.2.0-16.0.0-10.0.0-ucrt-r5": {
+      "network_path": "\\\\127.0.0.1\\efs\\compilers\\mingw-w64-12.2.0-16.0.0-10.0.0-ucrt-r5",
+      "root_path": "\\\\127.0.0.1\\efs",
+      "cache_size_mb": 2048,
+      "cache_always": [
+        "bin/*.exe",
+        "bin/*.dll",
+        "share/cmake-3.26/Modules/**/*.cmake"
+      ],
+      "prefetch_patterns": [
+        "share/cmake-3.26/Modules/**/*.cmake"
+      ]
+    },
+    "compilers/mingw-w64-12.2.0-15.0.7-10.0.0-ucrt-r4": {
+      "network_path": "\\\\127.0.0.1\\efs\\compilers\\mingw-w64-12.2.0-15.0.7-10.0.0-ucrt-r4",
+      "root_path": "\\\\127.0.0.1\\efs",
       "cache_size_mb": 1024,
       "cache_always": [
-        "Include/**/*.h",
+        "bin/*.exe",
+        "bin/*.dll"
+      ],
+      "prefetch_patterns": []
+    },
+    "compilers/windows-kits-10": {
+      "network_path": "\\\\127.0.0.1\\efs\\compilers\\windows-kits-10",
+      "root_path": "\\\\127.0.0.1\\efs",
+      "cache_size_mb": 2048,
+      "cache_always": [
+        "Include/**",
         "Lib/**/*.lib",
-        "bin/**/*.exe"
+        "bin/*.exe",
+        "bin/*.dll"
       ],
       "prefetch_patterns": [
         "Include/**/*.h"
@@ -30,7 +70,7 @@
     }
   },
   "global": {
-    "total_cache_size_mb": 8192,
+    "total_cache_size_mb": 16384,
     "eviction_policy": "lru",
     "cache_directory": "D:\\CompilerCache",
     "download_threads": 6,

@@ -2,7 +2,7 @@
 #include "../include/ce-win-file-cache/logger.hpp"
 #include "../include/ce-win-file-cache/string_utils.hpp"
 #include <filesystem>
-#include <set>
+#include <unordered_set>
 
 #ifdef NO_WINFSP
 #include <fstream>
@@ -35,19 +35,29 @@ DirectoryNode *DirectoryCache::findNode(const std::wstring &virtual_path)
 
 NTSTATUS DirectoryCache::buildDirectoryTreeFromConfig(const Config &config)
 {
-    // Build directory tree from all configured compilers
+    // Build directory tree from root_path (not individual network paths)
+    // The root_path should be the base of the virtual filesystem
+
+    std::unordered_set<std::wstring> processed_roots;
+
     for (const auto &[compiler_name, compiler_config] : config.compilers)
     {
+        // Skip if we've already processed this root_path
+        if (processed_roots.find(compiler_config.root_path) != processed_roots.end())
+        {
+            continue;
+        }
+        processed_roots.insert(compiler_config.root_path);
+
+        // Initialize the tree with the root path
         directory_tree.init(compiler_config.root_path);
 
-        std::wstring virtual_root = std::filesystem::relative(compiler_config.network_path, compiler_config.root_path).wstring();
-        virtual_root = DirectoryNode::normalizePath(L"/" + virtual_root);
+        // Enumerate the entire directory structure starting from root_path
+        // This shows ALL directories from the base root, not just specific compiler paths
+        Logger::info(LogCategory::DIRECTORY, "Enumerating entire directory tree from root: '{}'",
+                     StringUtils::wideToUtf8(compiler_config.root_path));
 
-        // Add compiler root directory
-        directory_tree.addDirectory(virtual_root, compiler_config.network_path);
-
-        // Enumerate network directory to build complete tree
-        (void)enumerateNetworkDirectory(compiler_config.network_path, virtual_root);
+        (void)enumerateNetworkDirectory(compiler_config.root_path, L"/");
         // Don't fail initialization if some network paths are inaccessible
         // Directory tree will be built on-demand during access
     }
@@ -71,6 +81,11 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryWindows(const std::wstring &ne
 {
     WIN32_FIND_DATAW find_data;
     std::wstring search_pattern = network_path + L"\\*";
+    std::wstring child_virtual_path;
+    std::wstring child_network_path;
+
+    child_virtual_path.reserve(4096);
+    child_network_path.reserve(4096);
 
     HANDLE find_handle = FindFirstFileW(search_pattern.c_str(), &find_data);
     if (find_handle == INVALID_HANDLE_VALUE)
@@ -87,9 +102,11 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryWindows(const std::wstring &ne
             continue;
         }
 
-        std::wstring child_name = find_data.cFileName;
-        std::wstring child_virtual_path = DirectoryNode::normalizePath(virtual_path + L"/" + child_name);
-        std::wstring child_network_path = network_path + L"\\" + child_name;
+        child_virtual_path.clear();
+        child_virtual_path.append(DirectoryNode::normalizePath(virtual_path + L"/" + find_data.cFileName));
+
+        child_network_path.clear();
+        child_network_path.append(network_path + L"\\" + find_data.cFileName);
 
         if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
         {
@@ -97,7 +114,7 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryWindows(const std::wstring &ne
             directory_tree.addDirectory(child_virtual_path, child_network_path);
 
             // Recursively enumerate subdirectory with cycle detection
-            static thread_local std::set<std::wstring> visited_paths;
+            static thread_local std::unordered_set<std::wstring> visited_paths;
 
             // Check for circular references (junction points, symbolic links)
             if (visited_paths.find(child_network_path) == visited_paths.end())

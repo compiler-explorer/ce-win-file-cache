@@ -365,7 +365,7 @@ if((WIN32 OR USE_WINE_WINDOWS_API) AND TARGET ${PROJECT_NAME})
         target_compile_options(${PROJECT_NAME} PRIVATE
             /W4 /wd4464 /wd5039 /wd4005 /wd4820 /wd4625 /wd4626 /wd5219 /wd4244 /wd4100 /wd4815
             /Zc:strictStrings-
-            $<$<CONFIG:Release>:/O2 /GL>
+            $<$<CONFIG:Release>:/O2 /GL /favor:INTEL64 /arch:AVX2>
         )
         
         # Enable LTO for release builds (disabled for cross-compilation compatibility)

@@ -32,7 +32,8 @@
       "Read(//c/PROGRA~2/WinFsp/inc/winfsp/**)",
       "Read(//d/efs/compilers/msvc/14.40.33807-14.40.33811.0/bin/**)",
       "Bash(./build-msvc.bat)",
-      "Bash(./build-with-tests.bat)"
+      "Bash(./build-with-tests.bat)",
+      "WebFetch(domain:127.0.0.1)"
     ],
     "deny": []
   }

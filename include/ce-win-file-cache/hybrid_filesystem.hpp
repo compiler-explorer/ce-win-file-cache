@@ -76,6 +76,14 @@ class HybridFileSystem : public Fsp::FileSystemBase
     size_t current_cache_size;
     uint64_t creation_time;
 
+// Test access - allow tests to access private members
+#ifdef ENABLE_TEST_ACCESS
+public:
+    CachePolicy testDetermineCachePolicy(const std::wstring &path) { return determineCachePolicy(path); }
+    void testSetConfig(const Config &test_config) { config = test_config; }
+private:
+#endif
+
     // In-memory cache for fast file access
     MemoryCacheManager memory_cache;
 

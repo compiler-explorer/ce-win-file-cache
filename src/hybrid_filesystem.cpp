@@ -186,7 +186,7 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
     CacheEntry *entry = getCacheEntry(virtual_path);
     if (!entry)
     {
-        Logger::warn(LogCategory::SECURITY, "GetSecurityByName() - entry NOT FOUND for: '{}'", StringUtils::wideToUtf8(virtual_path));
+        Logger::debug(LogCategory::SECURITY, "GetSecurityByName() - entry NOT FOUND for: '{}'", StringUtils::wideToUtf8(virtual_path));
         return STATUS_OBJECT_NAME_NOT_FOUND;
     }
 
@@ -195,7 +195,7 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
     if (PFileAttributes)
     {
         *PFileAttributes = entry->file_attributes;
-        Logger::info(LogCategory::SECURITY, "GetSecurityByName() - returning file attributes: 0x{:x} for: {}", *PFileAttributes, StringUtils::wideToUtf8(virtual_path));
+        Logger::debug(LogCategory::SECURITY, "GetSecurityByName() - returning file attributes: 0x{:x} for: {}", *PFileAttributes, StringUtils::wideToUtf8(virtual_path));
 
         // Special logging for castguard.h to debug QueryDirectory issue
         if (virtual_path.find(L"castguard.h") != std::wstring::npos)
@@ -206,14 +206,6 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
                          entry->file_attributes);
         }
 
-        // Special logging for crtdefs.h to debug Properties dialog issue
-        if (virtual_path.find(L"crtdefs.h") != std::wstring::npos)
-        {
-            Logger::error(LogCategory::SECURITY, "CRTDEFS DEBUG - GetSecurityByName() File: {}, Attributes: 0x{:x}, IsDirectory: {}, entry->file_attributes: 0x{:x}",
-                         StringUtils::wideToUtf8(virtual_path), *PFileAttributes,
-                         (*PFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? "YES" : "NO",
-                         entry->file_attributes);
-        }
     }
 
     if (entry->SecDesc != nullptr)
@@ -249,9 +241,10 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
                     // Check if the provided buffer is large enough
                     if (*PSecurityDescriptorSize < sdSize)
                     {
+                        SIZE_T provided_size = *PSecurityDescriptorSize;
                         *PSecurityDescriptorSize = sdSize;
-                        Logger::debug(LogCategory::SECURITY, "GetSecurityByName() - buffer too small, need: {}", sdSize);
-                        return STATUS_BUFFER_TOO_SMALL;
+                        Logger::debug(LogCategory::SECURITY, "GetSecurityByName() - buffer too small, provided: {}, need: {}", provided_size, sdSize);
+                        return STATUS_BUFFER_OVERFLOW;  // WinFsp retries on STATUS_BUFFER_OVERFLOW, not STATUS_BUFFER_TOO_SMALL
                     }
 
                     // Copy the security descriptor to the output buffer
@@ -285,10 +278,11 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
 
             if (*PSecurityDescriptorSize < sdSize)
             {
+                SIZE_T provided_size = *PSecurityDescriptorSize;
                 *PSecurityDescriptorSize = sdSize;
                 LocalFree(temp_descriptor);
-                Logger::debug(LogCategory::SECURITY, "GetSecurityByName() - fallback buffer too small, need: {}", sdSize);
-                return STATUS_BUFFER_TOO_SMALL;
+                Logger::debug(LogCategory::SECURITY, "GetSecurityByName() - fallback buffer too small, provided: {}, need: {}", provided_size, sdSize);
+                return STATUS_BUFFER_OVERFLOW;  // WinFsp retries on STATUS_BUFFER_OVERFLOW, not STATUS_BUFFER_TOO_SMALL
             }
 
             memcpy(SecurityDescriptor, temp_descriptor, sdSize);
@@ -353,7 +347,7 @@ NTSTATUS HybridFileSystem::GetFileInfoByName(PWSTR FileName, FileInfo *FileInfo)
 NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 GrantedAccess, PVOID *PFileNode, PVOID *PFileDesc, OpenFileInfo *OpenFileInfo)
 {
     std::wstring virtual_path(FileName);
-    Logger::info(LogCategory::FILESYSTEM, "Open() called for: '{}', CreateOptions: 0x{:x}", StringUtils::wideToUtf8(virtual_path), CreateOptions);
+    Logger::debug(LogCategory::FILESYSTEM, "Open() called for: '{}', CreateOptions: 0x{:x}", StringUtils::wideToUtf8(virtual_path), CreateOptions);
 
     *PFileNode = nullptr;
     *PFileDesc = nullptr;
@@ -430,21 +424,41 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
             Logger::debug(LogCategory::FILESYSTEM, "Open() - calling isFileInMemoryCache for: {}", StringUtils::wideToUtf8(entry->virtual_path));
             if (memory_cache.isFileInMemoryCache(entry->virtual_path))
             {
-                // File is in memory - create a temporary file if we need a handle for compatibility
-                std::wstring temp_path = createTemporaryFileForMemoryCached(entry);
+                // Check if we need a real file on disk (executables, DLLs, libs need physical paths)
+                std::wstring lower_path = entry->virtual_path;
+                std::transform(lower_path.begin(), lower_path.end(), lower_path.begin(), ::towlower);
+                bool needs_disk_file = (lower_path.ends_with(L".exe") ||
+                                       lower_path.ends_with(L".dll") ||
+                                       lower_path.ends_with(L".lib"));
 
-                if (!temp_path.empty())
+                if (needs_disk_file)
                 {
-                    file_desc->handle =
-                    CreateFileW(temp_path.c_str(), GrantedAccess, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                nullptr, OPEN_EXISTING, create_flags | FILE_FLAG_DELETE_ON_CLOSE, nullptr);
-                    entry->local_path = temp_path; // Track temp file for cleanup
+                    // Create a persistent cache file for executables/DLLs that need to be loaded
+                    std::wstring cache_file_path = createTemporaryFileForMemoryCached(entry);
+
+                    if (!cache_file_path.empty())
+                    {
+                        file_desc->handle =
+                        CreateFileW(cache_file_path.c_str(), GrantedAccess, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                    nullptr, OPEN_EXISTING, create_flags, nullptr);
+                        // Store the persistent cache file path for reuse
+                        entry->local_path = cache_file_path;
+                    }
+                    else
+                    {
+                        // If cache file creation fails, fallback to network
+                        file_desc->handle = CreateFileW(entry->network_path.c_str(), GrantedAccess,
+                                                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                                                        OPEN_EXISTING, create_flags, nullptr);
+                    }
                 }
                 else
                 {
-                    // If temp file creation fails, use INVALID_HANDLE_VALUE
-                    // Read method will still work with memory cache
+                    // For non-executables (headers, .lib files), serve directly from memory - no disk file needed
+                    // Set INVALID_HANDLE_VALUE - Read() will serve from memory cache
                     file_desc->handle = INVALID_HANDLE_VALUE;
+                    Logger::debug(LogCategory::CACHE, "Open() - serving from memory cache (no handle) for: {}",
+                                StringUtils::wideToUtf8(entry->virtual_path));
                 }
             }
             else
@@ -468,7 +482,14 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         if (file_desc->handle == INVALID_HANDLE_VALUE && !(entry->state == FileState::CACHED && entry->local_path.empty() &&
                                                            memory_cache.isFileInMemoryCache(entry->virtual_path)))
         {
-            Logger::error(LogCategory::FILESYSTEM, "Open() - file handle creation failed");
+            DWORD lastError = GetLastError();
+            std::wstring attempted_path = entry->local_path.empty() ? entry->network_path : entry->local_path;
+            Logger::error(LogCategory::FILESYSTEM,
+                "Open() - file handle creation failed for '{}', state: {}, attempted_path: '{}', Windows error: {} (0x{:x})",
+                StringUtils::wideToUtf8(entry->virtual_path),
+                static_cast<int>(entry->state),
+                StringUtils::wideToUtf8(attempted_path),
+                lastError, lastError);
             delete file_desc;
             return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
         }
@@ -487,7 +508,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         // Ensure directories have size 0
         OpenFileInfo->FileInfo.FileSize = 0;
         OpenFileInfo->FileInfo.AllocationSize = ALLOCATION_UNIT;
-        Logger::info(LogCategory::FILESYSTEM, "Open() - Directory: {}, Size: {}, Attributes: 0x{:x}",
+        Logger::debug(LogCategory::FILESYSTEM, "Open() - Directory: {}, Size: {}, Attributes: 0x{:x}",
                      StringUtils::wideToUtf8(entry->virtual_path), OpenFileInfo->FileInfo.FileSize, OpenFileInfo->FileInfo.FileAttributes);
     }
     else
@@ -496,7 +517,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         // Use cached metadata from DirectoryNode instead of querying handle
         // This ensures consistent file information for virtual filesystem files
         copyFileInfo(entry, &OpenFileInfo->FileInfo);
-        Logger::info(LogCategory::FILESYSTEM, "Open() - File: {}, Size: {}, Attributes: 0x{:x}",
+        Logger::debug(LogCategory::FILESYSTEM, "Open() - File: {}, Size: {}, Attributes: 0x{:x}",
                      StringUtils::wideToUtf8(entry->virtual_path), OpenFileInfo->FileInfo.FileSize, OpenFileInfo->FileInfo.FileAttributes);
 
         // Special logging for castguard.h to debug QueryDirectory issue
@@ -508,14 +529,6 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
                          entry->file_attributes);
         }
 
-        // Special logging for crtdefs.h to debug Properties dialog issue
-        if (entry->virtual_path.find(L"crtdefs.h") != std::wstring::npos)
-        {
-            Logger::error(LogCategory::FILESYSTEM, "CRTDEFS DEBUG - Open() File: {}, Attributes: 0x{:x}, IsDirectory: {}, entry->file_attributes: 0x{:x}",
-                         StringUtils::wideToUtf8(entry->virtual_path), OpenFileInfo->FileInfo.FileAttributes,
-                         (OpenFileInfo->FileInfo.FileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? "YES" : "NO",
-                         entry->file_attributes);
-        }
     }
 
 
@@ -571,6 +584,9 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
     auto start_time = std::chrono::high_resolution_clock::now();
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
 
+    std::string path_str = file_desc->entry ? StringUtils::wideToUtf8(file_desc->entry->virtual_path) : "unknown";
+    Logger::debug(LogCategory::FILESYSTEM, "Read() called for: '{}', Offset: {}, Length: {}", path_str, Offset, Length);
+
     // Record filesystem operation
     GlobalMetrics::instance().recordFilesystemOperation("read");
 
@@ -611,10 +627,15 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
     overlapped.Offset = static_cast<DWORD>(Offset);
     overlapped.OffsetHigh = static_cast<DWORD>(Offset >> 32);
 
+    Logger::debug(LogCategory::FILESYSTEM, "Read() - reading from file handle for: '{}'", path_str);
     if (!ReadFile(file_desc->handle, Buffer, Length, PBytesTransferred, &overlapped))
     {
+        DWORD error = GetLastError();
+        Logger::error(LogCategory::FILESYSTEM, "Read() - ReadFile failed for: '{}', Error: {}", path_str, error);
         return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
     }
+
+    Logger::debug(LogCategory::FILESYSTEM, "Read() - success for: '{}', BytesTransferred: {}", path_str, *PBytesTransferred);
 
     // Update access statistics
     if (file_desc->entry)
@@ -655,7 +676,7 @@ NTSTATUS HybridFileSystem::GetFileInfo(PVOID FileNode, PVOID FileDesc, FileInfo 
     copyFileInfo(entry, FileInfo);
 
     // Log key values for Properties dialog debugging
-    Logger::info(LogCategory::FILESYSTEM, "GetFileInfo() called - File: {}, Size: {}, Attributes: 0x{:x}, CreationTime: {}",
+    Logger::debug(LogCategory::FILESYSTEM, "GetFileInfo() called - File: {}, Size: {}, Attributes: 0x{:x}, CreationTime: {}",
                  StringUtils::wideToUtf8(entry->virtual_path), entry->file_size, entry->file_attributes, FileInfo->CreationTime);
 
     return STATUS_SUCCESS;
@@ -790,7 +811,7 @@ NTSTATUS HybridFileSystem::SetSecurity(PVOID FileNode, PVOID FileDesc, SECURITY_
 
 NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID Buffer, ULONG Length, PULONG PBytesTransferred)
 {
-    Logger::info(LogCategory::FILESYSTEM, "ReadDirectory() called - Pattern: '{}', Length: {}, Marker: {}",
+    Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() called - Pattern: '{}', Length: {}, Marker: {}",
                  Pattern ? StringUtils::wideToUtf8(Pattern) : "null",
                  Length,
                  Marker ? StringUtils::wideToUtf8(Marker) : "null");
@@ -800,7 +821,7 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
     // Windows filesystem allows QueryDirectory on files to get their directory entry
     if (!file_desc->entry || !(file_desc->entry->file_attributes & FILE_ATTRIBUTE_DIRECTORY))
     {
-        Logger::info(LogCategory::FILESYSTEM, "ReadDirectory() called on file: '{}' - returning file as single directory entry",
+        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() called on file: '{}' - returning file as single directory entry",
                      file_desc->entry ? StringUtils::wideToUtf8(file_desc->entry->virtual_path) : "null");
 
         if (!file_desc->entry)
@@ -878,10 +899,19 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
         // Calculate size needed for this entry
         size_t name_chars = node->name.length();
         size_t name_bytes = name_chars * sizeof(WCHAR);
-        size_t entry_size = sizeof(FSP_FSCTL_DIR_INFO) + name_bytes + sizeof(WCHAR); // +WCHAR for null terminator
+        // Size = base structure + filename bytes (matching WinFsp memfs example)
+        size_t dir_info_size = sizeof(FSP_FSCTL_DIR_INFO) + name_bytes;
 
-        // Align to 8-byte boundary
-        entry_size = (entry_size + 7) & ~7;
+        // Check if entry size exceeds UINT16 maximum
+        if (dir_info_size > UINT16_MAX)
+        {
+            Logger::error(LogCategory::FILESYSTEM, "ReadDirectory() - entry '{}' size {} exceeds UINT16_MAX, skipping",
+                         StringUtils::wideToUtf8(node->name), dir_info_size);
+            continue;
+        }
+
+        // Align to 8-byte boundary for buffer positioning (but Size field stays unaligned)
+        size_t entry_size = (dir_info_size + 7) & ~7;
 
         // Removed verbose per-entry logging for performance
 
@@ -894,7 +924,7 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
 
         // Fill directory info
         FSP_FSCTL_DIR_INFO *dir_info = (FSP_FSCTL_DIR_INFO *)(buffer_ptr + bytes_used);
-        dir_info->Size = (UINT16)entry_size;
+        dir_info->Size = (UINT16)dir_info_size;  // Size field is unaligned
 
         // Set file attributes from cached network data
         dir_info->FileInfo.FileAttributes = node->file_attributes;
@@ -1241,6 +1271,12 @@ CacheEntry *HybridFileSystem::createDynamicCacheEntry(DirectoryNode *node)
 
 NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
 {
+    // Skip directories - they don't need to be cached
+    if (entry->file_attributes & FILE_ATTRIBUTE_DIRECTORY)
+    {
+        return STATUS_SUCCESS;
+    }
+
     if (entry->state == FileState::CACHED)
     {
         // File is already cached in memory
@@ -1378,29 +1414,50 @@ std::vector<DirectoryNode *> HybridFileSystem::filterDirectoryContents(const std
 
 CachePolicy HybridFileSystem::determineCachePolicy(const std::wstring &virtual_path)
 {
-    // Extract compiler name from virtual path (e.g., "/msvc-14.40/bin/cl.exe" -> "msvc-14.40")
+    // Match against configured compiler paths using longest-prefix matching
+    // This handles both simple paths like "/msvc-14.40/bin/cl.exe"
+    // and multi-level paths like "/compilers/msvc/14.40.33807-14.40.33811.0/bin/cl.exe"
     if (virtual_path.empty() || virtual_path[0] != L'/')
     {
         return CachePolicy::NEVER_CACHE;
     }
 
-    size_t second_slash = virtual_path.find(L'/', 1);
-    if (second_slash == std::wstring::npos)
+    std::wstring path_without_leading_slash = virtual_path.substr(1);
+    std::wstring best_match_compiler;
+    size_t best_match_length = 0;
+
+    // Find the longest matching compiler path
+    for (const auto &[compiler_name, compiler_config] : config.compilers)
+    {
+        // Check if virtual path starts with this compiler path
+        if (path_without_leading_slash.starts_with(compiler_name))
+        {
+            // Ensure it's a proper path boundary (next char is / or end of string)
+            size_t compiler_name_len = compiler_name.length();
+            if (compiler_name_len > best_match_length &&
+                (path_without_leading_slash.length() == compiler_name_len ||
+                 path_without_leading_slash[compiler_name_len] == L'/'))
+            {
+                best_match_compiler = compiler_name;
+                best_match_length = compiler_name_len;
+            }
+        }
+    }
+
+    // No matching compiler found
+    if (best_match_compiler.empty())
     {
         return CachePolicy::NEVER_CACHE;
     }
 
-    std::wstring compiler_name = virtual_path.substr(1, second_slash - 1);
-    std::wstring relative_path = virtual_path.substr(second_slash + 1);
+    const auto &compiler_config = config.compilers.at(best_match_compiler);
 
-    // Find compiler config
-    auto compiler_it = config.compilers.find(compiler_name);
-    if (compiler_it == config.compilers.end())
+    // Get relative path within the compiler directory
+    std::wstring relative_path;
+    if (path_without_leading_slash.length() > best_match_length)
     {
-        return CachePolicy::NEVER_CACHE;
+        relative_path = path_without_leading_slash.substr(best_match_length + 1); // +1 to skip the /
     }
-
-    const auto &compiler_config = compiler_it->second;
 
     // Check cache_always_patterns for immediate caching
     for (const auto &pattern : compiler_config.cache_always_patterns)
@@ -1427,40 +1484,60 @@ std::wstring HybridFileSystem::createTemporaryFileForMemoryCached(CacheEntry *en
 
     const auto &content = cached.value();
 
-    // Create temporary file path
-    wchar_t temp_path[MAX_PATH];
-    wchar_t temp_dir[MAX_PATH];
+    // Create persistent cache file path using cache directory
+    std::wstring cache_dir = config.global.cache_directory;
 
-    if (!GetTempPathW(MAX_PATH, temp_dir))
+    // Ensure cache directory exists
+    CreateDirectoryW(cache_dir.c_str(), nullptr);
+
+    // Create simple hash from virtual path for filename
+    std::hash<std::wstring> hasher;
+    size_t path_hash = hasher(entry->virtual_path);
+    std::wstring cache_filename = L"cache_" + std::to_wstring(path_hash) + L".tmp";
+    std::wstring cache_file_path = cache_dir + L"\\" + cache_filename;
+
+    // Check if cache file already exists and is valid
+    WIN32_FILE_ATTRIBUTE_DATA file_attr;
+    if (GetFileAttributesExW(cache_file_path.c_str(), GetFileExInfoStandard, &file_attr))
     {
-        return L"";
+        // File exists - check if size matches
+        LARGE_INTEGER file_size;
+        file_size.LowPart = file_attr.nFileSizeLow;
+        file_size.HighPart = file_attr.nFileSizeHigh;
+
+        if (static_cast<size_t>(file_size.QuadPart) == content.size())
+        {
+            Logger::debug(LogCategory::CACHE, "createTemporaryFileForMemoryCached() - reusing existing cache file: {}",
+                         StringUtils::wideToUtf8(cache_file_path));
+            return cache_file_path;
+        }
     }
 
-    if (!GetTempFileNameW(temp_dir, L"CWF", 0, temp_path))
-    {
-        return L"";
-    }
+    // Write memory content to persistent cache file
+    HANDLE cache_file = CreateFileW(cache_file_path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 
-    // Write memory content to temporary file
-    HANDLE temp_file = CreateFileW(temp_path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
-
-    if (temp_file == INVALID_HANDLE_VALUE)
+    if (cache_file == INVALID_HANDLE_VALUE)
     {
+        Logger::warn(LogCategory::CACHE, "createTemporaryFileForMemoryCached() - failed to create cache file: {}",
+                    StringUtils::wideToUtf8(cache_file_path));
         return L"";
     }
 
     DWORD bytes_written;
-    BOOL write_result = WriteFile(temp_file, content.data(), static_cast<DWORD>(content.size()), &bytes_written, nullptr);
+    BOOL write_result = WriteFile(cache_file, content.data(), static_cast<DWORD>(content.size()), &bytes_written, nullptr);
 
-    CloseHandle(temp_file);
+    CloseHandle(cache_file);
 
     if (!write_result || bytes_written != content.size())
     {
-        DeleteFileW(temp_path); // Clean up on failure
+        DeleteFileW(cache_file_path.c_str()); // Clean up on failure
         return L"";
     }
 
-    return std::wstring(temp_path);
+    Logger::debug(LogCategory::CACHE, "createTemporaryFileForMemoryCached() - created cache file: {} ({} bytes)",
+                 StringUtils::wideToUtf8(cache_file_path), content.size());
+
+    return cache_file_path;
 }
 
 std::wstring HybridFileSystem::normalizePath(const std::wstring &path)
@@ -1519,8 +1596,18 @@ void HybridFileSystem::fillDirInfo(DirInfo *dir_info, DirectoryNode *node)
     size_t name_length_chars = name.length();
     size_t name_size_bytes = name_length_chars * sizeof(WCHAR);
 
-    // Size includes the structure + filename + null terminator
-    dir_info->Size = (UINT16)(sizeof(FSP_FSCTL_DIR_INFO) + name_size_bytes + sizeof(WCHAR));
+    // Size includes the structure + filename (FileNameBuf already counted in sizeof)
+    size_t entry_size = sizeof(FSP_FSCTL_DIR_INFO) + name_size_bytes;
+
+    // Check for overflow before casting to UINT16
+    if (entry_size > UINT16_MAX)
+    {
+        Logger::error(LogCategory::FILESYSTEM, "fillDirInfo() - entry '{}' size {} exceeds UINT16_MAX",
+                     StringUtils::wideToUtf8(name), entry_size);
+        entry_size = UINT16_MAX;
+    }
+
+    dir_info->Size = (UINT16)entry_size;
 
     Logger::info(LogCategory::FILESYSTEM, "fillDirInfo() - filling entry for: '{}', attributes: 0x{:x}, size: {}", StringUtils::wideToUtf8(name), node->file_attributes, dir_info->Size);
 
@@ -1559,9 +1646,8 @@ void HybridFileSystem::fillDirInfo(DirInfo *dir_info, DirectoryNode *node)
     // Clear padding
     memset(dir_info->Padding, 0, sizeof(dir_info->Padding));
 
-    // Copy filename to FileNameBuf with proper null termination
+    // Copy filename with null termination
     memcpy(dir_info->FileNameBuf, name.c_str(), name_size_bytes);
-    // Ensure null termination
     WCHAR *filename_end = (WCHAR *)((char *)dir_info->FileNameBuf + name_size_bytes);
     *filename_end = L'\0';
 
@@ -1632,7 +1718,16 @@ NTSTATUS HybridFileSystem::handleFileAsDirectoryEntry(CacheEntry *entry, PWSTR P
     // Calculate required buffer size
     size_t name_length_chars = filename.length();
     size_t name_size_bytes = name_length_chars * sizeof(WCHAR);
-    size_t required_size = sizeof(FSP_FSCTL_DIR_INFO) + name_size_bytes + sizeof(WCHAR);
+    size_t required_size = sizeof(FSP_FSCTL_DIR_INFO) + name_size_bytes;
+
+    // Check for overflow before using
+    if (required_size > UINT16_MAX)
+    {
+        Logger::error(LogCategory::FILESYSTEM, "handleFileAsDirectoryEntry() - entry '{}' size {} exceeds UINT16_MAX",
+                     StringUtils::wideToUtf8(filename), required_size);
+        *PBytesTransferred = 0;
+        return STATUS_INVALID_PARAMETER;
+    }
 
     if (Length < required_size)
     {
@@ -1674,7 +1769,7 @@ NTSTATUS HybridFileSystem::handleFileAsDirectoryEntry(CacheEntry *entry, PWSTR P
     // Clear padding
     memset(dir_info->Padding, 0, sizeof(dir_info->Padding));
 
-    // Copy filename to FileNameBuf with proper null termination
+    // Copy filename with null termination
     memcpy(dir_info->FileNameBuf, filename.c_str(), name_size_bytes);
     WCHAR *filename_end = (WCHAR *)((char *)dir_info->FileNameBuf + name_size_bytes);
     *filename_end = L'\0';

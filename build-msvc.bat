@@ -59,6 +59,6 @@ copy "compilers.json" "build-msvc\bin\"
 echo Setup complete!
 
 
-echo Running
-cd build-msvc\bin
-.\CeWinFileCacheFS.exe -d 1 --mount "M:" --log-level debug
+@REM echo Running
+@REM cd build-msvc\bin
+@REM .\CeWinFileCacheFS.exe -d 1 --mount "M:" --log-level debug
