@@ -34,6 +34,7 @@ class PrometheusMetricsImpl
     void updateCacheSize(size_t bytes);
     void updateCacheEntryCount(size_t count);
     void recordCacheEviction();
+    void recordCacheEvictionFailed();
 
     // Download metrics
     void recordDownloadQueued();
@@ -65,6 +66,7 @@ class PrometheusMetricsImpl
     prometheus::Gauge *cacheSizeBytes;
     prometheus::Gauge *cacheEntriesTotal;
     prometheus::Counter *cacheEvictionsTotal;
+    prometheus::Counter *cacheEvictionsFailedTotal;
 
     // Download metrics
     prometheus::Counter *downloadsQueuedTotal;

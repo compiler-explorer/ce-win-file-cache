@@ -70,11 +70,28 @@ class HybridFileSystem : public Fsp::FileSystemBase
     NTSTATUS evictIfNeeded();
     void updateAccessTime(CacheEntry *entry);
 
+    // Memory cache eviction with policy-aware LRU
+    size_t performMemoryEviction(size_t bytes_needed);
+
+    // Activity tracking for idle detection
+    void recordActivity();
+    bool isSystemIdle(std::chrono::seconds threshold = std::chrono::seconds(5)) const;
+
+    // Background eviction thread
+    void memoryEvictionThreadFunc();
+
     Config config;
     std::unordered_map<std::wstring, std::unique_ptr<CacheEntry>> cache_entries;
     std::mutex cache_mutex;
     size_t current_cache_size;
     uint64_t creation_time;
+
+    // Activity tracking
+    std::atomic<std::chrono::steady_clock::time_point> last_activity;
+
+    // Background eviction thread
+    std::thread memory_eviction_thread;
+    std::atomic<bool> shutdown_eviction{false};
 
 // Test access - allow tests to access private members
 #ifdef ENABLE_TEST_ACCESS
@@ -109,6 +126,12 @@ struct FileDescriptor
     }
     ~FileDescriptor()
     {
+        // Decrement memory reference count if we were using cached content
+        if (cached_content && entry)
+        {
+            entry->memory_ref_count--;
+        }
+
         if (handle != INVALID_HANDLE_VALUE)
         {
             CloseHandle(handle);

@@ -30,6 +30,7 @@ class MetricsCollector
     void updateCacheSize(size_t bytes);
     void updateCacheEntryCount(size_t count);
     void recordCacheEviction();
+    void recordCacheEvictionFailed();
 
     // Download metrics
     void recordDownloadQueued();
@@ -99,6 +100,9 @@ class MetricsCollector
     {
     }
     void recordCacheEviction()
+    {
+    }
+    void recordCacheEvictionFailed()
     {
     }
 

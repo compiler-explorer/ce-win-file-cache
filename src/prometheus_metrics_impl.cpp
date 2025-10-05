@@ -48,6 +48,12 @@ PrometheusMetricsImpl::PrometheusMetricsImpl(const MetricsConfig &config) : conf
                                .Register(*registry)
                                .Add({});
 
+        cacheEvictionsFailedTotal = &prometheus::BuildCounter()
+                                     .Name("cache_evictions_failed_total")
+                                     .Help("Total number of failed cache eviction attempts (0 files evicted)")
+                                     .Register(*registry)
+                                     .Add({});
+
         // Initialize download metrics
         downloadsQueuedTotal = &prometheus::BuildCounter()
                                 .Name("downloads_queued_total")
@@ -160,6 +166,14 @@ void PrometheusMetricsImpl::recordCacheEviction()
     if (cacheEvictionsTotal)
     {
         cacheEvictionsTotal->Increment();
+    }
+}
+
+void PrometheusMetricsImpl::recordCacheEvictionFailed()
+{
+    if (cacheEvictionsFailedTotal)
+    {
+        cacheEvictionsFailedTotal->Increment();
     }
 }
 

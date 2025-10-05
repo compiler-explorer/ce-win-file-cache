@@ -3,7 +3,6 @@
     "compilers/msvc/14.40.33807-14.40.33811.0": {
       "network_path": "\\\\127.0.0.1\\efs\\compilers\\msvc\\14.40.33807-14.40.33811.0",
       "root_path": "\\\\127.0.0.1\\efs",
-      "cache_size_mb": 2048,
       "cache_always": [
         "bin/**/*.exe",
         "bin/**/*.dll",
@@ -19,7 +18,6 @@
     "compilers/msvc/14.38.33130-14.38.33133.0": {
       "network_path": "\\\\127.0.0.1\\efs\\compilers\\msvc\\14.38.33130-14.38.33133.0",
       "root_path": "\\\\127.0.0.1\\efs",
-      "cache_size_mb": 2048,
       "cache_always": [
         "bin/**/*.exe",
         "bin/**/*.dll",
@@ -34,7 +32,6 @@
     "compilers/mingw-w64-12.2.0-16.0.0-10.0.0-ucrt-r5": {
       "network_path": "\\\\127.0.0.1\\efs\\compilers\\mingw-w64-12.2.0-16.0.0-10.0.0-ucrt-r5",
       "root_path": "\\\\127.0.0.1\\efs",
-      "cache_size_mb": 2048,
       "cache_always": [
         "bin/*.exe",
         "bin/*.dll",
@@ -47,7 +44,6 @@
     "compilers/mingw-w64-12.2.0-15.0.7-10.0.0-ucrt-r4": {
       "network_path": "\\\\127.0.0.1\\efs\\compilers\\mingw-w64-12.2.0-15.0.7-10.0.0-ucrt-r4",
       "root_path": "\\\\127.0.0.1\\efs",
-      "cache_size_mb": 1024,
       "cache_always": [
         "bin/*.exe",
         "bin/*.dll"
@@ -57,7 +53,6 @@
     "compilers/windows-kits-10": {
       "network_path": "\\\\127.0.0.1\\efs\\compilers\\windows-kits-10",
       "root_path": "\\\\127.0.0.1\\efs",
-      "cache_size_mb": 2048,
       "cache_always": [
         "Include/**",
         "Lib/**/*.lib",
@@ -70,7 +65,7 @@
     }
   },
   "global": {
-    "total_cache_size_mb": 16384,
+    "total_cache_size_mb": 4096,
     "eviction_policy": "lru",
     "cache_directory": "D:\\CompilerCache",
     "download_threads": 6,

@@ -282,6 +282,13 @@ bool AsyncDownloadManager::downloadFile(const std::wstring network_path, const s
         }
 
         std::vector<uint8_t> uint8_buffer(buffer.begin(), buffer.end());
+
+        // Check if we need to evict before adding this file
+        if (eviction_callback)
+        {
+            eviction_callback(uint8_buffer.size());
+        }
+
         memory_cache.addFileToMemoryCache(virtual_path, uint8_buffer);
         return true;
     }

@@ -14,7 +14,6 @@ struct CompilerConfig
     std::wstring network_path;
     std::wstring root_path;
     std::vector<std::wstring> cache_always_patterns;
-    size_t cache_size_mb{};
     std::vector<std::wstring> prefetch_patterns;
 };
 

@@ -41,6 +41,12 @@ class AsyncDownloadManager
     AsyncDownloadManager(MemoryCacheManager &memory_cache, const Config &config, size_t thread_count = 4);
     ~AsyncDownloadManager();
 
+    // Set callback for memory eviction check before caching files
+    void setEvictionCallback(std::function<void(size_t)> callback)
+    {
+        eviction_callback = callback;
+    }
+
     NTSTATUS queueDownload(const std::wstring &virtual_path,
                            const std::wstring &network_path,
                            CacheEntry *cache_entry,
@@ -74,6 +80,9 @@ class AsyncDownloadManager
 
     std::atomic<size_t> pending_count{};
     std::atomic<size_t> active_count{};
+
+    // Callback for memory eviction before caching files
+    std::function<void(size_t)> eviction_callback;
 };
 
 } // namespace CeWinFileCache

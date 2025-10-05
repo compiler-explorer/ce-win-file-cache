@@ -72,12 +72,6 @@ std::optional<Config> ConfigParser::parseJsonString(std::string_view json_conten
                     cc.root_path = StringUtils::utf8ToWide(compiler_config["root_path"]);
                 }
 
-                // Parse cache_size_mb
-                if (compiler_config.contains("cache_size_mb") && compiler_config["cache_size_mb"].is_number())
-                {
-                    cc.cache_size_mb = compiler_config["cache_size_mb"];
-                }
-
                 // Parse cache_always patterns
                 if (compiler_config.contains("cache_always") && compiler_config["cache_always"].is_array())
                 {

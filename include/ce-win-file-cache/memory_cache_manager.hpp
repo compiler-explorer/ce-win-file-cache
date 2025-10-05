@@ -11,6 +11,9 @@
 namespace CeWinFileCache
 {
 
+// Forward declaration
+struct CacheEntry;
+
 class MemoryCacheManager
 {
     public:
@@ -28,7 +31,12 @@ class MemoryCacheManager
 
     const std::vector<uint8_t> *getMemoryCachedFilePtr(const std::wstring &virtual_path);
 
+    // Get pointer and increment reference count for eviction protection
+    const std::vector<uint8_t> *getMemoryCachedFilePtr(CacheEntry *entry);
+
     void addFileToMemoryCache(const std::wstring &virtual_path, const std::vector<uint8_t> &content);
+
+    void removeFileFromMemoryCache(const std::wstring &virtual_path);
 
     std::vector<uint8_t> getFileContent(const std::wstring &virtual_path, const Config &config);
 

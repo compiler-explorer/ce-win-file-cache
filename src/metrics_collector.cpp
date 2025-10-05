@@ -52,6 +52,14 @@ void MetricsCollector::recordCacheEviction()
     }
 }
 
+void MetricsCollector::recordCacheEvictionFailed()
+{
+    if (implementation)
+    {
+        implementation->recordCacheEvictionFailed();
+    }
+}
+
 void MetricsCollector::recordDownloadQueued()
 {
     if (implementation)

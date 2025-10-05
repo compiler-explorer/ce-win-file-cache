@@ -28,6 +28,13 @@ HybridFileSystem::HybridFileSystem()
 
 HybridFileSystem::~HybridFileSystem()
 {
+    // Stop background eviction thread
+    shutdown_eviction = true;
+    if (memory_eviction_thread.joinable())
+    {
+        memory_eviction_thread.join();
+    }
+
     // Shutdown global metrics
     GlobalMetrics::shutdown();
 }
@@ -82,6 +89,21 @@ NTSTATUS HybridFileSystem::Initialize(const Config &new_config)
     // Initialize async download manager with configured number of worker threads
     Logger::info(LogCategory::NETWORK, "Initializing async download manager with {} threads", new_config.global.download_threads);
     download_manager = std::make_unique<AsyncDownloadManager>(memory_cache, new_config, new_config.global.download_threads);
+
+    // Set up memory eviction callback for cache size management
+    // Note: Immediate eviction removed - background thread handles eviction during idle periods
+    download_manager->setEvictionCallback([this](size_t bytes_needed)
+    {
+        // Just record activity - background thread will handle eviction when system is idle
+        recordActivity();
+    });
+
+    // Initialize activity tracking
+    last_activity.store(std::chrono::steady_clock::now());
+
+    // Start background memory eviction thread
+    Logger::info(LogCategory::CACHE, "Starting background memory eviction thread");
+    memory_eviction_thread = std::thread(&HybridFileSystem::memoryEvictionThreadFunc, this);
 
     // Initialize file access tracker if enabled
     if (new_config.global.file_tracking.enabled)
@@ -354,7 +376,10 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    // Record filesystem operation
+    // Record activity and filesystem operation
+    // OPTIMIZATION: Single clock call for both activity tracking and metrics
+    auto now = std::chrono::steady_clock::now();
+    last_activity.store(now, std::memory_order_relaxed);
     GlobalMetrics::instance().recordFilesystemOperation("open");
 
     // Get or create cache entry
@@ -429,7 +454,8 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
                 file_desc->handle = INVALID_HANDLE_VALUE;
 
                 // Get direct pointer to cached content for fast reads - only ONE mutex lock!
-                file_desc->cached_content = memory_cache.getMemoryCachedFilePtr(entry->virtual_path);
+                // This also increments memory_ref_count for eviction protection
+                file_desc->cached_content = memory_cache.getMemoryCachedFilePtr(entry);
 
                 Logger::debug(LogCategory::CACHE, "Open() - serving from memory cache (no handle) for: {}, cached_ptr: {}",
                             StringUtils::wideToUtf8(entry->virtual_path), (void*)file_desc->cached_content);
@@ -560,9 +586,6 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
     std::string path_str = file_desc->entry ? StringUtils::wideToUtf8(file_desc->entry->virtual_path) : "unknown";
     Logger::debug(LogCategory::FILESYSTEM, "Read() called for: '{}', Offset: {}, Length: {}", path_str, Offset, Length);
 
-    // Record filesystem operation
-    GlobalMetrics::instance().recordFilesystemOperation("read");
-
     // Try to serve from memory cache first for maximum performance - using cached pointer!
     if (file_desc->cached_content != nullptr)
     {
@@ -584,11 +607,32 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
         memcpy(Buffer, content.data() + Offset, bytes_to_read);
         *PBytesTransferred = bytes_to_read;
 
-        // Update access statistics
-        updateAccessTime(file_desc->entry);
+        // OPTIMIZATION: Only update activity/access time every ~100 reads to reduce overhead
+        if (file_desc->entry)
+        {
+            file_desc->entry->access_count++;
+
+            // Update timestamps only every 128 reads (1% overhead instead of 100%)
+            // Use fast bit mask check instead of modulo
+            if ((file_desc->entry->access_count & 0x7F) == 0)
+            {
+                auto now = std::chrono::steady_clock::now();
+                file_desc->entry->last_used = now;
+                last_activity.store(now, std::memory_order_relaxed);
+            }
+        }
+
+        // Record filesystem operation (metrics) - keep for monitoring
+        GlobalMetrics::instance().recordFilesystemOperation("read");
 
         return STATUS_SUCCESS;
     }
+
+    // Record activity for non-cached reads (less frequent, more important to track)
+    recordActivity();
+
+    // Record filesystem operation
+    GlobalMetrics::instance().recordFilesystemOperation("read");
 
     // Fallback to file handle read (for network-only files or cache miss)
     OVERLAPPED overlapped = {};
@@ -783,6 +827,10 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
                  Pattern ? StringUtils::wideToUtf8(Pattern) : "null",
                  Length,
                  Marker ? StringUtils::wideToUtf8(Marker) : "null");
+
+    // Record activity for idle detection
+    recordActivity();
+
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
 
     // Handle special case: ReadDirectory called on a file path
@@ -1626,6 +1674,213 @@ NTSTATUS HybridFileSystem::evictIfNeeded()
 {
     // todo: implement LRU eviction
     return STATUS_SUCCESS;
+}
+
+size_t HybridFileSystem::performMemoryEviction(size_t bytes_needed)
+{
+    Logger::info(LogCategory::CACHE, "=== Memory Eviction Starting ===");
+    Logger::info(LogCategory::CACHE, "Target: evict {} bytes ({} MB)",
+                 bytes_needed, bytes_needed / (1024 * 1024));
+
+    std::lock_guard<std::mutex> lock(cache_mutex);
+
+    // Log current cache state
+    size_t current_size = memory_cache.getCacheSize();
+    size_t cache_entry_count = 0;
+    size_t always_cache_count = 0;
+    size_t on_demand_count = 0;
+    size_t active_readers = 0;
+
+    for (const auto &[path, entry] : cache_entries)
+    {
+        if (entry->is_in_memory_cache.load())
+        {
+            cache_entry_count++;
+            if (entry->policy == CachePolicy::ALWAYS_CACHE)
+                always_cache_count++;
+            else if (entry->policy == CachePolicy::ON_DEMAND)
+                on_demand_count++;
+            if (entry->memory_ref_count.load() > 0)
+                active_readers++;
+        }
+    }
+
+    Logger::info(LogCategory::CACHE, "Current cache: {} MB, {} files ({} ALWAYS_CACHE, {} ON_DEMAND, {} with active readers)",
+                 current_size / (1024 * 1024), cache_entry_count, always_cache_count, on_demand_count, active_readers);
+
+    // Collect candidates for eviction - only ON_DEMAND files
+    // Sorted by last_used (oldest first) for LRU policy
+    std::vector<std::pair<std::chrono::steady_clock::time_point, std::wstring>> candidates;
+
+    for (const auto &[path, entry] : cache_entries)
+    {
+        // Skip NEVER_CACHE files (shouldn't be in memory cache anyway)
+        if (entry->policy == CachePolicy::NEVER_CACHE)
+        {
+            continue;
+        }
+
+        // Never evict ALWAYS_CACHE files (critical compiler binaries)
+        if (entry->policy == CachePolicy::ALWAYS_CACHE)
+        {
+            continue;
+        }
+
+        // Never evict files currently being downloaded
+        if (entry->is_downloading.load())
+        {
+            continue;
+        }
+
+        // Never evict files with active readers (reference counting protection)
+        if (entry->memory_ref_count.load() > 0)
+        {
+            continue;
+        }
+
+        // Only evict files actually in memory cache
+        if (!entry->is_in_memory_cache.load())
+        {
+            continue;
+        }
+
+        // This is an ON_DEMAND file safe to evict
+        candidates.emplace_back(entry->last_used, path);
+    }
+
+    // Sort by last access time (oldest first) - LRU policy
+    std::sort(candidates.begin(), candidates.end());
+
+    Logger::info(LogCategory::CACHE, "Found {} evictable ON_DEMAND files", candidates.size());
+
+    // If no ON_DEMAND files available, collect ALWAYS_CACHE files as emergency fallback
+    if (candidates.empty())
+    {
+        Logger::warn(LogCategory::CACHE, "No ON_DEMAND files to evict - entering emergency mode");
+        Logger::warn(LogCategory::CACHE, "Will evict ALWAYS_CACHE files (excluding active readers and downloads)");
+
+        for (const auto &[path, entry] : cache_entries)
+        {
+            if (entry->policy != CachePolicy::ALWAYS_CACHE)
+                continue;
+
+            if (entry->is_downloading.load())
+                continue;
+
+            if (entry->memory_ref_count.load() > 0)
+                continue;
+
+            if (!entry->is_in_memory_cache.load())
+                continue;
+
+            candidates.emplace_back(entry->last_used, path);
+        }
+
+        std::sort(candidates.begin(), candidates.end());
+        Logger::warn(LogCategory::CACHE, "Emergency mode: found {} ALWAYS_CACHE files to evict", candidates.size());
+    }
+
+    // Evict files until we have enough space
+    size_t bytes_evicted = 0;
+    size_t files_evicted = 0;
+
+    for (const auto &[last_used, path] : candidates)
+    {
+        if (bytes_evicted >= bytes_needed)
+        {
+            break;
+        }
+
+        auto it = cache_entries.find(path);
+        if (it != cache_entries.end() && it->second->is_in_memory_cache.load())
+        {
+            size_t file_size = it->second->file_size;
+
+            Logger::info(LogCategory::CACHE, "  [{}] Evicting: {} ({} KB, last used {} sec ago)",
+                         files_evicted + 1,
+                         StringUtils::wideToUtf8(path),
+                         file_size / 1024,
+                         std::chrono::duration_cast<std::chrono::seconds>(
+                             std::chrono::steady_clock::now() - last_used).count());
+
+            // Remove from memory cache
+            memory_cache.removeFileFromMemoryCache(path);
+
+            // Update entry state
+            it->second->is_in_memory_cache.store(false);
+
+            files_evicted++;
+            bytes_evicted += file_size;
+        }
+    }
+
+    size_t new_size = memory_cache.getCacheSize();
+    Logger::info(LogCategory::CACHE, "=== Eviction Complete ===");
+    Logger::info(LogCategory::CACHE, "Evicted {} files, {} bytes ({} MB)",
+                 files_evicted, bytes_evicted, bytes_evicted / (1024 * 1024));
+    Logger::info(LogCategory::CACHE, "Cache size: {} MB -> {} MB",
+                 current_size / (1024 * 1024), new_size / (1024 * 1024));
+
+    // Record failed eviction metric if nothing was evicted
+    if (files_evicted == 0)
+    {
+        GlobalMetrics::instance().recordCacheEvictionFailed();
+    }
+
+    return bytes_evicted;
+}
+
+void HybridFileSystem::recordActivity()
+{
+    last_activity.store(std::chrono::steady_clock::now());
+}
+
+bool HybridFileSystem::isSystemIdle(std::chrono::seconds threshold) const
+{
+    auto now = std::chrono::steady_clock::now();
+    auto idle_time = std::chrono::duration_cast<std::chrono::seconds>(now - last_activity.load());
+    return idle_time >= threshold;
+}
+
+void HybridFileSystem::memoryEvictionThreadFunc()
+{
+    Logger::info(LogCategory::CACHE, "Memory eviction background thread started");
+
+    while (!shutdown_eviction)
+    {
+        // Check every 10 seconds
+        std::this_thread::sleep_for(std::chrono::seconds(10));
+
+        if (shutdown_eviction)
+        {
+            break;
+        }
+
+        // Only evict if system has been idle for at least 5 seconds
+        if (!isSystemIdle(std::chrono::seconds(5)))
+        {
+            Logger::debug(LogCategory::CACHE, "System active, skipping eviction check");
+            continue;
+        }
+
+        // System is idle - check if eviction needed
+        size_t max_cache_size = config.global.total_cache_size_mb * 1024ULL * 1024ULL;
+        size_t current_size = memory_cache.getCacheSize();
+
+        if (current_size > max_cache_size * 0.9)
+        {
+            Logger::info(LogCategory::CACHE,
+                        "System idle and memory cache at {}% capacity ({} MB / {} MB), performing background eviction",
+                        (current_size * 100) / max_cache_size,
+                        current_size / (1024 * 1024),
+                        max_cache_size / (1024 * 1024));
+
+            size_t bytes_to_evict = current_size - (max_cache_size * 0.8);
+            performMemoryEviction(bytes_to_evict);
+        }
+    }
+
+    Logger::info(LogCategory::CACHE, "Memory eviction background thread stopped");
 }
 
 void HybridFileSystem::updateAccessTime(CacheEntry *entry)

@@ -293,7 +293,6 @@ int testConfigOnly(const Config &config)
     {
         Logger::info("[CONFIG TEST]     - {}: {}", StringUtils::wideToUtf8(name),
                      StringUtils::wideToUtf8(compiler_config.network_path));
-        Logger::info("[CONFIG TEST]       Cache size: {} MB", compiler_config.cache_size_mb);
         Logger::info("[CONFIG TEST]       Cache patterns: {} patterns", compiler_config.cache_always_patterns.size());
         Logger::info("[CONFIG TEST]       Prefetch patterns: {} patterns", compiler_config.prefetch_patterns.size());
     }

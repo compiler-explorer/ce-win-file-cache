@@ -1,6 +1,7 @@
 #include "../include/ce-win-file-cache/memory_cache_manager.hpp"
 #include "../include/ce-win-file-cache/logger.hpp"
 #include "../include/ce-win-file-cache/string_utils.hpp"
+#include "../include/types/cache_entry.hpp"
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -120,6 +121,28 @@ const std::vector<uint8_t> *MemoryCacheManager::getMemoryCachedFilePtr(const std
     return nullptr;
 }
 
+const std::vector<uint8_t> *MemoryCacheManager::getMemoryCachedFilePtr(CacheEntry *entry)
+{
+    if (!entry)
+    {
+        return nullptr;
+    }
+
+    std::lock_guard<std::mutex> lock(cache_mutex);
+
+    auto it = memory_cache.find(entry->virtual_path);
+    if (it != memory_cache.end())
+    {
+        // Increment reference count to protect from eviction
+        entry->memory_ref_count++;
+
+        // Return pointer to cached data
+        return &(it->second);
+    }
+
+    return nullptr;
+}
+
 void MemoryCacheManager::addFileToMemoryCache(const std::wstring &virtual_path, const std::vector<uint8_t> &content)
 {
     std::lock_guard<std::mutex> lock(cache_mutex);
@@ -158,6 +181,27 @@ std::vector<uint8_t> MemoryCacheManager::getFileContent(const std::wstring &virt
     }
 
     return content;
+}
+
+void MemoryCacheManager::removeFileFromMemoryCache(const std::wstring &virtual_path)
+{
+    std::lock_guard<std::mutex> lock(cache_mutex);
+
+    auto it = memory_cache.find(virtual_path);
+    if (it != memory_cache.end())
+    {
+        memory_cache.erase(it);
+
+        // Update cache metrics
+        size_t total_size = 0;
+        for (const auto &[path, content] : memory_cache)
+        {
+            total_size += content.size();
+        }
+        GlobalMetrics::instance().updateCacheSize(total_size);
+        GlobalMetrics::instance().updateCacheEntryCount(memory_cache.size());
+        GlobalMetrics::instance().recordCacheEviction();
+    }
 }
 
 void MemoryCacheManager::clearCache()

@@ -37,6 +37,10 @@ struct CacheEntry
     // Memory cache tracking - avoids repeated mutex locks to check memory cache status
     std::atomic<bool> is_in_memory_cache = false;
 
+    // Reference counting for memory cache eviction protection
+    // Tracks how many FileDescriptors are actively using cached_content pointer
+    std::atomic<size_t> memory_ref_count = 0;
+
     CacheEntry() = default;
 };
 
