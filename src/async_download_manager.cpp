@@ -187,6 +187,7 @@ void AsyncDownloadManager::processDownload(std::shared_ptr<DownloadTask> task)
                     task->cache_entry->last_used = std::chrono::steady_clock::now();
                     task->cache_entry->access_count++;
                     task->cache_entry->local_path.clear();
+                    task->cache_entry->is_in_memory_cache.store(true);
                 }
                 else
                 {

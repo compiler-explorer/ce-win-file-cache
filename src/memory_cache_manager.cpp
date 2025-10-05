@@ -106,6 +106,20 @@ std::optional<std::vector<uint8_t>> MemoryCacheManager::getMemoryCachedFile(cons
     return std::nullopt;
 }
 
+const std::vector<uint8_t> *MemoryCacheManager::getMemoryCachedFilePtr(const std::wstring &virtual_path)
+{
+    std::lock_guard<std::mutex> lock(cache_mutex);
+
+    auto it = memory_cache.find(virtual_path);
+    if (it != memory_cache.end())
+    {
+        // Return pointer to cached data - MUST NOT be used after cache is modified!
+        return &(it->second);
+    }
+
+    return nullptr;
+}
+
 void MemoryCacheManager::addFileToMemoryCache(const std::wstring &virtual_path, const std::vector<uint8_t> &content)
 {
     std::lock_guard<std::mutex> lock(cache_mutex);

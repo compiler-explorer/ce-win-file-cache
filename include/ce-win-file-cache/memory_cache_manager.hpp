@@ -26,6 +26,8 @@ class MemoryCacheManager
 
     std::optional<std::vector<uint8_t>> getMemoryCachedFile(const std::wstring &virtual_path);
 
+    const std::vector<uint8_t> *getMemoryCachedFilePtr(const std::wstring &virtual_path);
+
     void addFileToMemoryCache(const std::wstring &virtual_path, const std::vector<uint8_t> &content);
 
     std::vector<uint8_t> getFileContent(const std::wstring &virtual_path, const Config &config);

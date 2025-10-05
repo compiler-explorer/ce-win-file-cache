@@ -30,10 +30,12 @@ struct CacheEntry
     // Cache metadata
     std::chrono::steady_clock::time_point last_used = std::chrono::steady_clock::now();
     size_t access_count = 0;
-    bool is_dirty = false;
 
     // Download protection - prevents eviction during active downloads
     std::atomic<bool> is_downloading = false;
+
+    // Memory cache tracking - avoids repeated mutex locks to check memory cache status
+    std::atomic<bool> is_in_memory_cache = false;
 
     CacheEntry() = default;
 };

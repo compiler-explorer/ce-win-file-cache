@@ -420,46 +420,19 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         // Check if file is in memory cache first
         if (entry->state == FileState::CACHED && entry->local_path.empty())
         {
-            // File is in memory cache - check if we have it
-            Logger::debug(LogCategory::FILESYSTEM, "Open() - calling isFileInMemoryCache for: {}", StringUtils::wideToUtf8(entry->virtual_path));
-            if (memory_cache.isFileInMemoryCache(entry->virtual_path))
+            // File is in memory cache - use flag to avoid mutex lock
+            Logger::debug(LogCategory::FILESYSTEM, "Open() - checking is_in_memory_cache flag for: {}", StringUtils::wideToUtf8(entry->virtual_path));
+            if (entry->is_in_memory_cache.load())
             {
-                // Check if we need a real file on disk (executables, DLLs, libs need physical paths)
-                std::wstring lower_path = entry->virtual_path;
-                std::transform(lower_path.begin(), lower_path.end(), lower_path.begin(), ::towlower);
-                bool needs_disk_file = (lower_path.ends_with(L".exe") ||
-                                       lower_path.ends_with(L".dll") ||
-                                       lower_path.ends_with(L".lib"));
+                // Serve ALL files directly from memory cache - no temp files needed!
+                // As a filesystem driver, we handle Read() callbacks directly
+                file_desc->handle = INVALID_HANDLE_VALUE;
 
-                if (needs_disk_file)
-                {
-                    // Create a persistent cache file for executables/DLLs that need to be loaded
-                    std::wstring cache_file_path = createTemporaryFileForMemoryCached(entry);
+                // Get direct pointer to cached content for fast reads - only ONE mutex lock!
+                file_desc->cached_content = memory_cache.getMemoryCachedFilePtr(entry->virtual_path);
 
-                    if (!cache_file_path.empty())
-                    {
-                        file_desc->handle =
-                        CreateFileW(cache_file_path.c_str(), GrantedAccess, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                    nullptr, OPEN_EXISTING, create_flags, nullptr);
-                        // Store the persistent cache file path for reuse
-                        entry->local_path = cache_file_path;
-                    }
-                    else
-                    {
-                        // If cache file creation fails, fallback to network
-                        file_desc->handle = CreateFileW(entry->network_path.c_str(), GrantedAccess,
-                                                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
-                                                        OPEN_EXISTING, create_flags, nullptr);
-                    }
-                }
-                else
-                {
-                    // For non-executables (headers, .lib files), serve directly from memory - no disk file needed
-                    // Set INVALID_HANDLE_VALUE - Read() will serve from memory cache
-                    file_desc->handle = INVALID_HANDLE_VALUE;
-                    Logger::debug(LogCategory::CACHE, "Open() - serving from memory cache (no handle) for: {}",
-                                StringUtils::wideToUtf8(entry->virtual_path));
-                }
+                Logger::debug(LogCategory::CACHE, "Open() - serving from memory cache (no handle) for: {}, cached_ptr: {}",
+                            StringUtils::wideToUtf8(entry->virtual_path), (void*)file_desc->cached_content);
             }
             else
             {
@@ -478,9 +451,9 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         }
 
         // For files, check if handle creation failed
-        Logger::debug(LogCategory::FILESYSTEM, "Open() - calling isFileInMemoryCache (error check) for: {}", StringUtils::wideToUtf8(entry->virtual_path));
+        Logger::debug(LogCategory::FILESYSTEM, "Open() - checking handle validity (using is_in_memory_cache flag) for: {}", StringUtils::wideToUtf8(entry->virtual_path));
         if (file_desc->handle == INVALID_HANDLE_VALUE && !(entry->state == FileState::CACHED && entry->local_path.empty() &&
-                                                           memory_cache.isFileInMemoryCache(entry->virtual_path)))
+                                                           entry->is_in_memory_cache.load()))
         {
             DWORD lastError = GetLastError();
             std::wstring attempted_path = entry->local_path.empty() ? entry->network_path : entry->local_path;
@@ -548,13 +521,13 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         // Only check memory cache for files, not directories
         if (!(entry->file_attributes & FILE_ATTRIBUTE_DIRECTORY))
         {
-            Logger::debug(LogCategory::FILESYSTEM, "Open() - calling isFileInMemoryCache (access tracker) for: {}",
+            Logger::debug(LogCategory::FILESYSTEM, "Open() - checking is_in_memory_cache flag (access tracker) for: {}",
                           StringUtils::wideToUtf8(entry->virtual_path));
-            is_memory_cached = memory_cache.isFileInMemoryCache(entry->virtual_path);
+            is_memory_cached = entry->is_in_memory_cache.load();
         }
         else
         {
-            Logger::debug(LogCategory::FILESYSTEM, "Open() - skipping isFileInMemoryCache for directory: {}",
+            Logger::debug(LogCategory::FILESYSTEM, "Open() - skipping memory cache check for directory: {}",
                           StringUtils::wideToUtf8(entry->virtual_path));
         }
 
@@ -590,36 +563,31 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
     // Record filesystem operation
     GlobalMetrics::instance().recordFilesystemOperation("read");
 
-    // Try to serve from memory cache first for maximum performance
-    if (file_desc->entry && file_desc->entry->state == FileState::CACHED && file_desc->entry->local_path.empty())
+    // Try to serve from memory cache first for maximum performance - using cached pointer!
+    if (file_desc->cached_content != nullptr)
     {
-        // File is cached in memory - serve directly from memory cache
-        auto cached = memory_cache.getMemoryCachedFile(file_desc->entry->virtual_path);
+        // File is cached in memory - serve directly from cached pointer (NO mutex lock!)
+        const auto &content = *file_desc->cached_content;
 
-        if (cached.has_value())
+        // Validate read parameters
+        if (Offset >= content.size())
         {
-            const auto &content = cached.value();
-
-            // Validate read parameters
-            if (Offset >= content.size())
-            {
-                *PBytesTransferred = 0;
-                return STATUS_END_OF_FILE;
-            }
-
-            // Calculate actual bytes to transfer
-            ULONG bytes_available = static_cast<ULONG>(content.size() - Offset);
-            ULONG bytes_to_read = std::min(Length, bytes_available);
-
-            // Copy data directly from memory
-            memcpy(Buffer, content.data() + Offset, bytes_to_read);
-            *PBytesTransferred = bytes_to_read;
-
-            // Update access statistics
-            updateAccessTime(file_desc->entry);
-
-            return STATUS_SUCCESS;
+            *PBytesTransferred = 0;
+            return STATUS_END_OF_FILE;
         }
+
+        // Calculate actual bytes to transfer
+        ULONG bytes_available = static_cast<ULONG>(content.size() - Offset);
+        ULONG bytes_to_read = std::min(Length, bytes_available);
+
+        // Copy data directly from memory - blazing fast memcpy with no locks!
+        memcpy(Buffer, content.data() + Offset, bytes_to_read);
+        *PBytesTransferred = bytes_to_read;
+
+        // Update access statistics
+        updateAccessTime(file_desc->entry);
+
+        return STATUS_SUCCESS;
     }
 
     // Fallback to file handle read (for network-only files or cache miss)
@@ -650,9 +618,9 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
         auto duration = std::chrono::duration<double>(end_time - start_time).count();
 
         bool is_cache_hit = (file_desc->entry->state == FileState::CACHED);
-        Logger::debug(LogCategory::FILESYSTEM, "Read() - calling isFileInMemoryCache (access tracker) for: {}",
+        Logger::debug(LogCategory::FILESYSTEM, "Read() - checking is_in_memory_cache flag (access tracker) for: {}",
                       StringUtils::wideToUtf8(file_desc->entry->virtual_path));
-        bool is_memory_cached = memory_cache.isFileInMemoryCache(file_desc->entry->virtual_path);
+        bool is_memory_cached = file_desc->entry->is_in_memory_cache.load();
 
         access_tracker->recordAccess(file_desc->entry->virtual_path, file_desc->entry->network_path,
                                      file_desc->entry->file_size, file_desc->entry->state, is_cache_hit, is_memory_cached,

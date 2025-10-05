@@ -102,8 +102,9 @@ struct FileDescriptor
     HANDLE handle;
     CacheEntry *entry;
     PVOID dir_buffer;
+    const std::vector<uint8_t> *cached_content;  // Direct pointer to memory cached content for fast reads
 
-    FileDescriptor() : handle(INVALID_HANDLE_VALUE), entry(nullptr), dir_buffer(nullptr)
+    FileDescriptor() : handle(INVALID_HANDLE_VALUE), entry(nullptr), dir_buffer(nullptr), cached_content(nullptr)
     {
     }
     ~FileDescriptor()
