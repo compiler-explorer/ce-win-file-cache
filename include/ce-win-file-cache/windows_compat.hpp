@@ -3,12 +3,12 @@
 // Unified Windows compatibility header
 // Handles Wine cross-compilation and native Windows compilation
 
-#if defined(NO_WINFSP) && !defined(_WIN32)
+#if !defined(_WIN32)
 // Compatibility mode for non-Windows platforms (macOS/Linux)
 #include "macos_compat.hpp"
 #elif defined(WINE_CROSS_COMPILE)
 #include "wine_compat.hpp"
-#elif defined(NO_WINFSP) && defined(_WIN32)
+#elif defined(NO_WINFSP)
 // Windows unit tests - use native Windows headers but without WinFsp
 #ifndef NOMINMAX
 #define NOMINMAX
