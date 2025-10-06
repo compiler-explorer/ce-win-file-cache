@@ -218,16 +218,6 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
     {
         *PFileAttributes = entry->file_attributes;
         Logger::debug(LogCategory::SECURITY, "GetSecurityByName() - returning file attributes: 0x{:x} for: {}", *PFileAttributes, StringUtils::wideToUtf8(virtual_path));
-
-        // Special logging for castguard.h to debug QueryDirectory issue
-        if (virtual_path.find(L"castguard.h") != std::wstring::npos)
-        {
-            Logger::error(LogCategory::SECURITY, "CASTGUARD DEBUG - GetSecurityByName() File: {}, Attributes: 0x{:x}, IsDirectory: {}, entry->file_attributes: 0x{:x}",
-                         StringUtils::wideToUtf8(virtual_path), *PFileAttributes,
-                         (*PFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? "YES" : "NO",
-                         entry->file_attributes);
-        }
-
     }
 
     if (entry->SecDesc != nullptr)
@@ -377,7 +367,6 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     auto start_time = std::chrono::high_resolution_clock::now();
 
     // Record activity and filesystem operation
-    // OPTIMIZATION: Single clock call for both activity tracking and metrics
     auto now = std::chrono::steady_clock::now();
     last_activity.store(now, std::memory_order_relaxed);
     GlobalMetrics::instance().recordFilesystemOperation("open");
