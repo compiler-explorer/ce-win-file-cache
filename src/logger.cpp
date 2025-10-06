@@ -340,12 +340,12 @@ Logger &Logger::getInstance()
 
 void Logger::writeLog(LogLevel level, LogCategory category, const std::string &message)
 {
-    std::lock_guard<std::mutex> lock(log_mutex);
-
     if (!initialized || output_type == LogOutput::DISABLED)
     {
         return;
     }
+
+    std::lock_guard<std::mutex> lock(log_mutex);
 
     switch (output_type)
     {

@@ -1208,32 +1208,45 @@ NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PW
 CacheEntry *HybridFileSystem::getCacheEntry(const std::wstring &virtual_path)
 {
     Logger::debug(LogCategory::CACHE, "getCacheEntry() called for: '{}'", StringUtils::wideToUtf8(virtual_path));
-    std::lock_guard<std::mutex> lock(cache_mutex);
 
     auto normalized = this->normalizePath(virtual_path);
 
-    // 1. Check existing cache_entries first (fast path)
+    // Fast path: check if entry exists in cache
+    {
+        std::lock_guard<std::mutex> lock(cache_mutex);
+        auto it = cache_entries.find(normalized);
+        if (it != cache_entries.end())
+        {
+            Logger::debug(LogCategory::CACHE, "getCacheEntry() - found existing entry for: '{}'", StringUtils::wideToUtf8(virtual_path));
+            Logger::debug(LogCategory::CACHE, "getCacheEntry() - entry state: {}, attributes: 0x{:x}",
+                          static_cast<int>(it->second->state), it->second->file_attributes);
+            return it->second.get();
+        }
+    }
+    // Lock released - allows concurrent cache access during directory tree lookup
+
+    // Slow path: lookup in directory tree (no lock held)
+    Logger::debug(LogCategory::CACHE, "getCacheEntry() - checking DirectoryCache for: '{}'", StringUtils::wideToUtf8(virtual_path));
+    DirectoryNode *node = directory_cache.findNode(normalized);
+    if (!node)
+    {
+        return nullptr;
+    }
+
+    Logger::debug(LogCategory::CACHE, "getCacheEntry() - found node in DirectoryCache, creating dynamic entry");
+
+    // Reacquire lock to create and insert cache entry
+    std::lock_guard<std::mutex> lock(cache_mutex);
+
+    // Double-check: another thread might have created the entry while we were unlocked
     auto it = cache_entries.find(normalized);
     if (it != cache_entries.end())
     {
-        Logger::debug(LogCategory::CACHE, "getCacheEntry() - found existing entry for: '{}'", StringUtils::wideToUtf8(virtual_path));
-        Logger::debug(LogCategory::CACHE, "getCacheEntry() - entry state: {}, attributes: 0x{:x}",
-                      static_cast<int>(it->second->state), it->second->file_attributes);
         return it->second.get();
     }
 
-    // 2. Check DirectoryCache for path existence
-    // Note: Pass normalized path - directory_cache will normalize again but it's already done
-    Logger::debug(LogCategory::CACHE, "getCacheEntry() - checking DirectoryCache for: '{}'", StringUtils::wideToUtf8(virtual_path));
-    DirectoryNode *node = directory_cache.findNode(normalized);
-    if (node)
-    {
-        Logger::debug(LogCategory::CACHE, "getCacheEntry() - found node in DirectoryCache, creating dynamic entry");
-        // 3. Create dynamic cache entry from DirectoryNode
-        return createDynamicCacheEntry(node);
-    }
-
-    return nullptr;
+    // Create entry and add to cache
+    return createDynamicCacheEntry(node);
 }
 
 CacheEntry *HybridFileSystem::createDynamicCacheEntry(DirectoryNode *node)
