@@ -51,8 +51,9 @@ struct DirectoryNode
     // Helper methods
     bool isDirectory() const;
     bool isFile() const;
-    DirectoryNode *findChild(const std::wstring &child_name);
+    DirectoryNode *findChild(std::wstring_view child_name);
     DirectoryNode *addChild(const std::wstring &child_name, NodeType child_type);
+    DirectoryNode *addChild(std::wstring_view child_name, NodeType child_type);
     std::vector<std::wstring> getChildNames() const;
     std::vector<DirectoryNode *> getChildNodes() const;
 
@@ -101,7 +102,7 @@ class DirectoryTree
     std::wstring base_network_path;
 
     // Helper methods
-    static std::vector<std::wstring> splitPath(const std::wstring &path);
+    static std::vector<std::wstring_view> splitPath(const std::wstring &path);
     DirectoryNode *findOrCreatePath(const std::wstring &virtual_path, NodeType node_type, bool create_missing);
     static void updateNodeMetadata(DirectoryNode *node,
                                    const std::wstring &network_path,

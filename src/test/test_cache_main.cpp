@@ -135,12 +135,10 @@ int main(int argc, char **argv)
     // Add mock compiler configs
     CompilerConfig msvc_config;
     msvc_config.network_path = L"/mock/path/msvc";
-    msvc_config.cache_size_mb = 512;
     config.compilers[L"msvc-14.40"] = msvc_config;
 
     CompilerConfig ninja_config;
     ninja_config.network_path = L"/mock/path/ninja";
-    ninja_config.cache_size_mb = 100;
     config.compilers[L"ninja"] = ninja_config;
 
     int result = testCacheOperations(config);

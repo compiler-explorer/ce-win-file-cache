@@ -28,9 +28,9 @@ bool DirectoryNode::isFile() const
     return type == NodeType::FILE;
 }
 
-DirectoryNode *DirectoryNode::findChild(const std::wstring &child_name)
+DirectoryNode *DirectoryNode::findChild(std::wstring_view child_name)
 {
-    std::wstring name_copy = child_name;
+    std::wstring name_copy = std::wstring(child_name);
     if (!loaded_config.global.case_sensitive)
     {
         StringUtils::toLower(name_copy);
@@ -39,6 +39,25 @@ DirectoryNode *DirectoryNode::findChild(const std::wstring &child_name)
     std::lock_guard<std::mutex> lock(children_mutex);
     auto child_it = children.find(name_copy);
     return (child_it != children.end()) ? child_it->second.get() : nullptr;
+}
+
+DirectoryNode *DirectoryNode::addChild(std::wstring_view child_name, NodeType child_type)
+{
+    std::wstring name_copy = std::wstring(child_name);
+    if (!loaded_config.global.case_sensitive)
+    {
+        StringUtils::toLower(name_copy);
+    }
+
+    std::lock_guard<std::mutex> lock(children_mutex);
+    auto child = std::make_unique<DirectoryNode>(name_copy, child_type, this);
+
+    children[name_copy] = std::move(child);
+
+    // Invalidate sorted cache since we added a child
+    sorted_cache_valid = false;
+
+    return children[name_copy].get();
 }
 
 DirectoryNode *DirectoryNode::addChild(const std::wstring &child_name, NodeType child_type)
@@ -308,16 +327,17 @@ void DirectoryTree::reset()
     root->file_attributes = FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_OFFLINE;
 }
 
-std::vector<std::wstring> DirectoryTree::splitPath(const std::wstring &path)
+std::vector<std::wstring_view> DirectoryTree::splitPath(const std::wstring &path)
 {
-    std::vector<std::wstring> components;
+    std::vector<std::wstring_view> components;
+    components.reserve(10);
 
     if (path.empty() || path == L"/")
     {
         return components;
     }
 
-    std::wstring normalized_path = path;
+    std::wstring_view normalized_path = path;
 
     // Remove leading slash (path is guaranteed non-empty here)
     if (normalized_path[0] == L'/')
@@ -328,7 +348,7 @@ std::vector<std::wstring> DirectoryTree::splitPath(const std::wstring &path)
     // Remove trailing slash
     if (!normalized_path.empty() && normalized_path.back() == L'/')
     {
-        normalized_path.pop_back();
+        normalized_path = normalized_path.substr(0, normalized_path.length() - 1);
     }
 
     // Split by '/'

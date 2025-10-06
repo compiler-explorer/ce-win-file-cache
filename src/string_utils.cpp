@@ -208,7 +208,7 @@ void StringUtils::toLower(std::wstring &str)
 
 void StringUtils::toLower(std::string &str)
 {
-    std::transform(str.begin(), str.end(), str.begin(), ::towlower);
+    std::transform(str.begin(), str.end(), str.begin(), ::tolower);
 }
 
 } // namespace CeWinFileCache

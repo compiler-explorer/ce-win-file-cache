@@ -60,7 +60,6 @@ foreach(TEST_PROGRAM ${TEST_PROGRAMS})
     # Link Catch2 for unit test programs
     if(TEST_PROGRAM STREQUAL "glob_matcher_unit_test" OR TEST_PROGRAM STREQUAL "cache_policy_test")
         target_link_libraries(${TEST_PROGRAM} Catch2::Catch2WithMain)
-        add_test(NAME GlobMatcherTests COMMAND glob_matcher_unit_test)
     endif()
 
     # Link WinFsp for cache_policy_test (needs HybridFileSystem)

@@ -840,14 +840,13 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
     }
 
     // Get directory path
-    std::wstring dir_path = file_desc->entry->virtual_path;
-    std::wstring normalized_path = normalizePath(dir_path);
+    std::wstring normalized_path = normalizePath(file_desc->entry->virtual_path);
 
     Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - enumerating directory: '{}'", StringUtils::wideToUtf8(normalized_path));
 
     // Get directory contents
-    std::vector<DirectoryNode *> contents = directory_cache.getDirectoryContents(dir_path);
-    Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - directory '{}' has {} entries", StringUtils::wideToUtf8(dir_path), contents.size());
+    std::vector<DirectoryNode *> contents = directory_cache.getDirectoryContents(file_desc->entry->virtual_path);
+    Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - directory '{}' has {} entries", StringUtils::wideToUtf8(file_desc->entry->virtual_path), contents.size());
 
     // Apply pattern filtering if specified
     if (Pattern && wcslen(Pattern) > 0)

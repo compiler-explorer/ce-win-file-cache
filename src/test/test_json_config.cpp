@@ -44,7 +44,6 @@ int main()
         {
             const auto &cc = config->compilers.at(L"test-compiler");
             std::wcout << L"  ✓ Compiler network_path: " << cc.network_path << std::endl;
-            std::cout << "  ✓ Cache size: " << cc.cache_size_mb << " MB" << std::endl;
             std::cout << "  ✓ Cache patterns: " << cc.cache_always_patterns.size() << std::endl;
             std::cout << "  ✓ Prefetch patterns: " << cc.prefetch_patterns.size() << std::endl;
         }
@@ -79,12 +78,6 @@ int main()
     {
         std::cout << "  ✓ compilers.json parsing successful" << std::endl;
         std::cout << "  ✓ Found " << file_config->compilers.size() << " compilers" << std::endl;
-
-        for (const auto &[name, compiler] : file_config->compilers)
-        {
-            std::wcout << L"    - " << name << L" (" << compiler.cache_size_mb << L" MB)" << std::endl;
-        }
-
         std::cout << "  ✓ Global config loaded successfully" << std::endl;
         std::cout << "    Total cache: " << file_config->global.total_cache_size_mb << " MB" << std::endl;
         std::cout << "    Download threads: " << file_config->global.download_threads << std::endl;
