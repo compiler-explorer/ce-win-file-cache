@@ -53,6 +53,10 @@ DirectoryNode *DirectoryNode::addChild(const std::wstring &child_name, NodeType 
     auto child = std::make_unique<DirectoryNode>(name_copy, child_type, this);
 
     children[name_copy] = std::move(child);
+
+    // Invalidate sorted cache since we added a child
+    sorted_cache_valid = false;
+
     return children[name_copy].get();
 }
 
@@ -71,14 +75,30 @@ std::vector<std::wstring> DirectoryNode::getChildNames() const
 std::vector<DirectoryNode *> DirectoryNode::getChildNodes() const
 {
     std::lock_guard<std::mutex> lock(children_mutex);
-    std::vector<DirectoryNode *> nodes;
-    nodes.reserve(children.size());
+
+    // Return cached sorted results if valid
+    if (sorted_cache_valid)
+    {
+        return sorted_children_cache;
+    }
+
+    // Rebuild cache
+    sorted_children_cache.clear();
+    sorted_children_cache.reserve(children.size());
     for (const auto &[child_name, child] : children)
     {
-        nodes.push_back(child.get());
+        sorted_children_cache.push_back(child.get());
     }
-    // No sorting needed - std::map keeps entries sorted by key
-    return nodes;
+
+    // Sort by name for consistent directory listings
+    std::sort(sorted_children_cache.begin(), sorted_children_cache.end(),
+              [](const DirectoryNode *a, const DirectoryNode *b)
+              {
+                  return a->name < b->name;
+              });
+
+    sorted_cache_valid = true;
+    return sorted_children_cache;
 }
 
 std::wstring DirectoryNode::normalizePath(const std::wstring &path)
@@ -228,7 +248,7 @@ std::vector<DirectoryNode *> DirectoryTree::getDirectoryContents(const std::wstr
     }
 
     // Use DirectoryNode's thread-safe method to get child nodes
-    // Already sorted because children is a std::map ordered by name
+    // Returns cached sorted results (sorted on first access, then cached)
     return dir_node->getChildNodes();
 }
 
