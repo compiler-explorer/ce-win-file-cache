@@ -268,7 +268,7 @@
   "global": {
     "total_cache_size_mb": 4096,
     "eviction_policy": "lru",
-    "cache_directory": "D:\\CompilerCache",
+    "cache_directory": "C:\\tmp\CompilerCache",
     "download_threads": 12,
     "metrics": {
       "enabled": true,
@@ -278,7 +278,7 @@
     },
     "file_tracking": {
       "enabled": true,
-      "report_directory": "D:\\CompilerCache\\reports",
+      "report_directory": "C:\\tmp\CompilerCache\\reports",
       "report_interval_minutes": 5,
       "top_files_count": 100
     }
