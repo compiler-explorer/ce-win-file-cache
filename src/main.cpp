@@ -221,7 +221,6 @@ ProgramOptions parseCommandLine(int argc, wchar_t **argv)
             {
                 std::string level_str = StringUtils::wideToUtf8(log_level);
                 options.log_level = parseLogLevel(level_str);
-                i += 1;
             }
             else
             {

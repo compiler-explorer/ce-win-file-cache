@@ -1223,6 +1223,7 @@ CacheEntry *HybridFileSystem::getCacheEntry(const std::wstring &virtual_path)
     }
 
     // 2. Check DirectoryCache for path existence
+    // Note: Pass normalized path - directory_cache will normalize again but it's already done
     Logger::debug(LogCategory::CACHE, "getCacheEntry() - checking DirectoryCache for: '{}'", StringUtils::wideToUtf8(virtual_path));
     DirectoryNode *node = directory_cache.findNode(normalized);
     if (node)

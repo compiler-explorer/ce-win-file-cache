@@ -77,6 +77,7 @@ std::vector<DirectoryNode *> DirectoryNode::getChildNodes() const
     {
         nodes.push_back(child.get());
     }
+    // No sorting needed - std::map keeps entries sorted by key
     return nodes;
 }
 
@@ -173,6 +174,13 @@ DirectoryNode *DirectoryTree::findNode(const std::wstring &virtual_path)
     return findOrCreatePath(path, NodeType::UNKNOWN, false);
 }
 
+DirectoryNode *DirectoryTree::findNodeNormalized(const std::wstring &normalized_virtual_path)
+{
+    // Path is already fully normalized (including case conversion)
+    std::lock_guard<std::mutex> tree_lock(tree_mutex);
+    return findOrCreatePath(normalized_virtual_path, NodeType::UNKNOWN, false);
+}
+
 bool DirectoryTree::addFile(const std::wstring &virtual_path,
                             const std::wstring &network_path,
                             UINT64 size,
@@ -220,16 +228,8 @@ std::vector<DirectoryNode *> DirectoryTree::getDirectoryContents(const std::wstr
     }
 
     // Use DirectoryNode's thread-safe method to get child nodes
-    std::vector<DirectoryNode *> contents = dir_node->getChildNodes();
-
-    // Sort for consistent enumeration order
-    std::ranges::sort(contents,
-                      [](const DirectoryNode *first, const DirectoryNode *second)
-                      {
-                          return first->name < second->name;
-                      });
-
-    return contents;
+    // Already sorted because children is a std::map ordered by name
+    return dir_node->getChildNodes();
 }
 
 size_t DirectoryTree::getTotalNodes() const

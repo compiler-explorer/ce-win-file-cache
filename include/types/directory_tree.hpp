@@ -2,10 +2,10 @@
 
 #include <ce-win-file-cache/windows_compat.hpp>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace CeWinFileCache
@@ -34,8 +34,8 @@ struct DirectoryNode
 
     PSECURITY_DESCRIPTOR SecDesc = nullptr;
 
-    // Directory structure
-    std::unordered_map<std::wstring, std::unique_ptr<DirectoryNode>> children;
+    // Directory structure - using std::map to keep children sorted by name
+    std::map<std::wstring, std::unique_ptr<DirectoryNode>> children;
     DirectoryNode *parent;
 
     // Thread safety for children operations
@@ -67,6 +67,7 @@ class DirectoryTree
 
     // Core operations
     DirectoryNode *findNode(const std::wstring &virtual_path);
+    DirectoryNode *findNodeNormalized(const std::wstring &normalized_virtual_path);  // Internal: path already normalized
     bool addFile(const std::wstring &virtual_path,
                  const std::wstring &network_path,
                  UINT64 size,

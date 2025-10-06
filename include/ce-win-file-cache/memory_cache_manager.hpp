@@ -49,6 +49,7 @@ class MemoryCacheManager
     private:
     mutable std::mutex cache_mutex;
     std::unordered_map<std::wstring, std::vector<uint8_t>> memory_cache;
+    std::atomic<size_t> total_cache_size{0};
 
     std::wstring resolveVirtualToNetworkPath(const std::wstring &virtual_path, const Config &config);
 };

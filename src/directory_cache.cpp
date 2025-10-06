@@ -30,7 +30,8 @@ std::vector<DirectoryNode *> DirectoryCache::getDirectoryContents(const std::wst
 DirectoryNode *DirectoryCache::findNode(const std::wstring &virtual_path)
 {
     std::wstring normalized_path = DirectoryNode::normalizePath(virtual_path);
-    return directory_tree.findNode(normalized_path);
+    // Use normalized version to skip redundant toLower() in DirectoryTree
+    return directory_tree.findNodeNormalized(normalized_path);
 }
 
 NTSTATUS DirectoryCache::buildDirectoryTreeFromConfig(const Config &config)

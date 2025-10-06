@@ -146,16 +146,22 @@ const std::vector<uint8_t> *MemoryCacheManager::getMemoryCachedFilePtr(CacheEntr
 void MemoryCacheManager::addFileToMemoryCache(const std::wstring &virtual_path, const std::vector<uint8_t> &content)
 {
     std::lock_guard<std::mutex> lock(cache_mutex);
+
+    // Check if file already exists in cache
+    auto it = memory_cache.find(virtual_path);
+    if (it != memory_cache.end())
+    {
+        // Subtract old size before replacing
+        total_cache_size -= it->second.size();
+    }
+
+    // Add new content
+    size_t content_size = content.size();
     memory_cache[virtual_path] = content;
+    total_cache_size += content_size;
 
     // Update cache metrics
-    // Update cache size and entry count
-    size_t total_size = 0;
-    for (const auto &[path, file_content] : memory_cache)
-    {
-        total_size += file_content.size();
-    }
-    GlobalMetrics::instance().updateCacheSize(total_size);
+    GlobalMetrics::instance().updateCacheSize(total_cache_size.load());
     GlobalMetrics::instance().updateCacheEntryCount(memory_cache.size());
 }
 
@@ -190,15 +196,12 @@ void MemoryCacheManager::removeFileFromMemoryCache(const std::wstring &virtual_p
     auto it = memory_cache.find(virtual_path);
     if (it != memory_cache.end())
     {
+        // Subtract size before removing
+        total_cache_size -= it->second.size();
         memory_cache.erase(it);
 
         // Update cache metrics
-        size_t total_size = 0;
-        for (const auto &[path, content] : memory_cache)
-        {
-            total_size += content.size();
-        }
-        GlobalMetrics::instance().updateCacheSize(total_size);
+        GlobalMetrics::instance().updateCacheSize(total_cache_size.load());
         GlobalMetrics::instance().updateCacheEntryCount(memory_cache.size());
         GlobalMetrics::instance().recordCacheEviction();
     }
@@ -209,6 +212,7 @@ void MemoryCacheManager::clearCache()
     std::lock_guard<std::mutex> lock(cache_mutex);
     size_t cleared_entries = memory_cache.size();
     memory_cache.clear();
+    total_cache_size = 0;
 
     // Update cache metrics after clearing
     GlobalMetrics::instance().updateCacheSize(0);
@@ -222,15 +226,7 @@ void MemoryCacheManager::clearCache()
 
 size_t MemoryCacheManager::getCacheSize() const
 {
-    std::lock_guard<std::mutex> lock(cache_mutex);
-
-    size_t total_size = 0;
-    for (const auto &[path, content] : memory_cache)
-    {
-        total_size += content.size();
-    }
-
-    return total_size;
+    return total_cache_size.load();
 }
 
 size_t MemoryCacheManager::getCachedFileCount() const
