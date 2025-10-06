@@ -3,6 +3,7 @@
 #include "../types/config.hpp"
 #include "metrics_collector.hpp"
 #include <mutex>
+#include <atomic>
 #include <optional>
 #include <string>
 #include <unordered_map>
