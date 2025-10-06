@@ -360,7 +360,7 @@ if((WIN32 OR USE_WINE_WINDOWS_API) AND TARGET ${PROJECT_NAME})
                 prometheus-cpp::pull
             )
         endif()
-        
+
         # Enable strict warnings as per CLAUDE.md
         target_compile_options(${PROJECT_NAME} PRIVATE
             /W4 /wd4464 /wd5039 /wd4005 /wd4820 /wd4625 /wd4626 /wd5219 /wd4244 /wd4100 /wd4815
@@ -369,9 +369,11 @@ if((WIN32 OR USE_WINE_WINDOWS_API) AND TARGET ${PROJECT_NAME})
         )
         
         # Enable LTO for release builds (disabled for cross-compilation compatibility)
-        # if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        #     set_property(TARGET ${PROJECT_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
-        # endif()
+        if(CMAKE_BUILD_TYPE STREQUAL "Release")
+            target_compile_definitions(${PROJECT_NAME} PRIVATE NO_LOGGING)
+
+            set_property(TARGET ${PROJECT_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+        endif()
         
         # Disable embedded manifest to avoid RC issues for now
         set_target_properties(${PROJECT_NAME} PROPERTIES

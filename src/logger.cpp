@@ -175,50 +175,62 @@ void Logger::shutdown()
 // Category-aware logging methods
 void Logger::trace(LogCategory category, const std::string &message)
 {
+#ifndef NO_LOGGING
     if (isEnabled(LogLevel::TRACE) && isEnabled(category))
     {
         getInstance().writeLog(LogLevel::TRACE, category, message);
     }
+#endif
 }
 
 void Logger::debug(LogCategory category, const std::string &message)
 {
+#ifndef NO_LOGGING
     if (isEnabled(LogLevel::DEBUG) && isEnabled(category))
     {
         getInstance().writeLog(LogLevel::DEBUG, category, message);
     }
+#endif
 }
 
 void Logger::info(LogCategory category, const std::string &message)
 {
+#ifndef NO_LOGGING
     if (isEnabled(LogLevel::INFO) && isEnabled(category))
     {
         getInstance().writeLog(LogLevel::INFO, category, message);
     }
+#endif
 }
 
 void Logger::warn(LogCategory category, const std::string &message)
 {
+#ifndef NO_LOGGING
     if (isEnabled(LogLevel::WARN) && isEnabled(category))
     {
         getInstance().writeLog(LogLevel::WARN, category, message);
     }
+#endif
 }
 
 void Logger::error(LogCategory category, const std::string &message)
 {
+#ifndef NO_LOGGING
     if (isEnabled(LogLevel::ERR) && isEnabled(category))
     {
         getInstance().writeLog(LogLevel::ERR, category, message);
     }
+#endif
 }
 
 void Logger::fatal(LogCategory category, const std::string &message)
 {
+#ifndef NO_LOGGING
     if (isEnabled(LogLevel::FATAL) && isEnabled(category))
     {
         getInstance().writeLog(LogLevel::FATAL, category, message);
     }
+#endif
 }
 
 // Convenience methods (use GENERAL category)

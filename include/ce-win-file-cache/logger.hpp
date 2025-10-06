@@ -164,55 +164,67 @@ class Logger
 template <typename... Args>
 void Logger::trace(LogCategory category, const std::string &format, Args &&...args)
 {
+#ifndef NO_LOGGING
     if (isEnabled(LogLevel::TRACE) && isEnabled(category))
     {
         getInstance().writeLog(LogLevel::TRACE, category, formatString(format, std::forward<Args>(args)...));
     }
+#endif
 }
 
 template <typename... Args>
 void Logger::debug(LogCategory category, const std::string &format, Args &&...args)
 {
+#ifndef NO_LOGGING
     if (isEnabled(LogLevel::DEBUG) && isEnabled(category))
     {
         getInstance().writeLog(LogLevel::DEBUG, category, formatString(format, std::forward<Args>(args)...));
     }
+#endif
 }
 
 template <typename... Args>
 void Logger::info(LogCategory category, const std::string &format, Args &&...args)
 {
+#ifndef NO_LOGGING
     if (isEnabled(LogLevel::INFO) && isEnabled(category))
     {
         getInstance().writeLog(LogLevel::INFO, category, formatString(format, std::forward<Args>(args)...));
     }
+#endif
 }
 
 template <typename... Args>
 void Logger::warn(LogCategory category, const std::string &format, Args &&...args)
 {
+#ifndef NO_LOGGING
     if (isEnabled(LogLevel::WARN) && isEnabled(category))
     {
         getInstance().writeLog(LogLevel::WARN, category, formatString(format, std::forward<Args>(args)...));
     }
+#endif
 }
 
 template <typename... Args>
 void Logger::error(LogCategory category, const std::string &format, Args &&...args)
 {
+#ifndef NO_LOGGING
     if (isEnabled(LogLevel::ERR) && isEnabled(category))
     {
         getInstance().writeLog(LogLevel::ERR, category, formatString(format, std::forward<Args>(args)...));
     }
+#endif
 }
 
 template <typename... Args>
 void Logger::fatal(LogCategory category, const std::string &format, Args &&...args)
 {
+#ifndef NO_LOGGING
     if (isEnabled(LogLevel::FATAL) && isEnabled(category))
     {
         getInstance().writeLog(LogLevel::FATAL, category, formatString(format, std::forward<Args>(args)...));
     }
+#endif
 }
 
 // Template implementations for convenience methods (GENERAL category)
