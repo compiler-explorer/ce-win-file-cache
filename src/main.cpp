@@ -76,7 +76,7 @@ struct ProgramOptions
 {
     std::wstring config_file = L"compilers.json";
     std::wstring mount_point = L"Z:";
-    std::wstring volume_prefix;
+    std::wstring volume_prefix = L"\\ce-win-file-cache\\compilers";
     ULONG debug_flags = 0;
     bool show_help = false;
     bool test_mode = false;
@@ -101,7 +101,7 @@ void printUsage()
     "Options:\n"
     "  -c, --config FILE      Configuration file (default: compilers.json)\n"
     "  -m, --mount POINT      Mount point (default: Z:)\n"
-    "  -u, --volume-prefix    Volume prefix for UNC paths\n"
+    "  -u, --volume-prefix    Volume prefix for UNC paths (default: \\\\ce-win-file-cache\\\\compilers)\n"
     "  -d, --debug [LEVEL]    WinFsp debug flags (0=off, -1=all, bitmask)\n"
     "  -t, --test             Test mode (no WinFsp mounting)\n"
     "      --test-paths       Test path resolution only\n"
