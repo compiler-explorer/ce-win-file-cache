@@ -215,22 +215,18 @@ void Logger::warn(LogCategory category, const std::string &message)
 
 void Logger::error(LogCategory category, const std::string &message)
 {
-#ifndef NO_LOGGING
     if (isEnabled(LogLevel::ERR) && isEnabled(category))
     {
         getInstance().writeLog(LogLevel::ERR, category, message);
     }
-#endif
 }
 
 void Logger::fatal(LogCategory category, const std::string &message)
 {
-#ifndef NO_LOGGING
     if (isEnabled(LogLevel::FATAL) && isEnabled(category))
     {
         getInstance().writeLog(LogLevel::FATAL, category, message);
     }
-#endif
 }
 
 // Convenience methods (use GENERAL category)

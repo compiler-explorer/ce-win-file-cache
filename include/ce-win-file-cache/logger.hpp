@@ -208,23 +208,19 @@ void Logger::warn(LogCategory category, const std::string &format, Args &&...arg
 template <typename... Args>
 void Logger::error(LogCategory category, const std::string &format, Args &&...args)
 {
-#ifndef NO_LOGGING
     if (isEnabled(LogLevel::ERR) && isEnabled(category))
     {
         getInstance().writeLog(LogLevel::ERR, category, formatString(format, std::forward<Args>(args)...));
     }
-#endif
 }
 
 template <typename... Args>
 void Logger::fatal(LogCategory category, const std::string &format, Args &&...args)
 {
-#ifndef NO_LOGGING
     if (isEnabled(LogLevel::FATAL) && isEnabled(category))
     {
         getInstance().writeLog(LogLevel::FATAL, category, formatString(format, std::forward<Args>(args)...));
     }
-#endif
 }
 
 // Template implementations for convenience methods (GENERAL category)
