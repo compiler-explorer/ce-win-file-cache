@@ -175,6 +175,7 @@ NTSTATUS HybridFileSystem::Init(PVOID Host)
     host->SetVolumeCreationTime(creation_time);
     host->SetVolumeSerialNumber(0x12345678);
     host->SetFlushAndPurgeOnCleanup(TRUE);
+    host->SetFileSystemName(L"NTFS"); // Required for DLL/executable loading
 
     Logger::debug(LogCategory::FILESYSTEM, "Init() completed successfully");
     return STATUS_SUCCESS;
