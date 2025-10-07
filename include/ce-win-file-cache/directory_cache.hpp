@@ -32,6 +32,9 @@ class DirectoryCache
     size_t getTotalFiles() const;
     size_t getTotalNodes() const;
 
+    // Security
+    bool getDirectorySecurityDescriptor(PSECURITY_DESCRIPTOR *out_descriptor, DWORD *out_size);
+
     // Testing support
     void addTestFile(const std::wstring &virtual_path, const std::wstring &network_path, UINT64 size = 1024);
     void addTestDirectory(const std::wstring &virtual_path, const std::wstring &network_path);

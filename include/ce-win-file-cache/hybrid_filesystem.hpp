@@ -26,6 +26,7 @@ class HybridFileSystem : public Fsp::FileSystemBase
 
     NTSTATUS Initialize(const Config &new_config);
     NTSTATUS SetPaths(const std::unordered_map<std::wstring, std::wstring> &compiler_paths);
+    bool getMountPointSecurityDescriptor(PSECURITY_DESCRIPTOR *out_descriptor, DWORD *out_size);
 
     protected:
     // WinFsp callbacks

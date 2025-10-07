@@ -385,19 +385,16 @@ DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path,
 
             root->full_virtual_path = L"/";
 
-            PSECURITY_DESCRIPTOR LocalSecDesc = nullptr;
-            DWORD ret = GetNamedSecurityInfoW(root->network_path.c_str(), SE_FILE_OBJECT,
-                                              OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
-                                              nullptr, nullptr, nullptr, nullptr, &LocalSecDesc);
-            if (ret == ERROR_SUCCESS)
+            // Use SecurityDescriptorBuilder instead of GetNamedSecurityInfoW
+            PSECURITY_DESCRIPTOR source_descriptor = nullptr;
+            DWORD descriptor_size = 0;
+            if (security_builder.getDirectorySecurityDescriptor(&source_descriptor, &descriptor_size))
             {
-                size_t len = GetSecurityDescriptorLength(LocalSecDesc);
-                root->SecDesc = malloc(len);
+                root->SecDesc = malloc(descriptor_size);
                 if (root->SecDesc != nullptr)
                 {
-                    memcpy(root->SecDesc, LocalSecDesc, len);
+                    memcpy(root->SecDesc, source_descriptor, descriptor_size);
                 }
-                LocalFree(LocalSecDesc);
             }
         }
         return root.get();
@@ -444,19 +441,27 @@ DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path,
 
             child->full_virtual_path = L"/" + current_path;
 
-            PSECURITY_DESCRIPTOR LocalSecDesc = nullptr;
-            DWORD ret = GetNamedSecurityInfoW(child->network_path.c_str(), SE_FILE_OBJECT,
-                                              OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
-                                              nullptr, nullptr, nullptr, nullptr, &LocalSecDesc);
-            if (ret == ERROR_SUCCESS)
+            // Use SecurityDescriptorBuilder instead of GetNamedSecurityInfoW
+            PSECURITY_DESCRIPTOR source_descriptor = nullptr;
+            DWORD descriptor_size = 0;
+            bool success = false;
+
+            if (child->type == NodeType::DIRECTORY)
             {
-                size_t desc_len = GetSecurityDescriptorLength(LocalSecDesc);
-                child->SecDesc = malloc(desc_len);
+                success = security_builder.getDirectorySecurityDescriptor(&source_descriptor, &descriptor_size);
+            }
+            else
+            {
+                success = security_builder.getFileSecurityDescriptor(&source_descriptor, &descriptor_size);
+            }
+
+            if (success)
+            {
+                child->SecDesc = malloc(descriptor_size);
                 if (child->SecDesc != nullptr)
                 {
-                    memcpy(child->SecDesc, LocalSecDesc, desc_len);
+                    memcpy(child->SecDesc, source_descriptor, descriptor_size);
                 }
-                LocalFree(LocalSecDesc);
             }
         }
 
@@ -493,6 +498,11 @@ void DirectoryTree::updateNodeMetadata(DirectoryNode *node,
 std::lock_guard<std::mutex> DirectoryTree::getLock()
 {
     return std::lock_guard<std::mutex>(tree_mutex);
+}
+
+bool DirectoryTree::getDirectorySecurityDescriptor(PSECURITY_DESCRIPTOR *out_descriptor, DWORD *out_size)
+{
+    return security_builder.getDirectorySecurityDescriptor(out_descriptor, out_size);
 }
 
 } // namespace CeWinFileCache

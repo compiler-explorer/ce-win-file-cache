@@ -199,6 +199,11 @@ NTSTATUS HybridFileSystem::GetVolumeInfo(VolumeInfo *VolumeInfo)
     return STATUS_SUCCESS;
 }
 
+bool HybridFileSystem::getMountPointSecurityDescriptor(PSECURITY_DESCRIPTOR *out_descriptor, DWORD *out_size)
+{
+    return directory_cache.getDirectorySecurityDescriptor(out_descriptor, out_size);
+}
+
 NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttributes, PSECURITY_DESCRIPTOR SecurityDescriptor, SIZE_T *PSecurityDescriptorSize)
 {
     std::wstring virtual_path(FileName);
@@ -733,50 +738,80 @@ NTSTATUS HybridFileSystem::SetBasicInfo(PVOID FileNode,
 
 NTSTATUS HybridFileSystem::GetSecurity(PVOID FileNode, PVOID FileDesc, PSECURITY_DESCRIPTOR SecurityDescriptor, SIZE_T *PSecurityDescriptorSize)
 {
-    Logger::debug(LogCategory::FILESYSTEM, "GetSecurity() called for opened file");
+    Logger::debug(LogCategory::SECURITY, "GetSecurity() called for opened file");
 
-    // Use the same security descriptor logic as GetSecurityByName
-    // This ensures consistency between the two methods
-
-    const char *sddl_string =
-    "O:S-1-5-21-663732323-46111922-2075403870-1001G:S-1-5-21-663732323-46111922-2075403870-1001D:(A;OICI;FA;;;SY)(A;"
-    "OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-21-663732323-46111922-2075403870-1001)";
-
-    PSECURITY_DESCRIPTOR temp_descriptor = nullptr;
-    if (!ConvertStringSecurityDescriptorToSecurityDescriptorA(sddl_string, SDDL_REVISION_1, &temp_descriptor, nullptr))
+    auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
+    if (!file_desc || !file_desc->entry)
     {
-        Logger::debug(LogCategory::FILESYSTEM, "GetSecurity() - Failed to convert SDDL string, error: {}", GetLastError());
-        return CeWinFileCache::WineCompat::NtStatusFromWin32(GetLastError());
+        Logger::error(LogCategory::SECURITY, "GetSecurity() - invalid file descriptor or entry");
+        return STATUS_INVALID_PARAMETER;
     }
 
-    DWORD descriptor_length = GetSecurityDescriptorLength(temp_descriptor);
-    Logger::debug(LogCategory::FILESYSTEM, "GetSecurity() - Security descriptor size: {}", descriptor_length);
+    CacheEntry *entry = file_desc->entry;
 
-    if (SecurityDescriptor == nullptr)
+    // Use entry's security descriptor if available
+    if (entry->SecDesc != nullptr)
     {
-        // Caller is querying the required buffer size
-        *PSecurityDescriptorSize = descriptor_length;
-        LocalFree(temp_descriptor);
-        Logger::debug(LogCategory::FILESYSTEM, "GetSecurity() - Returning required size: {}", descriptor_length);
+        if (!IsValidSecurityDescriptor(entry->SecDesc))
+        {
+            Logger::error(LogCategory::SECURITY, "GetSecurity() - invalid security descriptor in entry");
+            return STATUS_INVALID_SECURITY_DESCR;
+        }
+
+        DWORD sdSize = GetSecurityDescriptorLength(entry->SecDesc);
+
+        if (!SecurityDescriptor)
+        {
+            *PSecurityDescriptorSize = sdSize;
+            Logger::debug(LogCategory::SECURITY, "GetSecurity() - returning required size: {}", sdSize);
+            return STATUS_SUCCESS;
+        }
+
+        if (*PSecurityDescriptorSize < sdSize)
+        {
+            SIZE_T provided_size = *PSecurityDescriptorSize;
+            *PSecurityDescriptorSize = sdSize;
+            Logger::debug(LogCategory::SECURITY, "GetSecurity() - buffer too small, provided: {}, need: {}", provided_size, sdSize);
+            return STATUS_BUFFER_OVERFLOW;
+        }
+
+        memcpy(SecurityDescriptor, entry->SecDesc, sdSize);
+        *PSecurityDescriptorSize = sdSize;
+
+        Logger::debug(LogCategory::SECURITY, "GetSecurity() - provided entry security descriptor, size: {}", sdSize);
         return STATUS_SUCCESS;
     }
 
-    if (*PSecurityDescriptorSize < descriptor_length)
+    // Fallback: get directory security descriptor from directory tree
+    PSECURITY_DESCRIPTOR fallback_descriptor = nullptr;
+    DWORD fallback_size = 0;
+
+    if (directory_cache.getDirectorySecurityDescriptor(&fallback_descriptor, &fallback_size))
     {
-        // Buffer too small
-        *PSecurityDescriptorSize = descriptor_length;
-        LocalFree(temp_descriptor);
-        Logger::debug(LogCategory::FILESYSTEM, "GetSecurity() - Buffer too small");
-        return STATUS_BUFFER_TOO_SMALL;
+        if (!SecurityDescriptor)
+        {
+            *PSecurityDescriptorSize = fallback_size;
+            Logger::debug(LogCategory::SECURITY, "GetSecurity() - returning fallback size: {}", fallback_size);
+            return STATUS_SUCCESS;
+        }
+
+        if (*PSecurityDescriptorSize < fallback_size)
+        {
+            SIZE_T provided_size = *PSecurityDescriptorSize;
+            *PSecurityDescriptorSize = fallback_size;
+            Logger::debug(LogCategory::SECURITY, "GetSecurity() - fallback buffer too small, provided: {}, need: {}", provided_size, fallback_size);
+            return STATUS_BUFFER_OVERFLOW;
+        }
+
+        memcpy(SecurityDescriptor, fallback_descriptor, fallback_size);
+        *PSecurityDescriptorSize = fallback_size;
+
+        Logger::debug(LogCategory::SECURITY, "GetSecurity() - used fallback security descriptor, size: {}", fallback_size);
+        return STATUS_SUCCESS;
     }
 
-    // Copy security descriptor to provided buffer
-    memcpy(SecurityDescriptor, temp_descriptor, descriptor_length);
-    *PSecurityDescriptorSize = descriptor_length;
-    LocalFree(temp_descriptor);
-
-    Logger::debug(LogCategory::FILESYSTEM, "GetSecurity() completed successfully");
-    return STATUS_SUCCESS;
+    Logger::error(LogCategory::SECURITY, "GetSecurity() - no security descriptor available");
+    return STATUS_UNSUCCESSFUL;
 }
 
 NTSTATUS HybridFileSystem::SetSecurity(PVOID FileNode, PVOID FileDesc, SECURITY_INFORMATION SecurityInformation, PSECURITY_DESCRIPTOR ModificationDescriptor)

@@ -294,6 +294,91 @@ public:
 
 ## Debugging and Development
 
+### Debugging Principles
+
+When investigating bugs or unexpected behavior, follow this systematic approach:
+
+#### 1. Search Comprehensively First
+
+**Before making any changes**, search for ALL related code:
+
+```bash
+# Find all functions that might be involved
+grep -r "FunctionName" src/
+grep -r "RELATED_TYPE" src/
+grep -r "keyword" include/
+
+# Use multiple search terms
+grep -r "Security" src/ | grep -i "descriptor"
+```
+
+**Anti-pattern:** Assuming you know where the bug is and only looking at one file or function.
+
+#### 2. Read Actual Implementation
+
+**Read the code** before making assumptions:
+
+- Don't assume a function does what its name suggests
+- Don't assume helper classes are used everywhere
+- Don't assume code follows best practices
+- Check for hardcoded values, fallbacks, and special cases
+
+**Anti-pattern:** Looking at one function, seeing it's correct, and assuming all related functions work the same way.
+
+#### 3. Verify Actual Behavior
+
+**Test your hypothesis** before fixing:
+
+```bash
+# Check actual output
+cat output.log | grep "ERROR"
+
+# Verify what's being returned
+powershell -Command "Get-Acl Z: | Format-List"
+
+# Check runtime values
+./app --debug > debug.log
+```
+
+**Anti-pattern:** Blaming external factors (OS, libraries, frameworks) without evidence.
+
+#### 4. Fix the Right Problem
+
+Once you've found the bug:
+
+- Fix the **actual** bug, not a related issue
+- Don't fix things that aren't broken
+- Don't add workarounds for problems that don't exist
+
+**Anti-pattern:** Finding one issue, fixing it, then continuing to fix "related" things without re-verifying the original problem.
+
+#### 5. Common Debugging Mistakes
+
+❌ **Don't:**
+- Blame external systems without proof (OS, libraries, hardware)
+- Make assumptions about code you haven't read
+- Fix things based on what "should" be there
+- Search incompletely (only checking obvious places)
+- Add complexity (privileges, workarounds) before understanding the root cause
+
+✅ **Do:**
+- Search comprehensively for all related functions
+- Read the actual implementation of each function
+- Verify behavior with logs, tests, or manual checks
+- Fix only the identified bug
+- Re-test after the fix to confirm it worked
+
+#### 6. Debugging Mantra
+
+**"Read the code first, speculate second."**
+
+When stuck:
+1. What does the code **actually** do? (not what it should do)
+2. What is **actually** happening? (logs, output, behavior)
+3. Where is the **actual** discrepancy?
+
+See `docs/SECURITY_DESCRIPTOR_DEBUGGING_LESSON.md` for a concrete example of these principles in action.
+
 ### Diagnostic Handling
 
 - When a file or directory cannot be found or executed, check pwd to make sure you're in the right directory

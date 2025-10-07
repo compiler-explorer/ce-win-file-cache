@@ -255,6 +255,7 @@ set(SOURCES
     src/glob_matcher.cpp
     src/string_utils.cpp
     src/logger.cpp
+    src/security_descriptor_builder.cpp
     src/main.cpp
     src/time_utils.cpp
 )

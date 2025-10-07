@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ce-win-file-cache/windows_compat.hpp>
+#include <ce-win-file-cache/security_descriptor_builder.hpp>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -96,10 +97,14 @@ class DirectoryTree
     // Thread safety
     std::lock_guard<std::mutex> getLock();
 
+    // Security
+    bool getDirectorySecurityDescriptor(PSECURITY_DESCRIPTOR *out_descriptor, DWORD *out_size);
+
     private:
     std::unique_ptr<DirectoryNode> root;
     mutable std::mutex tree_mutex;
     std::wstring base_network_path;
+    SecurityDescriptorBuilder security_builder;
 
     // Helper methods
     static std::vector<std::wstring_view> splitPath(const std::wstring &path);

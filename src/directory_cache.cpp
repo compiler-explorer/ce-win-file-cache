@@ -248,5 +248,9 @@ void DirectoryCache::clearTree()
     directory_tree.reset();
 }
 
+bool DirectoryCache::getDirectorySecurityDescriptor(PSECURITY_DESCRIPTOR *out_descriptor, DWORD *out_size)
+{
+    return directory_tree.getDirectorySecurityDescriptor(out_descriptor, out_size);
+}
 
 } // namespace CeWinFileCache

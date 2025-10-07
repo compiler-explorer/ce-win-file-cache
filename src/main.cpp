@@ -839,7 +839,20 @@ class CompilerCacheService : public Fsp::Service
             // Mount filesystem
             Logger::debug(LogCategory::SERVICE, "Attempting to mount filesystem...");
             std::wstring mount_point_copy = options_.mount_point;
-            result = host.Mount(mount_point_copy.data(), nullptr, FALSE, options_.debug_flags);
+
+            // Get mount point security descriptor from filesystem
+            PSECURITY_DESCRIPTOR mount_sd = nullptr;
+            DWORD mount_sd_size = 0;
+            if (filesystem.getMountPointSecurityDescriptor(&mount_sd, &mount_sd_size))
+            {
+                Logger::info(LogCategory::SERVICE, "Using custom mount point security descriptor, size: {}", mount_sd_size);
+                result = host.Mount(mount_point_copy.data(), mount_sd, FALSE, options_.debug_flags);
+            }
+            else
+            {
+                Logger::warn(LogCategory::SERVICE, "Failed to get mount point security descriptor, using default");
+                result = host.Mount(mount_point_copy.data(), nullptr, FALSE, options_.debug_flags);
+            }
 
             if (!NT_SUCCESS(result))
             {
