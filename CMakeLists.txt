@@ -371,7 +371,7 @@ if((WIN32 OR USE_WINE_WINDOWS_API) AND TARGET ${PROJECT_NAME})
         
         # Enable LTO for release builds (disabled for cross-compilation compatibility)
         if(CMAKE_BUILD_TYPE STREQUAL "Release")
-            #target_compile_definitions(${PROJECT_NAME} PRIVATE NO_LOGGING)
+            target_compile_definitions(${PROJECT_NAME} PRIVATE NO_LOGGING)
 
             set_property(TARGET ${PROJECT_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
         endif()
