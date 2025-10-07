@@ -457,7 +457,10 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
             else
             {
                 // Memory cache miss - fallback to network
-                file_desc->handle = CreateFileW(entry->network_path.c_str(), GrantedAccess,
+                // Note: We open with GENERIC_READ (not GrantedAccess) because as the filesystem,
+                // we only need to read the source file to serve it. GrantedAccess is what the
+                // end-user was granted on Z:, not what we need to open the source on Y:.
+                file_desc->handle = CreateFileW(entry->network_path.c_str(), GENERIC_READ,
                                                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
                                                 OPEN_EXISTING, create_flags, nullptr);
             }
@@ -465,8 +468,11 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         else
         {
             // File not in memory cache - use local_path or network_path
+            // Note: We open with GENERIC_READ (not GrantedAccess) because as the filesystem,
+            // we only need to read the source file to serve it. GrantedAccess is what the
+            // end-user was granted on Z:, not what we need to open the source on Y:.
             std::wstring full_path = entry->local_path.empty() ? entry->network_path : entry->local_path;
-            file_desc->handle = CreateFileW(full_path.c_str(), GrantedAccess, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            file_desc->handle = CreateFileW(full_path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                             nullptr, OPEN_EXISTING, create_flags, nullptr);
         }
 
