@@ -25,12 +25,14 @@ SecurityDescriptorBuilder::SecurityDescriptorBuilder()
     // Default file ACEs
     config.file_aces.push_back({WellKnownSid::System, AccessRights::FullControl});
     config.file_aces.push_back({WellKnownSid::Administrators, AccessRights::FullControl});
+    config.file_aces.push_back({WellKnownSid::Everyone, AccessRights::ReadExecute}); // Match network share behavior
     config.file_aces.push_back({WellKnownSid::Users, AccessRights::ReadExecute});
     config.file_aces.push_back({WellKnownSid::AllApplicationPackages, AccessRights::ReadExecute});
 
     // Default directory ACEs (same as files but with inheritance for subdirectories and files)
     config.directory_aces.push_back({WellKnownSid::System, AccessRights::FullControl, InheritanceFlags::Both});
     config.directory_aces.push_back({WellKnownSid::Administrators, AccessRights::FullControl, InheritanceFlags::Both});
+    config.directory_aces.push_back({WellKnownSid::Everyone, AccessRights::ReadExecute, InheritanceFlags::Both}); // Match network share behavior
     config.directory_aces.push_back({WellKnownSid::Users, AccessRights::ReadExecute, InheritanceFlags::Both});
     config.directory_aces.push_back({WellKnownSid::AllApplicationPackages, AccessRights::ReadExecute, InheritanceFlags::Both});
 }
