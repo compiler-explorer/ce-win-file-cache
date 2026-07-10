@@ -120,12 +120,12 @@ jobs:
         echo "✅ All headers have proper include guards"
         
         echo "=== Checking for TODO comments ==="
-        TODO_COUNT=$(find src/ include/ -name "*.cpp" -o -name "*.hpp" | xargs grep -i "todo:" | wc -l || echo "0")
+        TODO_COUNT=$(find src/ include/ \( -name "*.cpp" -o -name "*.hpp" \) -print0 | xargs -0 grep -i "todo:" | wc -l || echo "0")
         echo "TODO comments found: $TODO_COUNT"
         
         if [ "$TODO_COUNT" -gt 0 ]; then
           echo "📝 TODO comments:"
-          find src/ include/ -name "*.cpp" -o -name "*.hpp" | xargs grep -n -i "todo:" || true
+          find src/ include/ \( -name "*.cpp" -o -name "*.hpp" \) -print0 | xargs -0 grep -n -i "todo:" || true
         fi
     
 
