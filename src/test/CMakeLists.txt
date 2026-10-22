@@ -20,8 +20,13 @@ set(TEST_PROGRAMS
     glob_test
     glob_matcher_unit_test
     file_access_tracker_test
-    cache_policy_test
 )
+
+# cache_policy_test exercises the real HybridFileSystem, which requires WinFsp
+# and the Windows SDK (sddl.h etc.), so it can only be built on Windows/Wine
+if(WIN32 OR USE_WINE_WINDOWS_API)
+    list(APPEND TEST_PROGRAMS cache_policy_test)
+endif()
 
 # Define test program configurations
 set(cache_test_SOURCES test_cache_main.cpp ../memory_cache_manager.cpp ../config_parser.cpp ../string_utils.cpp ../logger.cpp)
@@ -107,7 +112,9 @@ if(TARGET Catch2)
     list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
     include(Catch)
     catch_discover_tests(glob_matcher_unit_test)
-    catch_discover_tests(cache_policy_test)
+    if(TARGET cache_policy_test)
+        catch_discover_tests(cache_policy_test)
+    endif()
 endif()
 
 message(STATUS "Test programs will be built in: ${CMAKE_BINARY_DIR}/bin")
