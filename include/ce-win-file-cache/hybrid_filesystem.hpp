@@ -84,6 +84,9 @@ class HybridFileSystem : public Fsp::FileSystemBase
     // Background eviction thread
     void memoryEvictionThreadFunc();
 
+    // Queues every cache_always file for download so it is in memory before first use
+    void preloadAlwaysCached();
+
     Config config;
     std::unordered_map<std::wstring, std::unique_ptr<CacheEntry>> cache_entries;
     std::mutex cache_mutex;
@@ -96,6 +99,9 @@ class HybridFileSystem : public Fsp::FileSystemBase
     // Background eviction thread
     std::thread memory_eviction_thread;
     std::atomic<bool> shutdown_eviction{false};
+
+    // Startup preload of cache_always files, also stops on shutdown_eviction
+    std::thread preload_thread;
 
     // Bytes of downloads that are queued or in flight, counted towards the cache size for admission
     std::atomic<size_t> reserved_cache_bytes{0};
