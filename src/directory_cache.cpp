@@ -91,7 +91,10 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryWindows(const std::wstring &ne
     HANDLE find_handle = FindFirstFileW(search_pattern.c_str(), &find_data);
     if (find_handle == INVALID_HANDLE_VALUE)
     {
-        // Network path not accessible - return success to continue
+        // Network path not accessible - keep mounting, but the directory will show up empty
+        DWORD error = GetLastError();
+        Logger::error(LogCategory::DIRECTORY, "Cannot list '{}' (error {}), it will appear empty",
+                      StringUtils::wideToUtf8(network_path), error);
         return STATUS_SUCCESS;
     }
 
