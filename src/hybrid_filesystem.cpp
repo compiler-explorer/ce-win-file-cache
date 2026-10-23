@@ -44,9 +44,9 @@ HybridFileSystem::~HybridFileSystem()
 {
     // Stop background eviction thread
     shutdown_eviction = true;
-    if (preload_thread.joinable())
+    if (prefetch_thread.joinable())
     {
-        preload_thread.join();
+        prefetch_thread.join();
     }
     // Stop the download workers before the metrics they report to go away
     if (download_manager)
@@ -128,7 +128,7 @@ NTSTATUS HybridFileSystem::Initialize(const Config &new_config)
     Logger::info(LogCategory::CACHE, "Starting background memory eviction thread");
     memory_eviction_thread = std::thread(&HybridFileSystem::memoryEvictionThreadFunc, this);
 
-    preload_thread = std::thread(&HybridFileSystem::preloadAlwaysCached, this);
+    prefetch_thread = std::thread(&HybridFileSystem::prefetchFiles, this);
 
     // Initialize file access tracker if enabled
     if (new_config.global.file_tracking.enabled)
@@ -1505,18 +1505,18 @@ std::vector<DirectoryNode *> HybridFileSystem::filterDirectoryContents(const std
     return filtered_contents;
 }
 
-CachePolicy HybridFileSystem::determineCachePolicy(const std::wstring &virtual_path)
+const CompilerConfig *HybridFileSystem::findCompilerConfig(const std::wstring &virtual_path, std::wstring &relative_path) const
 {
     // Match against configured compiler paths using longest-prefix matching
     // This handles both simple paths like "/msvc-14.40/bin/cl.exe"
     // and multi-level paths like "/compilers/msvc/14.40.33807-14.40.33811.0/bin/cl.exe"
     if (virtual_path.empty() || virtual_path[0] != L'/')
     {
-        return CachePolicy::NEVER_CACHE;
+        return nullptr;
     }
 
-    std::wstring path_without_leading_slash = virtual_path.substr(1);
-    std::wstring best_match_compiler;
+    std::wstring_view path_without_leading_slash = std::wstring_view(virtual_path).substr(1);
+    const CompilerConfig *best_match = nullptr;
     size_t best_match_length = 0;
 
     // Find the longest matching compiler path
@@ -1531,29 +1531,39 @@ CachePolicy HybridFileSystem::determineCachePolicy(const std::wstring &virtual_p
                 (path_without_leading_slash.length() == compiler_name_len ||
                  path_without_leading_slash[compiler_name_len] == L'/'))
             {
-                best_match_compiler = compiler_name;
+                best_match = &compiler_config;
                 best_match_length = compiler_name_len;
             }
         }
     }
 
-    // No matching compiler found
-    if (best_match_compiler.empty())
+    if (best_match == nullptr)
     {
-        return CachePolicy::NEVER_CACHE;
+        return nullptr;
     }
 
-    const auto &compiler_config = config.compilers.at(best_match_compiler);
-
     // Get relative path within the compiler directory
-    std::wstring relative_path;
+    relative_path.clear();
     if (path_without_leading_slash.length() > best_match_length)
     {
         relative_path = path_without_leading_slash.substr(best_match_length + 1); // +1 to skip the /
     }
+    return best_match;
+}
+
+CachePolicy HybridFileSystem::determineCachePolicy(const std::wstring &virtual_path)
+{
+    std::wstring relative_path;
+    const CompilerConfig *compiler_config = findCompilerConfig(virtual_path, relative_path);
+
+    // No matching compiler found
+    if (compiler_config == nullptr)
+    {
+        return CachePolicy::NEVER_CACHE;
+    }
 
     // Check cache_always_patterns for immediate caching
-    for (const auto &pattern : compiler_config.cache_always_patterns)
+    for (const auto &pattern : compiler_config->cache_always_patterns)
     {
         if (matchesPattern(relative_path, pattern))
         {
@@ -1564,6 +1574,25 @@ CachePolicy HybridFileSystem::determineCachePolicy(const std::wstring &virtual_p
     // Default policy for compiler files is on-demand caching
     // This provides good performance while managing memory usage
     return CachePolicy::ON_DEMAND;
+}
+
+bool HybridFileSystem::isPrefetched(const std::wstring &virtual_path)
+{
+    std::wstring relative_path;
+    const CompilerConfig *compiler_config = findCompilerConfig(virtual_path, relative_path);
+    if (compiler_config == nullptr)
+    {
+        return false;
+    }
+
+    for (const auto &pattern : compiler_config->prefetch_patterns)
+    {
+        if (matchesPattern(relative_path, pattern))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 std::wstring HybridFileSystem::createTemporaryFileForMemoryCached(CacheEntry *entry)
@@ -1904,7 +1933,7 @@ bool HybridFileSystem::isSystemIdle(std::chrono::seconds threshold) const
     return idle_time >= threshold;
 }
 
-void HybridFileSystem::preloadAlwaysCached()
+void HybridFileSystem::prefetchFiles()
 {
     DirectoryNode *root = directory_cache.findNode(L"/");
     if (root == nullptr || !download_manager || config.global.download_threads == 0)
@@ -1912,7 +1941,7 @@ void HybridFileSystem::preloadAlwaysCached()
         return;
     }
 
-    // Keep the download queue short so files a compile opens meanwhile are not stuck behind the whole preload
+    // Keep the download queue short so files a compile opens meanwhile are not stuck behind the whole prefetch
     const size_t max_pending = config.global.download_threads * 2;
 
     size_t queued_files = 0;
@@ -1929,7 +1958,7 @@ void HybridFileSystem::preloadAlwaysCached()
                 pending.push_back(child);
                 continue;
             }
-            if (determineCachePolicy(child->full_virtual_path) != CachePolicy::ALWAYS_CACHE)
+            if (!isPrefetched(child->full_virtual_path))
             {
                 continue;
             }
@@ -1953,8 +1982,7 @@ void HybridFileSystem::preloadAlwaysCached()
         }
     }
 
-    Logger::info(LogCategory::CACHE, "Queued {} cache_always files ({} MB) for preloading", queued_files,
-                 queued_bytes / (1024 * 1024));
+    Logger::info(LogCategory::CACHE, "Queued {} files ({} MB) for prefetching", queued_files, queued_bytes / (1024 * 1024));
 }
 
 void HybridFileSystem::memoryEvictionThreadFunc()
