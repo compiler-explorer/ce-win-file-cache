@@ -1,5 +1,6 @@
 #include "../../include/ce-win-file-cache/async_download_manager.hpp"
 #include "../../include/ce-win-file-cache/config_parser.hpp"
+#include "../../include/ce-win-file-cache/string_utils.hpp"
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -210,7 +211,19 @@ int main()
     std::cout << (memory_cache_ok ? "✓ Insert-only add and reference-aware removal" : "❌ Memory cache add/remove semantics wrong")
               << std::endl;
 
-    if (!empty_file_ok || !memory_cache_ok)
+    // Test 7: Stable file ids are case and separator insensitive, distinct and never zero
+    std::cout << "\nTest 7: Stable file ids" << std::endl;
+    bool file_id_ok = true;
+    {
+        uint64_t id = StringUtils::stableFileId(L"/compilers/msvc/bin/Hostx64/x64/cl.exe");
+        file_id_ok &= id != 0;
+        file_id_ok &= id == StringUtils::stableFileId(L"\\COMPILERS\\msvc\\BIN\\hostx64\\x64\\CL.EXE");
+        file_id_ok &= id != StringUtils::stableFileId(L"/compilers/msvc/bin/Hostx64/x64/c1.dll");
+        file_id_ok &= StringUtils::stableFileId(L"") != 0;
+    }
+    std::cout << (file_id_ok ? "✓ Stable file ids" : "❌ Stable file ids wrong") << std::endl;
+
+    if (!empty_file_ok || !memory_cache_ok || !file_id_ok)
     {
         return 1;
     }
