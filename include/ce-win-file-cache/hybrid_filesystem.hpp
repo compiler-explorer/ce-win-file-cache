@@ -124,8 +124,11 @@ struct FileDescriptor
     CacheEntry *entry;
     PVOID dir_buffer;
     const std::vector<uint8_t> *cached_content;  // Direct pointer to memory cached content for fast reads
+    std::mutex handle_mutex; // Read() closes the source handle at end of file and reopens it when needed
+    std::wstring source_path; // File the handle reads from, kept so Read() can reopen it
+    UINT64 source_size; // Size of the source file when it was opened
 
-    FileDescriptor() : handle(INVALID_HANDLE_VALUE), entry(nullptr), dir_buffer(nullptr), cached_content(nullptr)
+    FileDescriptor() : handle(INVALID_HANDLE_VALUE), entry(nullptr), dir_buffer(nullptr), cached_content(nullptr), source_size(0)
     {
     }
     ~FileDescriptor()
