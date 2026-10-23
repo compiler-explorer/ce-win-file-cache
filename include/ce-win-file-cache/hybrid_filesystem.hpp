@@ -64,6 +64,9 @@ class HybridFileSystem : public Fsp::FileSystemBase
 
     // Directory tree management
     void fillDirInfo(DirInfo *dir_info, DirectoryNode *node);
+    DirectoryNode *findChildByPattern(DirectoryNode *dir_node, PWSTR pattern) const;
+    // Appends one entry to a ReadDirectory buffer, false when it does not fit
+    bool addDirInfo(PVOID buffer, ULONG length, size_t &bytes_used, std::wstring_view name, const DirectoryNode *node) const;
     std::vector<DirectoryNode *> filterDirectoryContents(const std::vector<DirectoryNode *> &contents, PWSTR pattern, const char *context);
     NTSTATUS handleFileAsDirectoryEntry(CacheEntry *entry, PWSTR Pattern, PWSTR Marker, PVOID Buffer, ULONG Length, PULONG PBytesTransferred);
 
