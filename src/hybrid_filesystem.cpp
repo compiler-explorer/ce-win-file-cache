@@ -439,61 +439,38 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     else
     {
         Logger::debug(LogCategory::FILESYSTEM, "Open() - handling file");
-        // Check if file is in memory cache first
-        if (entry->state == FileState::CACHED && entry->local_path.empty())
+        // Serve from the memory cache when possible. Taking the pointer increments memory_ref_count under
+        // the memory cache mutex, which protects it from eviction while this file is open. It is null
+        // when the content was evicted after the flag check.
+        if (entry->state == FileState::CACHED && entry->local_path.empty() && entry->is_in_memory_cache.load())
         {
-            // File is in memory cache - use flag to avoid mutex lock
-            Logger::debug(LogCategory::FILESYSTEM, "Open() - checking is_in_memory_cache flag for: {}", StringUtils::wideToUtf8(entry->virtual_path));
-            if (entry->is_in_memory_cache.load())
-            {
-                // Serve ALL files directly from memory cache - no temp files needed!
-                // As a filesystem driver, we handle Read() callbacks directly
-                file_desc->handle = INVALID_HANDLE_VALUE;
-
-                // Get direct pointer to cached content for fast reads - only ONE mutex lock!
-                // This also increments memory_ref_count for eviction protection
-                file_desc->cached_content = memory_cache.getMemoryCachedFilePtr(entry);
-
-                Logger::debug(LogCategory::CACHE, "Open() - serving from memory cache (no handle) for: {}, cached_ptr: {}",
-                            StringUtils::wideToUtf8(entry->virtual_path), (void*)file_desc->cached_content);
-            }
-            else
-            {
-                // Memory cache miss - fallback to network
-                // Note: We open with GENERIC_READ (not GrantedAccess) because as the filesystem,
-                // we only need to read the source file to serve it. GrantedAccess is what the
-                // end-user was granted on Z:, not what we need to open the source on Y:.
-                file_desc->handle = CreateFileW(entry->network_path.c_str(), GENERIC_READ,
-                                                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
-                                                OPEN_EXISTING, create_flags, nullptr);
-            }
+            file_desc->cached_content = memory_cache.getMemoryCachedFilePtr(entry);
+            Logger::debug(LogCategory::CACHE, "Open() - serving from memory cache for: {}, cached: {}",
+                          StringUtils::wideToUtf8(entry->virtual_path), file_desc->cached_content != nullptr);
         }
-        else
+
+        if (file_desc->cached_content == nullptr)
         {
-            // File not in memory cache - use local_path or network_path
+            // Not in memory (not cached yet, download in progress, not admitted or evicted) - read from the source.
             // Note: We open with GENERIC_READ (not GrantedAccess) because as the filesystem,
             // we only need to read the source file to serve it. GrantedAccess is what the
             // end-user was granted on Z:, not what we need to open the source on Y:.
             std::wstring full_path = entry->local_path.empty() ? entry->network_path : entry->local_path;
             file_desc->handle = CreateFileW(full_path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                             nullptr, OPEN_EXISTING, create_flags, nullptr);
-        }
 
-        // For files, check if handle creation failed
-        Logger::debug(LogCategory::FILESYSTEM, "Open() - checking handle validity (using is_in_memory_cache flag) for: {}", StringUtils::wideToUtf8(entry->virtual_path));
-        if (file_desc->handle == INVALID_HANDLE_VALUE && !(entry->state == FileState::CACHED && entry->local_path.empty() &&
-                                                           entry->is_in_memory_cache.load()))
-        {
-            DWORD lastError = GetLastError();
-            std::wstring attempted_path = entry->local_path.empty() ? entry->network_path : entry->local_path;
-            Logger::error(LogCategory::FILESYSTEM,
-                "Open() - file handle creation failed for '{}', state: {}, attempted_path: '{}', Windows error: {} (0x{:x})",
-                StringUtils::wideToUtf8(entry->virtual_path),
-                static_cast<int>(entry->state),
-                StringUtils::wideToUtf8(attempted_path),
-                lastError, lastError);
-            delete file_desc;
-            return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
+            if (file_desc->handle == INVALID_HANDLE_VALUE)
+            {
+                DWORD lastError = GetLastError();
+                Logger::error(LogCategory::FILESYSTEM,
+                    "Open() - file handle creation failed for '{}', state: {}, attempted_path: '{}', Windows error: {} (0x{:x})",
+                    StringUtils::wideToUtf8(entry->virtual_path),
+                    static_cast<int>(entry->state),
+                    StringUtils::wideToUtf8(full_path),
+                    lastError, lastError);
+                delete file_desc;
+                return CeWinFileCache::WineCompat::NtStatusFromWin32(lastError);
+            }
         }
 
         if (file_desc->cached_content != nullptr)
@@ -1369,7 +1346,7 @@ NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
     // Check if file is already being downloaded
     if (download_manager && download_manager->isDownloadInProgress(entry->virtual_path))
     {
-        entry->state = FileState::FETCHING;
+        // Don't write state here, the download may just have completed and set CACHED
         return STATUS_PENDING;
     }
 
@@ -1381,16 +1358,34 @@ NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
         return STATUS_SUCCESS;
     }
 
+    // Don't admit ON_DEMAND files when the cache is full, serving them from the network is fine and keeps
+    // memory bounded. The entry stays VIRTUAL so it can be cached later once eviction made room.
+    if (entry->policy == CachePolicy::ON_DEMAND)
+    {
+        size_t max_cache_size = config.global.total_cache_size_mb * 1024ULL * 1024ULL;
+        if (memory_cache.getCacheSize() + reserved_cache_bytes.load() + entry->file_size > max_cache_size)
+        {
+            Logger::debug(LogCategory::CACHE, "Cache full, serving from network: '{}'", StringUtils::wideToUtf8(entry->virtual_path));
+            return STATUS_SUCCESS;
+        }
+    }
+
     // Queue async download for ALWAYS_CACHE and ON_DEMAND policies
     if (download_manager && !entry->network_path.empty())
     {
         entry->state = FileState::FETCHING;
         entry->is_downloading.store(true);
 
+        // The callback is invoked exactly once per queueDownload call (completion, duplicate or shutdown)
+        size_t reserved = static_cast<size_t>(entry->file_size);
+        reserved_cache_bytes += reserved;
+
         NTSTATUS status = download_manager->queueDownload(
         entry->virtual_path, entry->network_path, entry, entry->policy,
-        [this](NTSTATUS download_status, const std::wstring error, CacheEntry *entry)
+        [this, reserved](NTSTATUS download_status, const std::wstring error, CacheEntry *entry)
         {
+            reserved_cache_bytes -= reserved;
+
             if (download_status == STATUS_SUCCESS)
             {
                 // Download completed successfully
@@ -1814,31 +1809,12 @@ size_t HybridFileSystem::performMemoryEviction(size_t bytes_needed)
 
     Logger::info(LogCategory::CACHE, "Found {} evictable ON_DEMAND files", candidates.size());
 
-    // If no ON_DEMAND files available, collect ALWAYS_CACHE files as emergency fallback
+    // ALWAYS_CACHE files are never evicted, they are the permanently hot set. When they alone exceed
+    // the cache size new ON_DEMAND files are simply not admitted and get served from the network.
     if (candidates.empty())
     {
-        Logger::warn(LogCategory::CACHE, "No ON_DEMAND files to evict - entering emergency mode");
-        Logger::warn(LogCategory::CACHE, "Will evict ALWAYS_CACHE files (excluding active readers and downloads)");
-
-        for (const auto &[path, entry] : cache_entries)
-        {
-            if (entry->policy != CachePolicy::ALWAYS_CACHE)
-                continue;
-
-            if (entry->is_downloading.load())
-                continue;
-
-            if (entry->memory_ref_count.load() > 0)
-                continue;
-
-            if (!entry->is_in_memory_cache.load())
-                continue;
-
-            candidates.emplace_back(entry->last_used, path);
-        }
-
-        std::sort(candidates.begin(), candidates.end());
-        Logger::warn(LogCategory::CACHE, "Emergency mode: found {} ALWAYS_CACHE files to evict", candidates.size());
+        Logger::warn(LogCategory::CACHE, "No evictable ON_DEMAND files, cache_always files use {} MB of {} MB",
+                     current_size / (1024 * 1024), config.global.total_cache_size_mb);
     }
 
     // Evict files until we have enough space
@@ -1857,18 +1833,22 @@ size_t HybridFileSystem::performMemoryEviction(size_t bytes_needed)
         {
             size_t file_size = it->second->file_size;
 
-            Logger::info(LogCategory::CACHE, "  [{}] Evicting: {} ({} KB, last used {} sec ago)",
+            Logger::debug(LogCategory::CACHE, "  [{}] Evicting: {} ({} KB, last used {} sec ago)",
                          files_evicted + 1,
                          StringUtils::wideToUtf8(path),
                          file_size / 1024,
                          std::chrono::duration_cast<std::chrono::seconds>(
                              std::chrono::steady_clock::now() - last_used).count());
 
-            // Remove from memory cache
-            memory_cache.removeFileFromMemoryCache(path);
-
-            // Update entry state
+            // Removal re-checks the reference count under the memory cache mutex, so a file opened since the
+            // candidates were collected is skipped. Opens that still see the flag get a null pointer and read
+            // from the network instead.
+            if (!memory_cache.removeFileIfUnreferenced(it->second.get()))
+            {
+                continue;
+            }
             it->second->is_in_memory_cache.store(false);
+            it->second->state = FileState::VIRTUAL; // eligible to be cached again on a later open
 
             files_evicted++;
             bytes_evicted += file_size;
