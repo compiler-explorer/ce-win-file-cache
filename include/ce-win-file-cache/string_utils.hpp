@@ -52,6 +52,10 @@ class StringUtils
     // Used as IndexNumber so tools (e.g. Defender's scan cache) can tell files apart.
     static uint64_t stableFileId(std::wstring_view path);
 
+    // Orders file names like NTFS directory listings: by upper-cased characters, ties broken by exact case
+    static bool fileNameLess(std::wstring_view a, std::wstring_view b);
+    static bool fileNameLessIgnoreCase(std::wstring_view a, std::wstring_view b);
+
     private:
     /**
      * Fallback ASCII-only conversion for testing/development

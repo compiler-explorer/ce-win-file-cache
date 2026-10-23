@@ -111,11 +111,11 @@ std::vector<DirectoryNode *> DirectoryNode::getChildNodes() const
         sorted_children_cache.push_back(child.get());
     }
 
-    // Sort by name for consistent directory listings
+    // Sort in NTFS order, ReadDirectory relies on this order to continue after a marker
     std::sort(sorted_children_cache.begin(), sorted_children_cache.end(),
               [](const DirectoryNode *a, const DirectoryNode *b)
               {
-                  return a->name < b->name;
+                  return StringUtils::fileNameLess(a->name, b->name);
               });
 
     sorted_cache_valid = true;
