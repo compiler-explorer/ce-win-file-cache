@@ -517,14 +517,6 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         Logger::debug(LogCategory::FILESYSTEM, "Open() - File: {}, Size: {}, Attributes: 0x{:x}",
                      StringUtils::wideToUtf8(entry->virtual_path), OpenFileInfo->FileInfo.FileSize, OpenFileInfo->FileInfo.FileAttributes);
 
-        // Special logging for castguard.h to debug QueryDirectory issue
-        if (entry->virtual_path.find(L"castguard.h") != std::wstring::npos)
-        {
-            Logger::error(LogCategory::FILESYSTEM, "CASTGUARD DEBUG - Open() File: {}, Attributes: 0x{:x}, IsDirectory: {}, node->file_attributes: 0x{:x}",
-                         StringUtils::wideToUtf8(entry->virtual_path), OpenFileInfo->FileInfo.FileAttributes,
-                         (OpenFileInfo->FileInfo.FileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? "YES" : "NO",
-                         entry->file_attributes);
-        }
 
     }
 
