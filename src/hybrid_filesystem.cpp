@@ -17,6 +17,20 @@
 namespace CeWinFileCache
 {
 
+namespace
+{
+// Opens the source file for reading, as the filesystem we only ever read it (not GrantedAccess).
+// Never passes FILE_DELETE_ON_CLOSE on, that would delete the real file on the share.
+HANDLE openSourceFile(const std::wstring &path, UINT64 &size)
+{
+    HANDLE handle = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                                OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    LARGE_INTEGER file_size{};
+    size = handle != INVALID_HANDLE_VALUE && GetFileSizeEx(handle, &file_size) ? static_cast<UINT64>(file_size.QuadPart) : 0;
+    return handle;
+}
+} // namespace
+
 constexpr ULONG ALLOCATION_UNIT = 4096;
 constexpr ULONG FULLPATH_SIZE = MAX_PATH + FSP_FSCTL_TRANSACT_PATH_SIZEMAX / sizeof(WCHAR);
 
@@ -30,6 +44,15 @@ HybridFileSystem::~HybridFileSystem()
 {
     // Stop background eviction thread
     shutdown_eviction = true;
+    if (prefetch_thread.joinable())
+    {
+        prefetch_thread.join();
+    }
+    // Stop the download workers before the metrics they report to go away
+    if (download_manager)
+    {
+        download_manager->shutdown();
+    }
     if (memory_eviction_thread.joinable())
     {
         memory_eviction_thread.join();
@@ -105,6 +128,8 @@ NTSTATUS HybridFileSystem::Initialize(const Config &new_config)
     Logger::info(LogCategory::CACHE, "Starting background memory eviction thread");
     memory_eviction_thread = std::thread(&HybridFileSystem::memoryEvictionThreadFunc, this);
 
+    prefetch_thread = std::thread(&HybridFileSystem::prefetchFiles, this);
+
     // Initialize file access tracker if enabled
     if (new_config.global.file_tracking.enabled)
     {
@@ -165,20 +190,22 @@ NTSTATUS HybridFileSystem::Init(PVOID Host)
     Logger::info(LogCategory::FILESYSTEM, "Setting sector size: {}", ALLOCATION_UNIT);
     host->SetSectorSize(ALLOCATION_UNIT);
     host->SetSectorsPerAllocationUnit(1);
-    host->SetFileInfoTimeout(1000);
+    host->SetFileInfoTimeout(config.global.file_info_timeout_ms);
     host->SetCaseSensitiveSearch(FALSE);
     host->SetCasePreservedNames(TRUE);
     host->SetUnicodeOnDisk(TRUE);
     host->SetPersistentAcls(TRUE);
     host->SetPostCleanupWhenModifiedOnly(TRUE);
-    // Let the WinFsp driver match directory patterns (FsRtlIsNameInExpression), it understands the
-    // DOS wildcards (<, >, ") that FindFirstFile produces, which GlobMatcher does not
-    host->SetPassQueryDirectoryPattern(FALSE);
+    // The WinFsp driver matches directory patterns itself (it understands the DOS wildcards <, > and " that
+    // FindFirstFile produces), ReadDirectory only uses the pattern to look up an exact name directly
+    host->SetPassQueryDirectoryPattern(TRUE);
     host->SetVolumeCreationTime(creation_time);
     host->SetVolumeSerialNumber(0x12345678);
-    host->SetFlushAndPurgeOnCleanup(TRUE);
+    host->SetFlushAndPurgeOnCleanup(config.global.flush_and_purge_on_cleanup ? TRUE : FALSE);
     host->SetFileSystemName(L"NTFS"); // Required for DLL/executable loading
 
+    Logger::info(LogCategory::FILESYSTEM, "FileInfoTimeout: {} ms, FlushAndPurgeOnCleanup: {}", config.global.file_info_timeout_ms,
+                 config.global.flush_and_purge_on_cleanup);
     Logger::debug(LogCategory::FILESYSTEM, "Init() completed successfully");
     return STATUS_SUCCESS;
 }
@@ -338,7 +365,7 @@ void HybridFileSystem::copyFileInfo(CacheEntry *source, FileInfo *dest) const
     dest->LastAccessTime = std::bit_cast<UINT64>(source->last_access_time);
     dest->LastWriteTime = std::bit_cast<UINT64>(source->last_write_time);
     dest->ChangeTime = dest->LastWriteTime; // Missing: Should track actual metadata change time separately
-    dest->IndexNumber = 0; // Missing: Should be unique file identifier (inode equivalent)
+    dest->IndexNumber = StringUtils::stableFileId(source->virtual_path);
     dest->HardLinks = 0; // Missing: Should track actual hard link count from filesystem
     dest->EaSize = 0; // Missing: Should reflect actual Extended Attributes size if EA support is added
 }
@@ -423,12 +450,6 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     Logger::debug(LogCategory::FILESYSTEM, "Open() - creating file descriptor");
     auto *file_desc = new FileDescriptor();
 
-    DWORD create_flags = FILE_FLAG_BACKUP_SEMANTICS;
-    if (CreateOptions & FILE_DELETE_ON_CLOSE)
-    {
-        create_flags |= FILE_FLAG_DELETE_ON_CLOSE;
-    }
-
     // Handle directories separately from files
     if (entry->file_attributes & FILE_ATTRIBUTE_DIRECTORY)
     {
@@ -439,61 +460,34 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     else
     {
         Logger::debug(LogCategory::FILESYSTEM, "Open() - handling file");
-        // Check if file is in memory cache first
-        if (entry->state == FileState::CACHED && entry->local_path.empty())
+        // Serve from the memory cache when possible. Taking the pointer increments memory_ref_count under
+        // the memory cache mutex, which protects it from eviction while this file is open. It is null
+        // when the content was evicted after the flag check.
+        if (entry->state == FileState::CACHED && entry->local_path.empty() && entry->is_in_memory_cache.load())
         {
-            // File is in memory cache - use flag to avoid mutex lock
-            Logger::debug(LogCategory::FILESYSTEM, "Open() - checking is_in_memory_cache flag for: {}", StringUtils::wideToUtf8(entry->virtual_path));
-            if (entry->is_in_memory_cache.load())
-            {
-                // Serve ALL files directly from memory cache - no temp files needed!
-                // As a filesystem driver, we handle Read() callbacks directly
-                file_desc->handle = INVALID_HANDLE_VALUE;
-
-                // Get direct pointer to cached content for fast reads - only ONE mutex lock!
-                // This also increments memory_ref_count for eviction protection
-                file_desc->cached_content = memory_cache.getMemoryCachedFilePtr(entry);
-
-                Logger::debug(LogCategory::CACHE, "Open() - serving from memory cache (no handle) for: {}, cached_ptr: {}",
-                            StringUtils::wideToUtf8(entry->virtual_path), (void*)file_desc->cached_content);
-            }
-            else
-            {
-                // Memory cache miss - fallback to network
-                // Note: We open with GENERIC_READ (not GrantedAccess) because as the filesystem,
-                // we only need to read the source file to serve it. GrantedAccess is what the
-                // end-user was granted on Z:, not what we need to open the source on Y:.
-                file_desc->handle = CreateFileW(entry->network_path.c_str(), GENERIC_READ,
-                                                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
-                                                OPEN_EXISTING, create_flags, nullptr);
-            }
-        }
-        else
-        {
-            // File not in memory cache - use local_path or network_path
-            // Note: We open with GENERIC_READ (not GrantedAccess) because as the filesystem,
-            // we only need to read the source file to serve it. GrantedAccess is what the
-            // end-user was granted on Z:, not what we need to open the source on Y:.
-            std::wstring full_path = entry->local_path.empty() ? entry->network_path : entry->local_path;
-            file_desc->handle = CreateFileW(full_path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                            nullptr, OPEN_EXISTING, create_flags, nullptr);
+            file_desc->cached_content = memory_cache.getMemoryCachedFilePtr(entry);
+            Logger::debug(LogCategory::CACHE, "Open() - serving from memory cache for: {}, cached: {}",
+                          StringUtils::wideToUtf8(entry->virtual_path), file_desc->cached_content != nullptr);
         }
 
-        // For files, check if handle creation failed
-        Logger::debug(LogCategory::FILESYSTEM, "Open() - checking handle validity (using is_in_memory_cache flag) for: {}", StringUtils::wideToUtf8(entry->virtual_path));
-        if (file_desc->handle == INVALID_HANDLE_VALUE && !(entry->state == FileState::CACHED && entry->local_path.empty() &&
-                                                           entry->is_in_memory_cache.load()))
+        if (file_desc->cached_content == nullptr)
         {
-            DWORD lastError = GetLastError();
-            std::wstring attempted_path = entry->local_path.empty() ? entry->network_path : entry->local_path;
-            Logger::error(LogCategory::FILESYSTEM,
-                "Open() - file handle creation failed for '{}', state: {}, attempted_path: '{}', Windows error: {} (0x{:x})",
-                StringUtils::wideToUtf8(entry->virtual_path),
-                static_cast<int>(entry->state),
-                StringUtils::wideToUtf8(attempted_path),
-                lastError, lastError);
-            delete file_desc;
-            return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
+            // Not in memory (not cached yet, download in progress, not admitted or evicted) - read from the source
+            file_desc->source_path = entry->local_path.empty() ? entry->network_path : entry->local_path;
+            file_desc->handle = openSourceFile(file_desc->source_path, file_desc->source_size);
+
+            if (file_desc->handle == INVALID_HANDLE_VALUE)
+            {
+                DWORD lastError = GetLastError();
+                Logger::error(LogCategory::FILESYSTEM,
+                    "Open() - file handle creation failed for '{}', state: {}, attempted_path: '{}', Windows error: {} (0x{:x})",
+                    StringUtils::wideToUtf8(entry->virtual_path),
+                    static_cast<int>(entry->state),
+                    StringUtils::wideToUtf8(file_desc->source_path),
+                    lastError, lastError);
+                delete file_desc;
+                return CeWinFileCache::WineCompat::NtStatusFromWin32(lastError);
+            }
         }
 
         if (file_desc->cached_content != nullptr)
@@ -507,6 +501,18 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     }
 
     file_desc->entry = entry;
+
+    // Report the original-case name, otherwise WinFsp assumes the upper-cased name on a case-insensitive volume
+    // (visible through GetModuleFileName/GetFinalPathNameByHandle). It may only differ in case from FileName.
+    std::wstring normalized_name = entry->virtual_path;
+    std::replace(normalized_name.begin(), normalized_name.end(), L'/', L'\\');
+    size_t normalized_bytes = normalized_name.size() * sizeof(WCHAR);
+    if (OpenFileInfo->NormalizedName != nullptr && normalized_bytes <= OpenFileInfo->NormalizedNameSize &&
+        normalized_name.size() == virtual_path.size() && _wcsicmp(normalized_name.c_str(), virtual_path.c_str()) == 0)
+    {
+        memcpy(OpenFileInfo->NormalizedName, normalized_name.data(), normalized_bytes);
+        OpenFileInfo->NormalizedNameSize = static_cast<UINT16>(normalized_bytes);
+    }
 
     Logger::debug(LogCategory::FILESYSTEM, "Open() - setting up file info");
 
@@ -531,14 +537,6 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
         Logger::debug(LogCategory::FILESYSTEM, "Open() - File: {}, Size: {}, Attributes: 0x{:x}",
                      StringUtils::wideToUtf8(entry->virtual_path), OpenFileInfo->FileInfo.FileSize, OpenFileInfo->FileInfo.FileAttributes);
 
-        // Special logging for castguard.h to debug QueryDirectory issue
-        if (entry->virtual_path.find(L"castguard.h") != std::wstring::npos)
-        {
-            Logger::error(LogCategory::FILESYSTEM, "CASTGUARD DEBUG - Open() File: {}, Attributes: 0x{:x}, IsDirectory: {}, node->file_attributes: 0x{:x}",
-                         StringUtils::wideToUtf8(entry->virtual_path), OpenFileInfo->FileInfo.FileAttributes,
-                         (OpenFileInfo->FileInfo.FileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? "YES" : "NO",
-                         entry->file_attributes);
-        }
 
     }
 
@@ -646,23 +644,49 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
     // Record filesystem operation
     GlobalMetrics::instance().recordFilesystemOperation("read");
 
-    // Fallback to file handle read (for network-only files or cache miss)
-    OVERLAPPED overlapped = {};
-    overlapped.Offset = static_cast<DWORD>(Offset);
-    overlapped.OffsetHigh = static_cast<DWORD>(Offset >> 32);
-
-    Logger::debug(LogCategory::FILESYSTEM, "Read() - reading from file handle for: '{}'", path_str);
-    if (!ReadFile(file_desc->handle, Buffer, Length, PBytesTransferred, &overlapped))
+    // Fallback to file handle read (for network-only files or cache miss). The handle is closed at end of file:
+    // with flush_and_purge_on_cleanup false Close() can come much later, keeping the share handle open until then.
     {
-        DWORD error = GetLastError();
-        if (error == ERROR_HANDLE_EOF)
+        std::lock_guard<std::mutex> handle_lock(file_desc->handle_mutex);
+
+        if (file_desc->handle == INVALID_HANDLE_VALUE)
         {
-            *PBytesTransferred = 0;
-            return STATUS_END_OF_FILE;
+            file_desc->handle = openSourceFile(file_desc->source_path, file_desc->source_size);
+            if (file_desc->handle == INVALID_HANDLE_VALUE)
+            {
+                DWORD error = GetLastError();
+                Logger::error(LogCategory::FILESYSTEM, "Read() - reopening failed for: '{}', Error: {}", path_str, error);
+                return CeWinFileCache::WineCompat::NtStatusFromWin32(error);
+            }
         }
 
-        Logger::error(LogCategory::FILESYSTEM, "Read() - ReadFile failed for: '{}', Error: {}", path_str, error);
-        return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
+        OVERLAPPED overlapped = {};
+        overlapped.Offset = static_cast<DWORD>(Offset);
+        overlapped.OffsetHigh = static_cast<DWORD>(Offset >> 32);
+
+        Logger::debug(LogCategory::FILESYSTEM, "Read() - reading from file handle for: '{}'", path_str);
+        BOOL read_ok = ReadFile(file_desc->handle, Buffer, Length, PBytesTransferred, &overlapped);
+        DWORD error = read_ok ? ERROR_SUCCESS : GetLastError();
+
+        bool at_end = read_ok ? *PBytesTransferred < Length || Offset + *PBytesTransferred >= file_desc->source_size
+                              : error == ERROR_HANDLE_EOF;
+        if (at_end)
+        {
+            CloseHandle(file_desc->handle);
+            file_desc->handle = INVALID_HANDLE_VALUE;
+        }
+
+        if (!read_ok)
+        {
+            if (error == ERROR_HANDLE_EOF)
+            {
+                *PBytesTransferred = 0;
+                return STATUS_END_OF_FILE;
+            }
+
+            Logger::error(LogCategory::FILESYSTEM, "Read() - ReadFile failed for: '{}', Error: {}", path_str, error);
+            return CeWinFileCache::WineCompat::NtStatusFromWin32(error);
+        }
     }
 
     Logger::debug(LogCategory::FILESYSTEM, "Read() - success for: '{}', BytesTransferred: {}", path_str, *PBytesTransferred);
@@ -898,161 +922,128 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
         return handleFileAsDirectoryEntry(file_desc->entry, Pattern, Marker, Buffer, Length, PBytesTransferred);
     }
 
-    // Get directory path
-    std::wstring normalized_path = normalizePath(file_desc->entry->virtual_path);
-
-    Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - enumerating directory: '{}'", StringUtils::wideToUtf8(normalized_path));
-
-    // Get directory contents
-    std::vector<DirectoryNode *> contents = directory_cache.getDirectoryContents(file_desc->entry->virtual_path);
-    Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - directory '{}' has {} entries", StringUtils::wideToUtf8(file_desc->entry->virtual_path), contents.size());
-
-    // Apply pattern filtering if specified
-    if (Pattern && wcslen(Pattern) > 0)
+    DirectoryNode *dir_node = directory_cache.findNode(file_desc->entry->virtual_path);
+    if (dir_node == nullptr)
     {
-        contents = filterDirectoryContents(contents, Pattern, "ReadDirectory");
-    }
-
-    if (contents.empty())
-    {
-        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - no entries found");
         *PBytesTransferred = 0;
-        return STATUS_NO_MORE_FILES;
+        return STATUS_OBJECT_NAME_NOT_FOUND;
     }
 
-    // Find starting index based on marker using binary search for O(log n) performance
-    size_t start_index = 0;
-    if (Marker && wcslen(Marker) > 0)
-    {
-        std::string marker_str = StringUtils::wideToUtf8(Marker);
-
-        // todo: should use hashmap that should already be cached (its not)
-
-        // Use binary search to find marker position (assumes contents are sorted by name)
-        auto it = std::lower_bound(contents.begin(), contents.end(), Marker,
-                                   [](const DirectoryNode *node, const std::wstring &marker)
-                                   {
-                                       return node->name < marker;
-                                   });
-
-        if (it != contents.end() && (*it)->name == Marker)
-        {
-            start_index = std::distance(contents.begin(), it) + 1; // Next entry after marker
-            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - found marker '{}' at index {}", marker_str, start_index - 1);
-        }
-        else
-        {
-            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - marker '{}' not found, starting from beginning", marker_str);
-        }
-    }
-    else
-    {
-        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - no marker, starting from beginning");
-    }
-
-    // Fill buffer with directory entries
-    PUCHAR buffer_ptr = (PUCHAR)Buffer;
+    // NTFS lists "." and ".." first in every directory except the root
+    bool has_dot_entries = normalizePath(file_desc->entry->virtual_path) != L"/";
+    DirectoryNode *parent_node = dir_node->parent != nullptr ? dir_node->parent : dir_node;
     size_t bytes_used = 0;
-    size_t entries_returned = 0;
 
-    for (size_t i = start_index; i < contents.size(); i++)
+    // The WinFsp driver filters the results with the pattern itself, so the pattern is only used to avoid listing
+    // the whole directory when it names a single file (FindFirstFile on an exact path, e.g. include lookups).
+    // The Marker is ignored here like WinFsp's GetDirInfoByName does: the driver sends one when it already
+    // scanned part of a cached listing, and never asks again once the file was returned.
+    if (Pattern != nullptr && wcspbrk(Pattern, L"*?<>\"") == nullptr)
     {
-        DirectoryNode *node = contents[i];
-
-        // Calculate size needed for this entry
-        size_t name_chars = node->name.length();
-        size_t name_bytes = name_chars * sizeof(WCHAR);
-        // Size = base structure + filename bytes (matching WinFsp memfs example)
-        size_t dir_info_size = sizeof(FSP_FSCTL_DIR_INFO) + name_bytes;
-
-        // Check if entry size exceeds UINT16 maximum
-        if (dir_info_size > UINT16_MAX)
+        if (has_dot_entries && (wcscmp(Pattern, L".") == 0 || wcscmp(Pattern, L"..") == 0))
         {
-            Logger::error(LogCategory::FILESYSTEM, "ReadDirectory() - entry '{}' size {} exceeds UINT16_MAX, skipping",
-                         StringUtils::wideToUtf8(node->name), dir_info_size);
-            continue;
+            addDirInfo(Buffer, Length, bytes_used, Pattern, Pattern[1] == L'.' ? parent_node : dir_node);
         }
-
-        // Align to 8-byte boundary for buffer positioning (but Size field stays unaligned)
-        size_t entry_size = (dir_info_size + 7) & ~7;
-
-        // Removed verbose per-entry logging for performance
-
-        // Check if entry fits in remaining buffer
-        if (bytes_used + entry_size > Length)
+        else if (DirectoryNode *child = findChildByPattern(dir_node, Pattern); child != nullptr)
         {
-            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - buffer full, stopping at index {}", i);
-            break;
+            addDirInfo(Buffer, Length, bytes_used, child->name, child);
         }
-
-        // Fill directory info
-        FSP_FSCTL_DIR_INFO *dir_info = (FSP_FSCTL_DIR_INFO *)(buffer_ptr + bytes_used);
-        dir_info->Size = (UINT16)dir_info_size;  // Size field is unaligned
-
-        // Set file attributes from cached network data
-        dir_info->FileInfo.FileAttributes = node->file_attributes;
-
-        // Debug logging for file attributes
-        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - entry '{}': attributes=0x{:x}, isDirectory={}, size={}",
-                     StringUtils::wideToUtf8(node->name), node->file_attributes,
-                     node->isDirectory(), node->file_size);
-        dir_info->FileInfo.ReparseTag = 0;
-        dir_info->FileInfo.FileSize = node->isDirectory() ? 0 : node->file_size;
-        dir_info->FileInfo.AllocationSize =
-        node->isDirectory() ? ALLOCATION_UNIT : (dir_info->FileInfo.FileSize + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
-
-        // Set timestamps
-        UINT64 creation_ts = std::bit_cast<UINT64>(node->creation_time);
-        UINT64 access_ts = std::bit_cast<UINT64>(node->last_access_time);
-        UINT64 write_ts = std::bit_cast<UINT64>(node->last_write_time);
-
-        if (creation_ts == 0)
-            creation_ts = creation_time;
-        if (access_ts == 0)
-            access_ts = creation_time;
-        if (write_ts == 0)
-            write_ts = creation_time;
-
-        dir_info->FileInfo.CreationTime = creation_ts;
-        dir_info->FileInfo.LastAccessTime = access_ts;
-        dir_info->FileInfo.LastWriteTime = write_ts;
-        dir_info->FileInfo.ChangeTime = write_ts;
-        dir_info->FileInfo.IndexNumber = 0;
-        dir_info->FileInfo.HardLinks = 0;
-
-        // Clear padding
-        memset(dir_info->Padding, 0, sizeof(dir_info->Padding));
-
-        // Copy filename with null termination
-        memcpy(dir_info->FileNameBuf, node->name.c_str(), name_bytes);
-        WCHAR *filename_end = (WCHAR *)((char *)dir_info->FileNameBuf + name_bytes);
-        *filename_end = L'\0';
-
-        bytes_used += entry_size;
-        entries_returned++;
-
-        // Removed verbose per-entry logging for performance
+        *PBytesTransferred = static_cast<ULONG>(bytes_used);
+        FspFileSystemAddDirInfo(nullptr, Buffer, Length, PBytesTransferred);
+        return STATUS_SUCCESS;
     }
 
+    std::vector<DirectoryNode *> contents = dir_node->getChildNodes();
+
+    // Continue after the marker, the last name returned by the previous call
+    auto next = contents.begin();
+    bool full = false;
+    if (Marker == nullptr || (has_dot_entries && wcscmp(Marker, L".") == 0))
+    {
+        if (has_dot_entries)
+        {
+            full = (Marker == nullptr && !addDirInfo(Buffer, Length, bytes_used, L".", dir_node)) ||
+                   !addDirInfo(Buffer, Length, bytes_used, L"..", parent_node);
+        }
+    }
+    else if (!(has_dot_entries && wcscmp(Marker, L"..") == 0))
+    {
+        // Ignoring case, a marker given by the caller (SL_INDEX_SPECIFIED) may differ in case from the name
+        next = std::upper_bound(contents.begin(), contents.end(), std::wstring_view(Marker),
+                                [](std::wstring_view marker, const DirectoryNode *node)
+                                {
+                                    return StringUtils::fileNameLessIgnoreCase(marker, node->name);
+                                });
+    }
+
+    for (; !full && next != contents.end(); ++next)
+    {
+        full = !addDirInfo(Buffer, Length, bytes_used, (*next)->name, *next);
+    }
+
+    // The end marker saves WinFsp a call that would only find the listing empty, a full buffer gets continued
     *PBytesTransferred = static_cast<ULONG>(bytes_used);
+    if (!full)
+    {
+        FspFileSystemAddDirInfo(nullptr, Buffer, Length, PBytesTransferred);
+    }
+    return STATUS_SUCCESS;
+}
 
-    Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - returning {} entries, {} bytes total", entries_returned, bytes_used);
+DirectoryNode *HybridFileSystem::findChildByPattern(DirectoryNode *dir_node, PWSTR pattern) const
+{
+    // The driver upper-cases the pattern. Child keys are lowercased with towlower, which is only reliable for ASCII.
+    std::wstring_view name(pattern);
+    bool is_ascii = std::all_of(name.begin(), name.end(), [](wchar_t ch) { return ch < 0x80; });
+    if (is_ascii && !config.global.case_sensitive)
+    {
+        return dir_node->findChild(name);
+    }
 
-    if (entries_returned == 0)
+    for (DirectoryNode *child : dir_node->getChildNodes())
     {
-        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - no entries returned, returning SUCCESS with 0 bytes");
-        return STATUS_SUCCESS; // Real Windows filesystem returns SUCCESS, not NO_MORE_FILES
+        if (CompareStringOrdinal(child->name.c_str(), static_cast<int>(child->name.size()), pattern,
+                                 static_cast<int>(name.size()), TRUE) == CSTR_EQUAL)
+        {
+            return child;
+        }
     }
-    else if (start_index + entries_returned >= contents.size())
+    return nullptr;
+}
+
+bool HybridFileSystem::addDirInfo(PVOID buffer, ULONG length, size_t &bytes_used, std::wstring_view name, const DirectoryNode *node) const
+{
+    size_t name_bytes = name.size() * sizeof(WCHAR);
+    size_t dir_info_size = sizeof(FSP_FSCTL_DIR_INFO) + name_bytes;
+    // Entries are 8-byte aligned in the buffer, the Size field stays unaligned
+    size_t entry_size = (dir_info_size + 7) & ~size_t{ 7 };
+    if (dir_info_size > UINT16_MAX || bytes_used + entry_size > length)
     {
-        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - enumeration complete");
-        return STATUS_SUCCESS; // All entries have been returned
+        return false;
     }
-    else
-    {
-        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - more entries available");
-        return STATUS_SUCCESS; // More entries available
-    }
+
+    auto *dir_info = reinterpret_cast<FSP_FSCTL_DIR_INFO *>(static_cast<PUCHAR>(buffer) + bytes_used);
+    memset(dir_info, 0, sizeof(FSP_FSCTL_DIR_INFO));
+    dir_info->Size = static_cast<UINT16>(dir_info_size);
+
+    dir_info->FileInfo.FileAttributes = node->file_attributes;
+    dir_info->FileInfo.FileSize = node->isDirectory() ? 0 : node->file_size;
+    dir_info->FileInfo.AllocationSize =
+    node->isDirectory() ? ALLOCATION_UNIT : (dir_info->FileInfo.FileSize + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
+
+    UINT64 creation_ts = std::bit_cast<UINT64>(node->creation_time);
+    UINT64 access_ts = std::bit_cast<UINT64>(node->last_access_time);
+    UINT64 write_ts = std::bit_cast<UINT64>(node->last_write_time);
+    dir_info->FileInfo.CreationTime = creation_ts != 0 ? creation_ts : creation_time;
+    dir_info->FileInfo.LastAccessTime = access_ts != 0 ? access_ts : creation_time;
+    dir_info->FileInfo.LastWriteTime = write_ts != 0 ? write_ts : creation_time;
+    dir_info->FileInfo.ChangeTime = dir_info->FileInfo.LastWriteTime;
+    dir_info->FileInfo.IndexNumber = StringUtils::stableFileId(node->full_virtual_path);
+
+    memcpy(dir_info->FileNameBuf, name.data(), name_bytes);
+
+    bytes_used += entry_size;
+    return true;
 }
 
 NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID *PContext, DirInfo *DirInfo)
@@ -1369,7 +1360,7 @@ NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
     // Check if file is already being downloaded
     if (download_manager && download_manager->isDownloadInProgress(entry->virtual_path))
     {
-        entry->state = FileState::FETCHING;
+        // Don't write state here, the download may just have completed and set CACHED
         return STATUS_PENDING;
     }
 
@@ -1381,16 +1372,34 @@ NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
         return STATUS_SUCCESS;
     }
 
+    // Don't admit ON_DEMAND files when the cache is full, serving them from the network is fine and keeps
+    // memory bounded. The entry stays VIRTUAL so it can be cached later once eviction made room.
+    if (entry->policy == CachePolicy::ON_DEMAND)
+    {
+        size_t max_cache_size = config.global.total_cache_size_mb * 1024ULL * 1024ULL;
+        if (memory_cache.getCacheSize() + reserved_cache_bytes.load() + entry->file_size > max_cache_size)
+        {
+            Logger::debug(LogCategory::CACHE, "Cache full, serving from network: '{}'", StringUtils::wideToUtf8(entry->virtual_path));
+            return STATUS_SUCCESS;
+        }
+    }
+
     // Queue async download for ALWAYS_CACHE and ON_DEMAND policies
     if (download_manager && !entry->network_path.empty())
     {
         entry->state = FileState::FETCHING;
         entry->is_downloading.store(true);
 
+        // The callback is invoked exactly once per queueDownload call (completion, duplicate or shutdown)
+        size_t reserved = static_cast<size_t>(entry->file_size);
+        reserved_cache_bytes += reserved;
+
         NTSTATUS status = download_manager->queueDownload(
         entry->virtual_path, entry->network_path, entry, entry->policy,
-        [this](NTSTATUS download_status, const std::wstring error, CacheEntry *entry)
+        [this, reserved](NTSTATUS download_status, const std::wstring error, CacheEntry *entry)
         {
+            reserved_cache_bytes -= reserved;
+
             if (download_status == STATUS_SUCCESS)
             {
                 // Download completed successfully
@@ -1404,9 +1413,16 @@ NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
             }
             else
             {
-                // Download failed
-                entry->state = FileState::NETWORK_ONLY;
-                entry->local_path = entry->network_path;
+                // Download failed. cache_always files go back to VIRTUAL so the next open retries the download.
+                if (entry->policy == CachePolicy::ALWAYS_CACHE)
+                {
+                    entry->state = FileState::VIRTUAL;
+                }
+                else
+                {
+                    entry->state = FileState::NETWORK_ONLY;
+                    entry->local_path = entry->network_path;
+                }
                 Logger::error(LogCategory::NETWORK, "Download failed for {}: {}",
                               StringUtils::wideToUtf8(entry->virtual_path), StringUtils::wideToUtf8(error));
             }
@@ -1489,18 +1505,18 @@ std::vector<DirectoryNode *> HybridFileSystem::filterDirectoryContents(const std
     return filtered_contents;
 }
 
-CachePolicy HybridFileSystem::determineCachePolicy(const std::wstring &virtual_path)
+const CompilerConfig *HybridFileSystem::findCompilerConfig(const std::wstring &virtual_path, std::wstring &relative_path) const
 {
     // Match against configured compiler paths using longest-prefix matching
     // This handles both simple paths like "/msvc-14.40/bin/cl.exe"
     // and multi-level paths like "/compilers/msvc/14.40.33807-14.40.33811.0/bin/cl.exe"
     if (virtual_path.empty() || virtual_path[0] != L'/')
     {
-        return CachePolicy::NEVER_CACHE;
+        return nullptr;
     }
 
-    std::wstring path_without_leading_slash = virtual_path.substr(1);
-    std::wstring best_match_compiler;
+    std::wstring_view path_without_leading_slash = std::wstring_view(virtual_path).substr(1);
+    const CompilerConfig *best_match = nullptr;
     size_t best_match_length = 0;
 
     // Find the longest matching compiler path
@@ -1515,29 +1531,39 @@ CachePolicy HybridFileSystem::determineCachePolicy(const std::wstring &virtual_p
                 (path_without_leading_slash.length() == compiler_name_len ||
                  path_without_leading_slash[compiler_name_len] == L'/'))
             {
-                best_match_compiler = compiler_name;
+                best_match = &compiler_config;
                 best_match_length = compiler_name_len;
             }
         }
     }
 
-    // No matching compiler found
-    if (best_match_compiler.empty())
+    if (best_match == nullptr)
     {
-        return CachePolicy::NEVER_CACHE;
+        return nullptr;
     }
 
-    const auto &compiler_config = config.compilers.at(best_match_compiler);
-
     // Get relative path within the compiler directory
-    std::wstring relative_path;
+    relative_path.clear();
     if (path_without_leading_slash.length() > best_match_length)
     {
         relative_path = path_without_leading_slash.substr(best_match_length + 1); // +1 to skip the /
     }
+    return best_match;
+}
+
+CachePolicy HybridFileSystem::determineCachePolicy(const std::wstring &virtual_path)
+{
+    std::wstring relative_path;
+    const CompilerConfig *compiler_config = findCompilerConfig(virtual_path, relative_path);
+
+    // No matching compiler found
+    if (compiler_config == nullptr)
+    {
+        return CachePolicy::NEVER_CACHE;
+    }
 
     // Check cache_always_patterns for immediate caching
-    for (const auto &pattern : compiler_config.cache_always_patterns)
+    for (const auto &pattern : compiler_config->cache_always_patterns)
     {
         if (matchesPattern(relative_path, pattern))
         {
@@ -1548,6 +1574,25 @@ CachePolicy HybridFileSystem::determineCachePolicy(const std::wstring &virtual_p
     // Default policy for compiler files is on-demand caching
     // This provides good performance while managing memory usage
     return CachePolicy::ON_DEMAND;
+}
+
+bool HybridFileSystem::isPrefetched(const std::wstring &virtual_path)
+{
+    std::wstring relative_path;
+    const CompilerConfig *compiler_config = findCompilerConfig(virtual_path, relative_path);
+    if (compiler_config == nullptr)
+    {
+        return false;
+    }
+
+    for (const auto &pattern : compiler_config->prefetch_patterns)
+    {
+        if (matchesPattern(relative_path, pattern))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 std::wstring HybridFileSystem::createTemporaryFileForMemoryCached(CacheEntry *entry)
@@ -1717,7 +1762,7 @@ void HybridFileSystem::fillDirInfo(DirInfo *dir_info, DirectoryNode *node)
     dir_info->FileInfo.LastAccessTime = access_timestamp;
     dir_info->FileInfo.LastWriteTime = write_timestamp;
     dir_info->FileInfo.ChangeTime = write_timestamp;
-    dir_info->FileInfo.IndexNumber = 0;
+    dir_info->FileInfo.IndexNumber = StringUtils::stableFileId(node->full_virtual_path);
     dir_info->FileInfo.HardLinks = 0;
 
     // Clear padding
@@ -1814,31 +1859,12 @@ size_t HybridFileSystem::performMemoryEviction(size_t bytes_needed)
 
     Logger::info(LogCategory::CACHE, "Found {} evictable ON_DEMAND files", candidates.size());
 
-    // If no ON_DEMAND files available, collect ALWAYS_CACHE files as emergency fallback
+    // ALWAYS_CACHE files are never evicted, they are the permanently hot set. When they alone exceed
+    // the cache size new ON_DEMAND files are simply not admitted and get served from the network.
     if (candidates.empty())
     {
-        Logger::warn(LogCategory::CACHE, "No ON_DEMAND files to evict - entering emergency mode");
-        Logger::warn(LogCategory::CACHE, "Will evict ALWAYS_CACHE files (excluding active readers and downloads)");
-
-        for (const auto &[path, entry] : cache_entries)
-        {
-            if (entry->policy != CachePolicy::ALWAYS_CACHE)
-                continue;
-
-            if (entry->is_downloading.load())
-                continue;
-
-            if (entry->memory_ref_count.load() > 0)
-                continue;
-
-            if (!entry->is_in_memory_cache.load())
-                continue;
-
-            candidates.emplace_back(entry->last_used, path);
-        }
-
-        std::sort(candidates.begin(), candidates.end());
-        Logger::warn(LogCategory::CACHE, "Emergency mode: found {} ALWAYS_CACHE files to evict", candidates.size());
+        Logger::warn(LogCategory::CACHE, "No evictable ON_DEMAND files, cache_always files use {} MB of {} MB",
+                     current_size / (1024 * 1024), config.global.total_cache_size_mb);
     }
 
     // Evict files until we have enough space
@@ -1857,18 +1883,22 @@ size_t HybridFileSystem::performMemoryEviction(size_t bytes_needed)
         {
             size_t file_size = it->second->file_size;
 
-            Logger::info(LogCategory::CACHE, "  [{}] Evicting: {} ({} KB, last used {} sec ago)",
+            Logger::debug(LogCategory::CACHE, "  [{}] Evicting: {} ({} KB, last used {} sec ago)",
                          files_evicted + 1,
                          StringUtils::wideToUtf8(path),
                          file_size / 1024,
                          std::chrono::duration_cast<std::chrono::seconds>(
                              std::chrono::steady_clock::now() - last_used).count());
 
-            // Remove from memory cache
-            memory_cache.removeFileFromMemoryCache(path);
-
-            // Update entry state
+            // Removal re-checks the reference count under the memory cache mutex, so a file opened since the
+            // candidates were collected is skipped. Opens that still see the flag get a null pointer and read
+            // from the network instead.
+            if (!memory_cache.removeFileIfUnreferenced(it->second.get()))
+            {
+                continue;
+            }
             it->second->is_in_memory_cache.store(false);
+            it->second->state = FileState::VIRTUAL; // eligible to be cached again on a later open
 
             files_evicted++;
             bytes_evicted += file_size;
@@ -1901,6 +1931,58 @@ bool HybridFileSystem::isSystemIdle(std::chrono::seconds threshold) const
     auto now = std::chrono::steady_clock::now();
     auto idle_time = std::chrono::duration_cast<std::chrono::seconds>(now - last_activity.load());
     return idle_time >= threshold;
+}
+
+void HybridFileSystem::prefetchFiles()
+{
+    DirectoryNode *root = directory_cache.findNode(L"/");
+    if (root == nullptr || !download_manager || config.global.download_threads == 0)
+    {
+        return;
+    }
+
+    // Keep the download queue short so files a compile opens meanwhile are not stuck behind the whole prefetch
+    const size_t max_pending = config.global.download_threads * 2;
+
+    size_t queued_files = 0;
+    UINT64 queued_bytes = 0;
+    std::vector<DirectoryNode *> pending{ root };
+    while (!pending.empty() && !shutdown_eviction)
+    {
+        DirectoryNode *dir_node = pending.back();
+        pending.pop_back();
+        for (DirectoryNode *child : dir_node->getChildNodes())
+        {
+            if (child->isDirectory())
+            {
+                pending.push_back(child);
+                continue;
+            }
+            if (!isPrefetched(child->full_virtual_path))
+            {
+                continue;
+            }
+
+            while (download_manager->getPendingCount() >= max_pending && !shutdown_eviction)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+            if (shutdown_eviction)
+            {
+                break;
+            }
+
+            CacheEntry *entry = getCacheEntry(child->full_virtual_path);
+            if (entry != nullptr && entry->state == FileState::VIRTUAL &&
+                ensureFileAvailable(entry) == STATUS_PENDING)
+            {
+                ++queued_files;
+                queued_bytes += entry->file_size;
+            }
+        }
+    }
+
+    Logger::info(LogCategory::CACHE, "Queued {} files ({} MB) for prefetching", queued_files, queued_bytes / (1024 * 1024));
 }
 
 void HybridFileSystem::memoryEvictionThreadFunc()
@@ -2047,7 +2129,7 @@ NTSTATUS HybridFileSystem::handleFileAsDirectoryEntry(CacheEntry *entry, PWSTR P
     dir_info->FileInfo.LastAccessTime = access_timestamp;
     dir_info->FileInfo.LastWriteTime = write_timestamp;
     dir_info->FileInfo.ChangeTime = write_timestamp;
-    dir_info->FileInfo.IndexNumber = 0;
+    dir_info->FileInfo.IndexNumber = StringUtils::stableFileId(entry->virtual_path);
     dir_info->FileInfo.HardLinks = 0;
 
     // Clear padding

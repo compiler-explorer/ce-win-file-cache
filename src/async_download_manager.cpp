@@ -181,7 +181,7 @@ void AsyncDownloadManager::processDownload(std::shared_ptr<DownloadTask> task)
             if (success && task->cache_entry)
             {
                 // check presence rather than emptiness, 0-byte files are valid cache entries
-                const auto *content = memory_cache.getMemoryCachedFilePtr(task->virtual_path);
+                auto content = memory_cache.getMemoryCachedFilePtr(task->virtual_path);
                 if (content != nullptr)
                 {
                     task->cache_entry->file_size = content->size();
@@ -274,23 +274,21 @@ bool AsyncDownloadManager::downloadFile(const std::wstring network_path, const s
         size_t file_size = file.tellg();
         file.seekg(0, std::ios::beg);
 
-        std::vector<char> buffer(file_size);
-        file.read(buffer.data(), file_size);
+        std::vector<uint8_t> buffer(file_size);
+        file.read(reinterpret_cast<char *>(buffer.data()), static_cast<std::streamsize>(file_size));
 
         if (!file.good() && !file.eof())
         {
             return false;
         }
 
-        std::vector<uint8_t> uint8_buffer(buffer.begin(), buffer.end());
-
         // Check if we need to evict before adding this file
         if (eviction_callback)
         {
-            eviction_callback(uint8_buffer.size());
+            eviction_callback(buffer.size());
         }
 
-        memory_cache.addFileToMemoryCache(virtual_path, uint8_buffer);
+        memory_cache.addFileToMemoryCache(virtual_path, std::move(buffer));
         return true;
     }
     catch (...)

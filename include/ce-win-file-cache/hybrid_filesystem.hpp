@@ -54,6 +54,8 @@ class HybridFileSystem : public Fsp::FileSystemBase
     NTSTATUS fetchFromNetwork(CacheEntry *entry);
     bool matchesPattern(const std::wstring &path, const std::wstring &pattern);
     CachePolicy determineCachePolicy(const std::wstring &virtual_path);
+    const CompilerConfig *findCompilerConfig(const std::wstring &virtual_path, std::wstring &relative_path) const;
+    bool isPrefetched(const std::wstring &virtual_path);
     std::wstring createTemporaryFileForMemoryCached(CacheEntry *entry);
 
     NTSTATUS GetFileInfoByName(PWSTR FileName, FileInfo *FileInfo);
@@ -64,6 +66,9 @@ class HybridFileSystem : public Fsp::FileSystemBase
 
     // Directory tree management
     void fillDirInfo(DirInfo *dir_info, DirectoryNode *node);
+    DirectoryNode *findChildByPattern(DirectoryNode *dir_node, PWSTR pattern) const;
+    // Appends one entry to a ReadDirectory buffer, false when it does not fit
+    bool addDirInfo(PVOID buffer, ULONG length, size_t &bytes_used, std::wstring_view name, const DirectoryNode *node) const;
     std::vector<DirectoryNode *> filterDirectoryContents(const std::vector<DirectoryNode *> &contents, PWSTR pattern, const char *context);
     NTSTATUS handleFileAsDirectoryEntry(CacheEntry *entry, PWSTR Pattern, PWSTR Marker, PVOID Buffer, ULONG Length, PULONG PBytesTransferred);
 
@@ -81,6 +86,9 @@ class HybridFileSystem : public Fsp::FileSystemBase
     // Background eviction thread
     void memoryEvictionThreadFunc();
 
+    // Queues every prefetch_patterns file for download so it is in memory before first use
+    void prefetchFiles();
+
     Config config;
     std::unordered_map<std::wstring, std::unique_ptr<CacheEntry>> cache_entries;
     std::mutex cache_mutex;
@@ -93,6 +101,12 @@ class HybridFileSystem : public Fsp::FileSystemBase
     // Background eviction thread
     std::thread memory_eviction_thread;
     std::atomic<bool> shutdown_eviction{false};
+
+    // Startup prefetch of prefetch_patterns files, also stops on shutdown_eviction
+    std::thread prefetch_thread;
+
+    // Bytes of downloads that are queued or in flight, counted towards the cache size for admission
+    std::atomic<size_t> reserved_cache_bytes{0};
 
 // Test access - allow tests to access private members
 #ifdef ENABLE_TEST_ACCESS
@@ -121,8 +135,11 @@ struct FileDescriptor
     CacheEntry *entry;
     PVOID dir_buffer;
     const std::vector<uint8_t> *cached_content;  // Direct pointer to memory cached content for fast reads
+    std::mutex handle_mutex; // Read() closes the source handle at end of file and reopens it when needed
+    std::wstring source_path; // File the handle reads from, kept so Read() can reopen it
+    UINT64 source_size; // Size of the source file when it was opened
 
-    FileDescriptor() : handle(INVALID_HANDLE_VALUE), entry(nullptr), dir_buffer(nullptr), cached_content(nullptr)
+    FileDescriptor() : handle(INVALID_HANDLE_VALUE), entry(nullptr), dir_buffer(nullptr), cached_content(nullptr), source_size(0)
     {
     }
     ~FileDescriptor()

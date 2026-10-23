@@ -82,6 +82,11 @@ class DirectoryTree
                  FILETIME last_write_time,
                  DWORD file_attributes);
     bool addDirectory(const std::wstring &virtual_path, const std::wstring &network_path);
+    bool addDirectory(const std::wstring &virtual_path,
+                      const std::wstring &network_path,
+                      FILETIME creation_time,
+                      FILETIME last_access_time,
+                      FILETIME last_write_time);
 
     // Directory enumeration
     std::vector<DirectoryNode *> getDirectoryContents(const std::wstring &virtual_path);
