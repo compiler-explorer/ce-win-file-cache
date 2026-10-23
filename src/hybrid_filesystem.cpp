@@ -44,6 +44,15 @@ HybridFileSystem::~HybridFileSystem()
 {
     // Stop background eviction thread
     shutdown_eviction = true;
+    if (preload_thread.joinable())
+    {
+        preload_thread.join();
+    }
+    // Stop the download workers before the metrics they report to go away
+    if (download_manager)
+    {
+        download_manager->shutdown();
+    }
     if (memory_eviction_thread.joinable())
     {
         memory_eviction_thread.join();
@@ -118,6 +127,8 @@ NTSTATUS HybridFileSystem::Initialize(const Config &new_config)
     // Start background memory eviction thread
     Logger::info(LogCategory::CACHE, "Starting background memory eviction thread");
     memory_eviction_thread = std::thread(&HybridFileSystem::memoryEvictionThreadFunc, this);
+
+    preload_thread = std::thread(&HybridFileSystem::preloadAlwaysCached, this);
 
     // Initialize file access tracker if enabled
     if (new_config.global.file_tracking.enabled)
@@ -1402,9 +1413,16 @@ NTSTATUS HybridFileSystem::ensureFileAvailable(CacheEntry *entry)
             }
             else
             {
-                // Download failed
-                entry->state = FileState::NETWORK_ONLY;
-                entry->local_path = entry->network_path;
+                // Download failed. cache_always files go back to VIRTUAL so the next open retries the download.
+                if (entry->policy == CachePolicy::ALWAYS_CACHE)
+                {
+                    entry->state = FileState::VIRTUAL;
+                }
+                else
+                {
+                    entry->state = FileState::NETWORK_ONLY;
+                    entry->local_path = entry->network_path;
+                }
                 Logger::error(LogCategory::NETWORK, "Download failed for {}: {}",
                               StringUtils::wideToUtf8(entry->virtual_path), StringUtils::wideToUtf8(error));
             }
@@ -1884,6 +1902,59 @@ bool HybridFileSystem::isSystemIdle(std::chrono::seconds threshold) const
     auto now = std::chrono::steady_clock::now();
     auto idle_time = std::chrono::duration_cast<std::chrono::seconds>(now - last_activity.load());
     return idle_time >= threshold;
+}
+
+void HybridFileSystem::preloadAlwaysCached()
+{
+    DirectoryNode *root = directory_cache.findNode(L"/");
+    if (root == nullptr || !download_manager || config.global.download_threads == 0)
+    {
+        return;
+    }
+
+    // Keep the download queue short so files a compile opens meanwhile are not stuck behind the whole preload
+    const size_t max_pending = config.global.download_threads * 2;
+
+    size_t queued_files = 0;
+    UINT64 queued_bytes = 0;
+    std::vector<DirectoryNode *> pending{ root };
+    while (!pending.empty() && !shutdown_eviction)
+    {
+        DirectoryNode *dir_node = pending.back();
+        pending.pop_back();
+        for (DirectoryNode *child : dir_node->getChildNodes())
+        {
+            if (child->isDirectory())
+            {
+                pending.push_back(child);
+                continue;
+            }
+            if (determineCachePolicy(child->full_virtual_path) != CachePolicy::ALWAYS_CACHE)
+            {
+                continue;
+            }
+
+            while (download_manager->getPendingCount() >= max_pending && !shutdown_eviction)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+            if (shutdown_eviction)
+            {
+                break;
+            }
+
+            CacheEntry *entry = getCacheEntry(child->full_virtual_path);
+            if (entry != nullptr && entry->state == FileState::VIRTUAL &&
+                ensureFileAvailable(entry) == STATUS_PENDING)
+            {
+                ++queued_files;
+                queued_bytes += entry->file_size;
+            }
+        }
+    }
+
+    Logger::info(LogCategory::CACHE, "Queued {} cache_always files ({} MB) for preloading", queued_files,
+                 queued_bytes / (1024 * 1024));
 }
 
 void HybridFileSystem::memoryEvictionThreadFunc()
