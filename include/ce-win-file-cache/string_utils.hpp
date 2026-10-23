@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <chrono>
@@ -46,6 +47,10 @@ class StringUtils
 
     static void toLower(std::wstring &str);
     static void toLower(std::string &str);
+
+    // Stable, non-zero 64-bit file id for a virtual path: case-insensitive and treats / and \ the same.
+    // Used as IndexNumber so tools (e.g. Defender's scan cache) can tell files apart.
+    static uint64_t stableFileId(std::wstring_view path);
 
     private:
     /**
