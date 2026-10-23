@@ -338,7 +338,7 @@ void HybridFileSystem::copyFileInfo(CacheEntry *source, FileInfo *dest) const
     dest->LastAccessTime = std::bit_cast<UINT64>(source->last_access_time);
     dest->LastWriteTime = std::bit_cast<UINT64>(source->last_write_time);
     dest->ChangeTime = dest->LastWriteTime; // Missing: Should track actual metadata change time separately
-    dest->IndexNumber = 0; // Missing: Should be unique file identifier (inode equivalent)
+    dest->IndexNumber = StringUtils::stableFileId(source->virtual_path);
     dest->HardLinks = 0; // Missing: Should track actual hard link count from filesystem
     dest->EaSize = 0; // Missing: Should reflect actual Extended Attributes size if EA support is added
 }
@@ -1029,7 +1029,7 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
         dir_info->FileInfo.LastAccessTime = access_ts;
         dir_info->FileInfo.LastWriteTime = write_ts;
         dir_info->FileInfo.ChangeTime = write_ts;
-        dir_info->FileInfo.IndexNumber = 0;
+        dir_info->FileInfo.IndexNumber = StringUtils::stableFileId(node->full_virtual_path);
         dir_info->FileInfo.HardLinks = 0;
 
         // Clear padding
@@ -1729,7 +1729,7 @@ void HybridFileSystem::fillDirInfo(DirInfo *dir_info, DirectoryNode *node)
     dir_info->FileInfo.LastAccessTime = access_timestamp;
     dir_info->FileInfo.LastWriteTime = write_timestamp;
     dir_info->FileInfo.ChangeTime = write_timestamp;
-    dir_info->FileInfo.IndexNumber = 0;
+    dir_info->FileInfo.IndexNumber = StringUtils::stableFileId(node->full_virtual_path);
     dir_info->FileInfo.HardLinks = 0;
 
     // Clear padding
@@ -2059,7 +2059,7 @@ NTSTATUS HybridFileSystem::handleFileAsDirectoryEntry(CacheEntry *entry, PWSTR P
     dir_info->FileInfo.LastAccessTime = access_timestamp;
     dir_info->FileInfo.LastWriteTime = write_timestamp;
     dir_info->FileInfo.ChangeTime = write_timestamp;
-    dir_info->FileInfo.IndexNumber = 0;
+    dir_info->FileInfo.IndexNumber = StringUtils::stableFileId(entry->virtual_path);
     dir_info->FileInfo.HardLinks = 0;
 
     // Clear padding
