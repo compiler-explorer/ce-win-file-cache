@@ -17,6 +17,20 @@
 namespace CeWinFileCache
 {
 
+namespace
+{
+// Opens the source file for reading, as the filesystem we only ever read it (not GrantedAccess).
+// Never passes FILE_DELETE_ON_CLOSE on, that would delete the real file on the share.
+HANDLE openSourceFile(const std::wstring &path, UINT64 &size)
+{
+    HANDLE handle = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                                OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    LARGE_INTEGER file_size{};
+    size = handle != INVALID_HANDLE_VALUE && GetFileSizeEx(handle, &file_size) ? static_cast<UINT64>(file_size.QuadPart) : 0;
+    return handle;
+}
+} // namespace
+
 constexpr ULONG ALLOCATION_UNIT = 4096;
 constexpr ULONG FULLPATH_SIZE = MAX_PATH + FSP_FSCTL_TRANSACT_PATH_SIZEMAX / sizeof(WCHAR);
 
@@ -425,9 +439,6 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     Logger::debug(LogCategory::FILESYSTEM, "Open() - creating file descriptor");
     auto *file_desc = new FileDescriptor();
 
-    // Never pass FILE_DELETE_ON_CLOSE on to the source, that would delete the real file on the share
-    DWORD create_flags = FILE_FLAG_BACKUP_SEMANTICS;
-
     // Handle directories separately from files
     if (entry->file_attributes & FILE_ATTRIBUTE_DIRECTORY)
     {
@@ -450,13 +461,9 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
 
         if (file_desc->cached_content == nullptr)
         {
-            // Not in memory (not cached yet, download in progress, not admitted or evicted) - read from the source.
-            // Note: We open with GENERIC_READ (not GrantedAccess) because as the filesystem,
-            // we only need to read the source file to serve it. GrantedAccess is what the
-            // end-user was granted on Z:, not what we need to open the source on Y:.
-            std::wstring full_path = entry->local_path.empty() ? entry->network_path : entry->local_path;
-            file_desc->handle = CreateFileW(full_path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                            nullptr, OPEN_EXISTING, create_flags, nullptr);
+            // Not in memory (not cached yet, download in progress, not admitted or evicted) - read from the source
+            file_desc->source_path = entry->local_path.empty() ? entry->network_path : entry->local_path;
+            file_desc->handle = openSourceFile(file_desc->source_path, file_desc->source_size);
 
             if (file_desc->handle == INVALID_HANDLE_VALUE)
             {
@@ -465,7 +472,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
                     "Open() - file handle creation failed for '{}', state: {}, attempted_path: '{}', Windows error: {} (0x{:x})",
                     StringUtils::wideToUtf8(entry->virtual_path),
                     static_cast<int>(entry->state),
-                    StringUtils::wideToUtf8(full_path),
+                    StringUtils::wideToUtf8(file_desc->source_path),
                     lastError, lastError);
                 delete file_desc;
                 return CeWinFileCache::WineCompat::NtStatusFromWin32(lastError);
@@ -626,23 +633,49 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
     // Record filesystem operation
     GlobalMetrics::instance().recordFilesystemOperation("read");
 
-    // Fallback to file handle read (for network-only files or cache miss)
-    OVERLAPPED overlapped = {};
-    overlapped.Offset = static_cast<DWORD>(Offset);
-    overlapped.OffsetHigh = static_cast<DWORD>(Offset >> 32);
-
-    Logger::debug(LogCategory::FILESYSTEM, "Read() - reading from file handle for: '{}'", path_str);
-    if (!ReadFile(file_desc->handle, Buffer, Length, PBytesTransferred, &overlapped))
+    // Fallback to file handle read (for network-only files or cache miss). The handle is closed at end of file:
+    // with flush_and_purge_on_cleanup false Close() can come much later, keeping the share handle open until then.
     {
-        DWORD error = GetLastError();
-        if (error == ERROR_HANDLE_EOF)
+        std::lock_guard<std::mutex> handle_lock(file_desc->handle_mutex);
+
+        if (file_desc->handle == INVALID_HANDLE_VALUE)
         {
-            *PBytesTransferred = 0;
-            return STATUS_END_OF_FILE;
+            file_desc->handle = openSourceFile(file_desc->source_path, file_desc->source_size);
+            if (file_desc->handle == INVALID_HANDLE_VALUE)
+            {
+                DWORD error = GetLastError();
+                Logger::error(LogCategory::FILESYSTEM, "Read() - reopening failed for: '{}', Error: {}", path_str, error);
+                return CeWinFileCache::WineCompat::NtStatusFromWin32(error);
+            }
         }
 
-        Logger::error(LogCategory::FILESYSTEM, "Read() - ReadFile failed for: '{}', Error: {}", path_str, error);
-        return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
+        OVERLAPPED overlapped = {};
+        overlapped.Offset = static_cast<DWORD>(Offset);
+        overlapped.OffsetHigh = static_cast<DWORD>(Offset >> 32);
+
+        Logger::debug(LogCategory::FILESYSTEM, "Read() - reading from file handle for: '{}'", path_str);
+        BOOL read_ok = ReadFile(file_desc->handle, Buffer, Length, PBytesTransferred, &overlapped);
+        DWORD error = read_ok ? ERROR_SUCCESS : GetLastError();
+
+        bool at_end = read_ok ? *PBytesTransferred < Length || Offset + *PBytesTransferred >= file_desc->source_size
+                              : error == ERROR_HANDLE_EOF;
+        if (at_end)
+        {
+            CloseHandle(file_desc->handle);
+            file_desc->handle = INVALID_HANDLE_VALUE;
+        }
+
+        if (!read_ok)
+        {
+            if (error == ERROR_HANDLE_EOF)
+            {
+                *PBytesTransferred = 0;
+                return STATUS_END_OF_FILE;
+            }
+
+            Logger::error(LogCategory::FILESYSTEM, "Read() - ReadFile failed for: '{}', Error: {}", path_str, error);
+            return CeWinFileCache::WineCompat::NtStatusFromWin32(error);
+        }
     }
 
     Logger::debug(LogCategory::FILESYSTEM, "Read() - success for: '{}', BytesTransferred: {}", path_str, *PBytesTransferred);
