@@ -223,7 +223,21 @@ int main()
     std::cout << (memory_cache_ok ? "✓ Insert-only add and reference-aware removal" : "❌ Memory cache add/remove semantics wrong")
               << std::endl;
 
-    if (!empty_file_ok || !file_id_ok || !memory_cache_ok)
+    // Test 8: WinFsp cache tuning options default to the old values and can be overridden
+    std::cout << "\nTest 8: WinFsp cache tuning config" << std::endl;
+    bool tuning_ok = true;
+    {
+        auto defaults = ConfigParser::parseJsonString(R"({"global": {"total_cache_size_mb": 1}, "compilers": {}})");
+        tuning_ok &= defaults.has_value() && defaults->global.file_info_timeout_ms == 1000 &&
+                     defaults->global.flush_and_purge_on_cleanup;
+        auto tuned = ConfigParser::parseJsonString(
+        R"({"global": {"total_cache_size_mb": 1, "file_info_timeout_ms": 4294967295, "flush_and_purge_on_cleanup": false}, "compilers": {}})");
+        tuning_ok &= tuned.has_value() && tuned->global.file_info_timeout_ms == 4294967295u &&
+                     !tuned->global.flush_and_purge_on_cleanup;
+    }
+    std::cout << (tuning_ok ? "✓ WinFsp cache tuning config" : "❌ WinFsp cache tuning config wrong") << std::endl;
+
+    if (!empty_file_ok || !memory_cache_ok || !file_id_ok || !tuning_ok)
     {
         return 1;
     }
