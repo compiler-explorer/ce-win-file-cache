@@ -183,7 +183,34 @@ int main()
     }
     std::cout << (empty_file_ok ? "✓ Empty file cached" : "❌ Empty file was not cached") << std::endl;
 
-    if (!empty_file_ok)
+    // Test 6: Moving content in never replaces existing content, and removal respects open references
+    std::cout << "\nTest 6: Insert-only add and reference-aware removal" << std::endl;
+    bool memory_cache_ok = true;
+    {
+        MemoryCacheManager memory_cache;
+        CacheEntry entry;
+        entry.virtual_path = L"/refs/file.bin";
+
+        memory_cache_ok &= memory_cache.addFileToMemoryCache(entry.virtual_path, std::vector<uint8_t>{ 1, 2, 3 });
+        const std::vector<uint8_t> *first = memory_cache.getMemoryCachedFilePtr(entry.virtual_path);
+        memory_cache_ok &= !memory_cache.addFileToMemoryCache(entry.virtual_path, std::vector<uint8_t>{ 4, 5 });
+        memory_cache_ok &= memory_cache.getMemoryCachedFilePtr(entry.virtual_path) == first;
+        memory_cache_ok &= memory_cache.getCacheSize() == 3;
+
+        const std::vector<uint8_t> *open_file = memory_cache.getMemoryCachedFilePtr(&entry);
+        memory_cache_ok &= open_file == first && entry.memory_ref_count.load() == 1;
+        memory_cache_ok &= !memory_cache.removeFileIfUnreferenced(&entry);
+        memory_cache_ok &= memory_cache.getCachedFileCount() == 1;
+
+        entry.memory_ref_count--;
+        memory_cache_ok &= memory_cache.removeFileIfUnreferenced(&entry);
+        memory_cache_ok &= memory_cache.getCachedFileCount() == 0 && memory_cache.getCacheSize() == 0;
+        memory_cache_ok &= !memory_cache.removeFileIfUnreferenced(&entry);
+    }
+    std::cout << (memory_cache_ok ? "✓ Insert-only add and reference-aware removal" : "❌ Memory cache add/remove semantics wrong")
+              << std::endl;
+
+    if (!empty_file_ok || !memory_cache_ok)
     {
         return 1;
     }

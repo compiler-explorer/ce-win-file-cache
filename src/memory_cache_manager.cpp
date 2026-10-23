@@ -165,6 +165,25 @@ void MemoryCacheManager::addFileToMemoryCache(const std::wstring &virtual_path, 
     GlobalMetrics::instance().updateCacheEntryCount(memory_cache.size());
 }
 
+bool MemoryCacheManager::addFileToMemoryCache(const std::wstring &virtual_path, std::vector<uint8_t> &&content)
+{
+    std::lock_guard<std::mutex> lock(cache_mutex);
+
+    // Never replace existing content: open files may hold a pointer to it (memory_ref_count)
+    size_t content_size = content.size();
+    auto [it, inserted] = memory_cache.try_emplace(virtual_path, std::move(content));
+    if (!inserted)
+    {
+        return false;
+    }
+    total_cache_size += content_size;
+
+    GlobalMetrics::instance().updateCacheSize(total_cache_size.load());
+    GlobalMetrics::instance().updateCacheEntryCount(memory_cache.size());
+
+    return true;
+}
+
 std::vector<uint8_t> MemoryCacheManager::getFileContent(const std::wstring &virtual_path, const Config &config)
 {
     auto cached = getMemoryCachedFile(virtual_path);
@@ -205,6 +224,31 @@ void MemoryCacheManager::removeFileFromMemoryCache(const std::wstring &virtual_p
         GlobalMetrics::instance().updateCacheEntryCount(memory_cache.size());
         GlobalMetrics::instance().recordCacheEviction();
     }
+}
+
+bool MemoryCacheManager::removeFileIfUnreferenced(CacheEntry *entry)
+{
+    std::lock_guard<std::mutex> lock(cache_mutex);
+
+    if (entry->memory_ref_count.load() > 0)
+    {
+        return false;
+    }
+
+    auto it = memory_cache.find(entry->virtual_path);
+    if (it == memory_cache.end())
+    {
+        return false;
+    }
+
+    total_cache_size -= it->second.size();
+    memory_cache.erase(it);
+
+    GlobalMetrics::instance().updateCacheSize(total_cache_size.load());
+    GlobalMetrics::instance().updateCacheEntryCount(memory_cache.size());
+    GlobalMetrics::instance().recordCacheEviction();
+
+    return true;
 }
 
 void MemoryCacheManager::clearCache()

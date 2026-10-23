@@ -94,6 +94,9 @@ class HybridFileSystem : public Fsp::FileSystemBase
     std::thread memory_eviction_thread;
     std::atomic<bool> shutdown_eviction{false};
 
+    // Bytes of downloads that are queued or in flight, counted towards the cache size for admission
+    std::atomic<size_t> reserved_cache_bytes{0};
+
 // Test access - allow tests to access private members
 #ifdef ENABLE_TEST_ACCESS
 public:
