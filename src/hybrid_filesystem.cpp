@@ -171,7 +171,9 @@ NTSTATUS HybridFileSystem::Init(PVOID Host)
     host->SetUnicodeOnDisk(TRUE);
     host->SetPersistentAcls(TRUE);
     host->SetPostCleanupWhenModifiedOnly(TRUE);
-    host->SetPassQueryDirectoryPattern(TRUE);
+    // Let the WinFsp driver match directory patterns (FsRtlIsNameInExpression), it understands the
+    // DOS wildcards (<, >, ") that FindFirstFile produces, which GlobMatcher does not
+    host->SetPassQueryDirectoryPattern(FALSE);
     host->SetVolumeCreationTime(creation_time);
     host->SetVolumeSerialNumber(0x12345678);
     host->SetFlushAndPurgeOnCleanup(TRUE);
@@ -493,6 +495,15 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
             delete file_desc;
             return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
         }
+
+        if (file_desc->cached_content != nullptr)
+        {
+            GlobalMetrics::instance().recordCacheHit("open");
+        }
+        else
+        {
+            GlobalMetrics::instance().recordCacheMiss("open");
+        }
     }
 
     file_desc->entry = entry;
@@ -644,6 +655,12 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
     if (!ReadFile(file_desc->handle, Buffer, Length, PBytesTransferred, &overlapped))
     {
         DWORD error = GetLastError();
+        if (error == ERROR_HANDLE_EOF)
+        {
+            *PBytesTransferred = 0;
+            return STATUS_END_OF_FILE;
+        }
+
         Logger::error(LogCategory::FILESYSTEM, "Read() - ReadFile failed for: '{}', Error: {}", path_str, error);
         return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
     }
