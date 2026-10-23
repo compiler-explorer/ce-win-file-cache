@@ -50,7 +50,8 @@ DirectoryNode *DirectoryNode::addChild(std::wstring_view child_name, NodeType ch
     }
 
     std::lock_guard<std::mutex> lock(children_mutex);
-    auto child = std::make_unique<DirectoryNode>(name_copy, child_type, this);
+    // name_copy is the lookup key (lowercased when case-insensitive), the node keeps the original case
+    auto child = std::make_unique<DirectoryNode>(std::wstring(child_name), child_type, this);
 
     children[name_copy] = std::move(child);
 
@@ -69,7 +70,8 @@ DirectoryNode *DirectoryNode::addChild(const std::wstring &child_name, NodeType 
     }
 
     std::lock_guard<std::mutex> lock(children_mutex);
-    auto child = std::make_unique<DirectoryNode>(name_copy, child_type, this);
+    // name_copy is the lookup key (lowercased when case-insensitive), the node keeps the original case
+    auto child = std::make_unique<DirectoryNode>(std::wstring(child_name), child_type, this);
 
     children[name_copy] = std::move(child);
 
@@ -109,11 +111,11 @@ std::vector<DirectoryNode *> DirectoryNode::getChildNodes() const
         sorted_children_cache.push_back(child.get());
     }
 
-    // Sort by name for consistent directory listings
+    // Sort in NTFS order, ReadDirectory relies on this order to continue after a marker
     std::sort(sorted_children_cache.begin(), sorted_children_cache.end(),
               [](const DirectoryNode *a, const DirectoryNode *b)
               {
-                  return a->name < b->name;
+                  return StringUtils::fileNameLess(a->name, b->name);
               });
 
     sorted_cache_valid = true;
@@ -243,6 +245,15 @@ bool DirectoryTree::addFile(const std::wstring &virtual_path,
 
 bool DirectoryTree::addDirectory(const std::wstring &virtual_path, const std::wstring &network_path)
 {
+    return addDirectory(virtual_path, network_path, { 0, 0 }, { 0, 0 }, { 0, 0 });
+}
+
+bool DirectoryTree::addDirectory(const std::wstring &virtual_path,
+                                 const std::wstring &network_path,
+                                 FILETIME creation_time,
+                                 FILETIME last_access_time,
+                                 FILETIME last_write_time)
+{
     std::lock_guard<std::mutex> tree_lock(tree_mutex);
 
     DirectoryNode *node = findOrCreatePath(virtual_path, NodeType::DIRECTORY, true);
@@ -251,7 +262,7 @@ bool DirectoryTree::addDirectory(const std::wstring &virtual_path, const std::ws
         return false;
     }
 
-    updateNodeMetadata(node, network_path, 0, { 0, 0 }, { 0, 0 }, { 0, 0 }, FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_OFFLINE);
+    updateNodeMetadata(node, network_path, 0, creation_time, last_access_time, last_write_time, FILE_ATTRIBUTE_DIRECTORY);
 
     return true;
 }
@@ -324,7 +335,7 @@ void DirectoryTree::reset()
     std::lock_guard<std::mutex> tree_lock(tree_mutex);
     root = std::make_unique<DirectoryNode>(L"", NodeType::DIRECTORY);
     root->full_virtual_path = L"/";
-    root->file_attributes = FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_OFFLINE;
+    root->file_attributes = FILE_ATTRIBUTE_DIRECTORY;
 }
 
 std::vector<std::wstring_view> DirectoryTree::splitPath(const std::wstring &path)
@@ -427,7 +438,7 @@ DirectoryNode *DirectoryTree::findOrCreatePath(const std::wstring &virtual_path,
             if ((idx < len) || (node_type == NodeType::DIRECTORY))
             {
                 child = current->addChild(component, NodeType::DIRECTORY);
-                child->file_attributes = FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_OFFLINE;
+                child->file_attributes = FILE_ATTRIBUTE_DIRECTORY;
             }
             else
             {

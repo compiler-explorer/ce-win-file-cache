@@ -1,6 +1,9 @@
 #include "../../include/ce-win-file-cache/async_download_manager.hpp"
 #include "../../include/ce-win-file-cache/config_parser.hpp"
+#include "../../include/ce-win-file-cache/string_utils.hpp"
+#include <atomic>
 #include <chrono>
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <thread>
@@ -143,6 +146,118 @@ int main()
     catch (const std::exception &e)
     {
         std::cout << "❌ Exception during shutdown: " << e.what() << std::endl;
+    }
+
+    // Test 5: Empty file with a cache entry must end up cached, not failed
+    std::cout << "\nTest 5: Empty file download with cache entry" << std::endl;
+    bool empty_file_ok = false;
+    {
+        Config config;
+        MemoryCacheManager memory_cache;
+        AsyncDownloadManager download_manager(memory_cache, config, 1);
+
+        std::ofstream("empty_file_test.txt").close();
+
+        CacheEntry entry;
+        entry.virtual_path = L"/empty/empty_file_test.txt";
+        entry.network_path = L"empty_file_test.txt";
+        entry.file_size = 123;
+
+        std::atomic<bool> completed(false);
+        std::atomic<NTSTATUS> result(STATUS_PENDING);
+        download_manager.queueDownload(entry.virtual_path, entry.network_path, &entry, CachePolicy::ALWAYS_CACHE,
+                                       [&completed, &result](NTSTATUS s, const std::wstring & /*e*/, CacheEntry * /*entry*/)
+                                       {
+                                           result = s;
+                                           completed = true;
+                                       });
+
+        auto start = std::chrono::steady_clock::now();
+        while (!completed && std::chrono::steady_clock::now() - start < std::chrono::seconds(5))
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+
+        empty_file_ok = completed && result == STATUS_SUCCESS && entry.state == FileState::CACHED &&
+                        entry.file_size == 0 && entry.is_in_memory_cache.load();
+        std::remove("empty_file_test.txt");
+    }
+    std::cout << (empty_file_ok ? "✓ Empty file cached" : "❌ Empty file was not cached") << std::endl;
+
+    // Test 6: Moving content in never replaces existing content, and removal respects open references
+    std::cout << "\nTest 6: Insert-only add and reference-aware removal" << std::endl;
+    bool memory_cache_ok = true;
+    {
+        MemoryCacheManager memory_cache;
+        CacheEntry entry;
+        entry.virtual_path = L"/refs/file.bin";
+
+        memory_cache_ok &= memory_cache.addFileToMemoryCache(entry.virtual_path, std::vector<uint8_t>{ 1, 2, 3 });
+        const std::vector<uint8_t> *first = memory_cache.getMemoryCachedFilePtr(entry.virtual_path);
+        memory_cache_ok &= !memory_cache.addFileToMemoryCache(entry.virtual_path, std::vector<uint8_t>{ 4, 5 });
+        memory_cache_ok &= memory_cache.getMemoryCachedFilePtr(entry.virtual_path) == first;
+        memory_cache_ok &= memory_cache.getCacheSize() == 3;
+
+        const std::vector<uint8_t> *open_file = memory_cache.getMemoryCachedFilePtr(&entry);
+        memory_cache_ok &= open_file == first && entry.memory_ref_count.load() == 1;
+        memory_cache_ok &= !memory_cache.removeFileIfUnreferenced(&entry);
+        memory_cache_ok &= memory_cache.getCachedFileCount() == 1;
+
+        entry.memory_ref_count--;
+        memory_cache_ok &= memory_cache.removeFileIfUnreferenced(&entry);
+        memory_cache_ok &= memory_cache.getCachedFileCount() == 0 && memory_cache.getCacheSize() == 0;
+        memory_cache_ok &= !memory_cache.removeFileIfUnreferenced(&entry);
+    }
+    std::cout << (memory_cache_ok ? "✓ Insert-only add and reference-aware removal" : "❌ Memory cache add/remove semantics wrong")
+              << std::endl;
+
+    // Test 7: Stable file ids are case and separator insensitive, distinct and never zero
+    std::cout << "\nTest 7: Stable file ids" << std::endl;
+    bool file_id_ok = true;
+    {
+        uint64_t id = StringUtils::stableFileId(L"/compilers/msvc/bin/Hostx64/x64/cl.exe");
+        file_id_ok &= id != 0;
+        file_id_ok &= id == StringUtils::stableFileId(L"\\COMPILERS\\msvc\\BIN\\hostx64\\x64\\CL.EXE");
+        file_id_ok &= id != StringUtils::stableFileId(L"/compilers/msvc/bin/Hostx64/x64/c1.dll");
+        file_id_ok &= StringUtils::stableFileId(L"") != 0;
+    }
+    std::cout << (file_id_ok ? "✓ Stable file ids" : "❌ Stable file ids wrong") << std::endl;
+
+    // Test 8: WinFsp cache tuning options default to the old values and can be overridden
+    std::cout << "\nTest 8: WinFsp cache tuning config" << std::endl;
+    bool tuning_ok = true;
+    {
+        auto defaults = ConfigParser::parseJsonString(R"({"global": {"total_cache_size_mb": 1}, "compilers": {}})");
+        tuning_ok &= defaults.has_value() && defaults->global.file_info_timeout_ms == 1000 &&
+                     defaults->global.flush_and_purge_on_cleanup;
+        auto tuned = ConfigParser::parseJsonString(
+        R"({"global": {"total_cache_size_mb": 1, "file_info_timeout_ms": 4294967295, "flush_and_purge_on_cleanup": false}, "compilers": {}})");
+        tuning_ok &= tuned.has_value() && tuned->global.file_info_timeout_ms == 4294967295u &&
+                     !tuned->global.flush_and_purge_on_cleanup;
+    }
+    std::cout << (tuning_ok ? "✓ WinFsp cache tuning config" : "❌ WinFsp cache tuning config wrong") << std::endl;
+
+    // Test 9: Directory listings are ordered like NTFS (upper-cased ordinal), not by exact case
+    std::cout << "\nTest 9: NTFS file name order" << std::endl;
+    bool order_ok = true;
+    {
+        order_ok &= StringUtils::fileNameLess(L"cliext", L"CodeAnalysis");
+        order_ok &= StringUtils::fileNameLess(L"CodeAnalysis", L"Manifest");
+        order_ok &= StringUtils::fileNameLess(L"Manifest", L"msclr");
+        order_ok &= !StringUtils::fileNameLess(L"msclr", L"Manifest");
+        order_ok &= StringUtils::fileNameLess(L"Bz", L"_a"); // '_' sorts after letters once upper-cased
+        order_ok &= StringUtils::fileNameLess(L"abc", L"ABCD");
+        order_ok &= StringUtils::fileNameLess(L"ABC", L"abc") && !StringUtils::fileNameLess(L"abc", L"ABC");
+        order_ok &= !StringUtils::fileNameLess(L"same", L"same");
+        order_ok &= !StringUtils::fileNameLessIgnoreCase(L"STDIO.H", L"stdio.h");
+        order_ok &= !StringUtils::fileNameLessIgnoreCase(L"stdio.h", L"STDIO.H");
+        order_ok &= StringUtils::fileNameLessIgnoreCase(L"STDIO.H", L"stdlib.h");
+    }
+    std::cout << (order_ok ? "✓ NTFS file name order" : "❌ NTFS file name order wrong") << std::endl;
+
+    if (!empty_file_ok || !memory_cache_ok || !file_id_ok || !tuning_ok || !order_ok)
+    {
+        return 1;
     }
 
     std::cout << "\n✅ All edge case tests completed!" << std::endl;

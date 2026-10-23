@@ -211,4 +211,45 @@ void StringUtils::toLower(std::string &str)
     std::transform(str.begin(), str.end(), str.begin(), ::tolower);
 }
 
+uint64_t StringUtils::stableFileId(std::wstring_view path)
+{
+    // FNV-1a
+    uint64_t hash = 14695981039346656037ULL;
+    for (wchar_t ch : path)
+    {
+        wchar_t folded = ch == L'\\' ? L'/' : static_cast<wchar_t>(::towlower(ch));
+        hash ^= static_cast<uint64_t>(folded);
+        hash *= 1099511628211ULL;
+    }
+    return hash != 0 ? hash : 1;
+}
+
+bool StringUtils::fileNameLess(std::wstring_view a, std::wstring_view b)
+{
+    if (fileNameLessIgnoreCase(a, b))
+    {
+        return true;
+    }
+    if (fileNameLessIgnoreCase(b, a))
+    {
+        return false;
+    }
+    return a < b;
+}
+
+bool StringUtils::fileNameLessIgnoreCase(std::wstring_view a, std::wstring_view b)
+{
+    size_t common = (std::min)(a.size(), b.size());
+    for (size_t i = 0; i < common; ++i)
+    {
+        wint_t upper_a = ::towupper(a[i]);
+        wint_t upper_b = ::towupper(b[i]);
+        if (upper_a != upper_b)
+        {
+            return upper_a < upper_b;
+        }
+    }
+    return a.size() < b.size();
+}
+
 } // namespace CeWinFileCache

@@ -133,6 +133,16 @@ std::optional<Config> ConfigParser::parseJsonString(std::string_view json_conten
                 config.global.download_threads = global["download_threads"];
             }
 
+            if (global.contains("file_info_timeout_ms") && global["file_info_timeout_ms"].is_number_unsigned())
+            {
+                config.global.file_info_timeout_ms = global["file_info_timeout_ms"];
+            }
+
+            if (global.contains("flush_and_purge_on_cleanup") && global["flush_and_purge_on_cleanup"].is_boolean())
+            {
+                config.global.flush_and_purge_on_cleanup = global["flush_and_purge_on_cleanup"];
+            }
+
             // Parse metrics section
             if (global.contains("metrics") && global["metrics"].is_object())
             {

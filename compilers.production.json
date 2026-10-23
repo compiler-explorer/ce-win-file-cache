@@ -11,8 +11,7 @@
         "lib/**/*.lib"
       ],
       "prefetch_patterns": [
-        "include/**/*.h",
-        "include/**/*.hpp"
+        "include/**"
       ]
     },
     "compilers/msvc/14.42.34433": {
@@ -26,7 +25,7 @@
         "lib/**/*.lib"
       ],
       "prefetch_patterns": [
-        "include/**/*.h"
+        "include/**"
       ]
     },
     "compilers/msvc/14.41.34120": {
@@ -40,7 +39,7 @@
         "lib/**/*.lib"
       ],
       "prefetch_patterns": [
-        "include/**/*.h"
+        "include/**"
       ]
     },
     "compilers/msvc/14.40.33807": {
@@ -54,7 +53,7 @@
         "lib/**/*.lib"
       ],
       "prefetch_patterns": [
-        "include/**/*.h"
+        "include/**"
       ]
     },
     "compilers/msvc/14.39.33519": {
@@ -67,7 +66,9 @@
         "include/**",
         "lib/**/*.lib"
       ],
-      "prefetch_patterns": []
+      "prefetch_patterns": [
+        "include/**"
+      ]
     },
     "compilers/msvc/14.38.33130": {
       "network_path": "Y:\\compilers\\msvc\\14.38.33130",
@@ -79,7 +80,9 @@
         "include/**",
         "lib/**/*.lib"
       ],
-      "prefetch_patterns": []
+      "prefetch_patterns": [
+        "include/**"
+      ]
     },
     "compilers/msvc/14.37.32822": {
       "network_path": "Y:\\compilers\\msvc\\14.37.32822",
@@ -91,7 +94,9 @@
         "include/**",
         "lib/**/*.lib"
       ],
-      "prefetch_patterns": []
+      "prefetch_patterns": [
+        "include/**"
+      ]
     },
     "compilers/msvc/14.36.32532": {
       "network_path": "Y:\\compilers\\msvc\\14.36.32532",
@@ -103,7 +108,9 @@
         "include/**",
         "lib/**/*.lib"
       ],
-      "prefetch_patterns": []
+      "prefetch_patterns": [
+        "include/**"
+      ]
     },
     "compilers/msvc/14.35.32215": {
       "network_path": "Y:\\compilers\\msvc\\14.35.32215",
@@ -248,7 +255,7 @@
         "lib/clang/*/include/**"
       ],
       "prefetch_patterns": [
-        "lib/clang/*/include/**/*.h"
+        "lib/clang/*/include/**"
       ]
     },
     "compilers/windows-kits-10": {
@@ -261,7 +268,7 @@
         "bin/*.dll"
       ],
       "prefetch_patterns": [
-        "Include/**/*.h"
+        "Include/**"
       ]
     }
   },

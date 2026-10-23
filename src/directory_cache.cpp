@@ -91,7 +91,10 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryWindows(const std::wstring &ne
     HANDLE find_handle = FindFirstFileW(search_pattern.c_str(), &find_data);
     if (find_handle == INVALID_HANDLE_VALUE)
     {
-        // Network path not accessible - return success to continue
+        // Network path not accessible - keep mounting, but the directory will show up empty
+        DWORD error = GetLastError();
+        Logger::error(LogCategory::DIRECTORY, "Cannot list '{}' (error {}), it will appear empty",
+                      StringUtils::wideToUtf8(network_path), error);
         return STATUS_SUCCESS;
     }
 
@@ -112,7 +115,8 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryWindows(const std::wstring &ne
         if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
         {
             // Add directory to tree
-            directory_tree.addDirectory(child_virtual_path, child_network_path);
+            directory_tree.addDirectory(child_virtual_path, child_network_path, find_data.ftCreationTime,
+                                        find_data.ftLastAccessTime, find_data.ftLastWriteTime);
 
             // Recursively enumerate subdirectory with cycle detection
             static thread_local std::unordered_set<std::wstring> visited_paths;

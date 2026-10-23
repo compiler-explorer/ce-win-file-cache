@@ -93,12 +93,18 @@ Let's say you have compilers on a network share at `Z:\compilers\`. Here's how t
 - **`eviction_policy`**: Cache eviction strategy (`"lru"` = Least Recently Used)
 - **`cache_directory`**: Where to store cached files locally
 - **`download_threads`**: Number of concurrent download threads
+- **`file_info_timeout_ms`**: How long the WinFsp kernel driver may cache file metadata (default `1000`). `4294967295` caches it until unmount.
+- **`flush_and_purge_on_cleanup`**: Drop the kernel's cached file data when the last handle to a file closes (default `true`). With `false`, data stays in the Windows file cache across opens.
+
+For immutable compiler trees, `"file_info_timeout_ms": 4294967295` together with `"flush_and_purge_on_cleanup": false` lets Windows serve repeated reads from its own cache without calling into the cache service. On a test VM this cut a warm header-heavy `cl` compile from 3.6 s to 2.8 s (local NTFS: 2.6 s) with no user-mode reads at all. Changes to files on the share are then not seen until the filesystem is remounted, and cached data also uses Windows file cache memory on top of `total_cache_size_mb`.
+
+Note that the memory cache is bounded: when `total_cache_size_mb` is reached, on-demand files are served from the network instead of being cached. `cache_always` files are always cached and never evicted, so the limit should be well above their total size.
 
 #### Compiler Settings
 - **`network_path`**: The actual network location of the compiler
 - **`cache_size_mb`**: Maximum cache size for this specific compiler
 - **`cache_always`**: Glob patterns for files to always keep cached
-- **`prefetch_patterns`**: Files to cache immediately on startup
+- **`prefetch_patterns`**: Files to load into memory in the background right after startup, before anything opens them. They follow the normal admission rules: files that are not also `cache_always` stop being prefetched once `total_cache_size_mb` is reached
 
 ### Advanced Configuration Example
 
