@@ -37,7 +37,15 @@ class MemoryCacheManager
 
     void addFileToMemoryCache(const std::wstring &virtual_path, const std::vector<uint8_t> &content);
 
+    // Moves the content in without copying, but only when the path is not cached yet (existing content may
+    // be in use by open files). Returns false when it was already cached.
+    bool addFileToMemoryCache(const std::wstring &virtual_path, std::vector<uint8_t> &&content);
+
     void removeFileFromMemoryCache(const std::wstring &virtual_path);
+
+    // Removes the entry's content only when no open file holds a pointer to it. Checked under the same
+    // mutex that getMemoryCachedFilePtr(CacheEntry *) uses to take a reference, so the two cannot race.
+    bool removeFileIfUnreferenced(CacheEntry *entry);
 
     std::vector<uint8_t> getFileContent(const std::wstring &virtual_path, const Config &config);
 
