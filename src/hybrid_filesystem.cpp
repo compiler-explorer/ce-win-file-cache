@@ -508,6 +508,18 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
 
     file_desc->entry = entry;
 
+    // Report the original-case name, otherwise WinFsp assumes the upper-cased name on a case-insensitive volume
+    // (visible through GetModuleFileName/GetFinalPathNameByHandle). It may only differ in case from FileName.
+    std::wstring normalized_name = entry->virtual_path;
+    std::replace(normalized_name.begin(), normalized_name.end(), L'/', L'\\');
+    size_t normalized_bytes = normalized_name.size() * sizeof(WCHAR);
+    if (OpenFileInfo->NormalizedName != nullptr && normalized_bytes <= OpenFileInfo->NormalizedNameSize &&
+        normalized_name.size() == virtual_path.size() && _wcsicmp(normalized_name.c_str(), virtual_path.c_str()) == 0)
+    {
+        memcpy(OpenFileInfo->NormalizedName, normalized_name.data(), normalized_bytes);
+        OpenFileInfo->NormalizedNameSize = static_cast<UINT16>(normalized_bytes);
+    }
+
     Logger::debug(LogCategory::FILESYSTEM, "Open() - setting up file info");
 
     // Get file info - handle directories differently
