@@ -54,6 +54,8 @@ class HybridFileSystem : public Fsp::FileSystemBase
     NTSTATUS fetchFromNetwork(CacheEntry *entry);
     bool matchesPattern(const std::wstring &path, const std::wstring &pattern);
     CachePolicy determineCachePolicy(const std::wstring &virtual_path);
+    const CompilerConfig *findCompilerConfig(const std::wstring &virtual_path, std::wstring &relative_path) const;
+    bool isPrefetched(const std::wstring &virtual_path);
     std::wstring createTemporaryFileForMemoryCached(CacheEntry *entry);
 
     NTSTATUS GetFileInfoByName(PWSTR FileName, FileInfo *FileInfo);
@@ -84,8 +86,8 @@ class HybridFileSystem : public Fsp::FileSystemBase
     // Background eviction thread
     void memoryEvictionThreadFunc();
 
-    // Queues every cache_always file for download so it is in memory before first use
-    void preloadAlwaysCached();
+    // Queues every prefetch_patterns file for download so it is in memory before first use
+    void prefetchFiles();
 
     Config config;
     std::unordered_map<std::wstring, std::unique_ptr<CacheEntry>> cache_entries;
@@ -100,8 +102,8 @@ class HybridFileSystem : public Fsp::FileSystemBase
     std::thread memory_eviction_thread;
     std::atomic<bool> shutdown_eviction{false};
 
-    // Startup preload of cache_always files, also stops on shutdown_eviction
-    std::thread preload_thread;
+    // Startup prefetch of prefetch_patterns files, also stops on shutdown_eviction
+    std::thread prefetch_thread;
 
     // Bytes of downloads that are queued or in flight, counted towards the cache size for admission
     std::atomic<size_t> reserved_cache_bytes{0};

@@ -104,7 +104,7 @@ Note that the memory cache is bounded: when `total_cache_size_mb` is reached, on
 - **`network_path`**: The actual network location of the compiler
 - **`cache_size_mb`**: Maximum cache size for this specific compiler
 - **`cache_always`**: Glob patterns for files to always keep cached
-- **`prefetch_patterns`**: Files to cache immediately on startup
+- **`prefetch_patterns`**: Files to load into memory in the background right after startup, before anything opens them. They follow the normal admission rules: files that are not also `cache_always` stop being prefetched once `total_cache_size_mb` is reached
 
 ### Advanced Configuration Example
 
