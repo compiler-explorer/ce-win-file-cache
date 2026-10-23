@@ -423,11 +423,8 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
     Logger::debug(LogCategory::FILESYSTEM, "Open() - creating file descriptor");
     auto *file_desc = new FileDescriptor();
 
+    // Never pass FILE_DELETE_ON_CLOSE on to the source, that would delete the real file on the share
     DWORD create_flags = FILE_FLAG_BACKUP_SEMANTICS;
-    if (CreateOptions & FILE_DELETE_ON_CLOSE)
-    {
-        create_flags |= FILE_FLAG_DELETE_ON_CLOSE;
-    }
 
     // Handle directories separately from files
     if (entry->file_attributes & FILE_ATTRIBUTE_DIRECTORY)
