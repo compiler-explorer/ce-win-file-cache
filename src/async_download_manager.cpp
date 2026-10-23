@@ -1,5 +1,6 @@
 #include "../include/ce-win-file-cache/async_download_manager.hpp"
 #include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 
@@ -253,8 +254,7 @@ bool AsyncDownloadManager::downloadFile(const std::wstring network_path, const s
         // Record filesystem operation
         GlobalMetrics::instance().recordFilesystemOperation("download");
 
-        std::string narrow_path(network_path.begin(), network_path.end());
-        std::ifstream file(narrow_path, std::ios::binary);
+        std::ifstream file(std::filesystem::path(network_path), std::ios::binary);
 
         if (!file.is_open())
         {

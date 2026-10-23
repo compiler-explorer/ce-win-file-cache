@@ -495,6 +495,15 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
             delete file_desc;
             return CeWinFileCache::WineCompat::GetLastErrorAsNtStatus();
         }
+
+        if (file_desc->cached_content != nullptr)
+        {
+            GlobalMetrics::instance().recordCacheHit("open");
+        }
+        else
+        {
+            GlobalMetrics::instance().recordCacheMiss("open");
+        }
     }
 
     file_desc->entry = entry;
