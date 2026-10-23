@@ -185,9 +185,9 @@ NTSTATUS HybridFileSystem::Init(PVOID Host)
     host->SetUnicodeOnDisk(TRUE);
     host->SetPersistentAcls(TRUE);
     host->SetPostCleanupWhenModifiedOnly(TRUE);
-    // Let the WinFsp driver match directory patterns (FsRtlIsNameInExpression), it understands the
-    // DOS wildcards (<, >, ") that FindFirstFile produces, which GlobMatcher does not
-    host->SetPassQueryDirectoryPattern(FALSE);
+    // The WinFsp driver matches directory patterns itself (it understands the DOS wildcards <, > and " that
+    // FindFirstFile produces), ReadDirectory only uses the pattern to look up an exact name directly
+    host->SetPassQueryDirectoryPattern(TRUE);
     host->SetVolumeCreationTime(creation_time);
     host->SetVolumeSerialNumber(0x12345678);
     host->SetFlushAndPurgeOnCleanup(config.global.flush_and_purge_on_cleanup ? TRUE : FALSE);
@@ -911,161 +911,128 @@ NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR P
         return handleFileAsDirectoryEntry(file_desc->entry, Pattern, Marker, Buffer, Length, PBytesTransferred);
     }
 
-    // Get directory path
-    std::wstring normalized_path = normalizePath(file_desc->entry->virtual_path);
-
-    Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - enumerating directory: '{}'", StringUtils::wideToUtf8(normalized_path));
-
-    // Get directory contents
-    std::vector<DirectoryNode *> contents = directory_cache.getDirectoryContents(file_desc->entry->virtual_path);
-    Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - directory '{}' has {} entries", StringUtils::wideToUtf8(file_desc->entry->virtual_path), contents.size());
-
-    // Apply pattern filtering if specified
-    if (Pattern && wcslen(Pattern) > 0)
+    DirectoryNode *dir_node = directory_cache.findNode(file_desc->entry->virtual_path);
+    if (dir_node == nullptr)
     {
-        contents = filterDirectoryContents(contents, Pattern, "ReadDirectory");
-    }
-
-    if (contents.empty())
-    {
-        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - no entries found");
         *PBytesTransferred = 0;
-        return STATUS_NO_MORE_FILES;
+        return STATUS_OBJECT_NAME_NOT_FOUND;
     }
 
-    // Find starting index based on marker using binary search for O(log n) performance
-    size_t start_index = 0;
-    if (Marker && wcslen(Marker) > 0)
-    {
-        std::string marker_str = StringUtils::wideToUtf8(Marker);
-
-        // todo: should use hashmap that should already be cached (its not)
-
-        // Use binary search to find marker position (assumes contents are sorted by name)
-        auto it = std::lower_bound(contents.begin(), contents.end(), Marker,
-                                   [](const DirectoryNode *node, const std::wstring &marker)
-                                   {
-                                       return node->name < marker;
-                                   });
-
-        if (it != contents.end() && (*it)->name == Marker)
-        {
-            start_index = std::distance(contents.begin(), it) + 1; // Next entry after marker
-            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - found marker '{}' at index {}", marker_str, start_index - 1);
-        }
-        else
-        {
-            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - marker '{}' not found, starting from beginning", marker_str);
-        }
-    }
-    else
-    {
-        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - no marker, starting from beginning");
-    }
-
-    // Fill buffer with directory entries
-    PUCHAR buffer_ptr = (PUCHAR)Buffer;
+    // NTFS lists "." and ".." first in every directory except the root
+    bool has_dot_entries = normalizePath(file_desc->entry->virtual_path) != L"/";
+    DirectoryNode *parent_node = dir_node->parent != nullptr ? dir_node->parent : dir_node;
     size_t bytes_used = 0;
-    size_t entries_returned = 0;
 
-    for (size_t i = start_index; i < contents.size(); i++)
+    // The WinFsp driver filters the results with the pattern itself, so the pattern is only used to avoid listing
+    // the whole directory when it names a single file (FindFirstFile on an exact path, e.g. include lookups).
+    // The Marker is ignored here like WinFsp's GetDirInfoByName does: the driver sends one when it already
+    // scanned part of a cached listing, and never asks again once the file was returned.
+    if (Pattern != nullptr && wcspbrk(Pattern, L"*?<>\"") == nullptr)
     {
-        DirectoryNode *node = contents[i];
-
-        // Calculate size needed for this entry
-        size_t name_chars = node->name.length();
-        size_t name_bytes = name_chars * sizeof(WCHAR);
-        // Size = base structure + filename bytes (matching WinFsp memfs example)
-        size_t dir_info_size = sizeof(FSP_FSCTL_DIR_INFO) + name_bytes;
-
-        // Check if entry size exceeds UINT16 maximum
-        if (dir_info_size > UINT16_MAX)
+        if (has_dot_entries && (wcscmp(Pattern, L".") == 0 || wcscmp(Pattern, L"..") == 0))
         {
-            Logger::error(LogCategory::FILESYSTEM, "ReadDirectory() - entry '{}' size {} exceeds UINT16_MAX, skipping",
-                         StringUtils::wideToUtf8(node->name), dir_info_size);
-            continue;
+            addDirInfo(Buffer, Length, bytes_used, Pattern, Pattern[1] == L'.' ? parent_node : dir_node);
         }
-
-        // Align to 8-byte boundary for buffer positioning (but Size field stays unaligned)
-        size_t entry_size = (dir_info_size + 7) & ~7;
-
-        // Removed verbose per-entry logging for performance
-
-        // Check if entry fits in remaining buffer
-        if (bytes_used + entry_size > Length)
+        else if (DirectoryNode *child = findChildByPattern(dir_node, Pattern); child != nullptr)
         {
-            Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - buffer full, stopping at index {}", i);
-            break;
+            addDirInfo(Buffer, Length, bytes_used, child->name, child);
         }
-
-        // Fill directory info
-        FSP_FSCTL_DIR_INFO *dir_info = (FSP_FSCTL_DIR_INFO *)(buffer_ptr + bytes_used);
-        dir_info->Size = (UINT16)dir_info_size;  // Size field is unaligned
-
-        // Set file attributes from cached network data
-        dir_info->FileInfo.FileAttributes = node->file_attributes;
-
-        // Debug logging for file attributes
-        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - entry '{}': attributes=0x{:x}, isDirectory={}, size={}",
-                     StringUtils::wideToUtf8(node->name), node->file_attributes,
-                     node->isDirectory(), node->file_size);
-        dir_info->FileInfo.ReparseTag = 0;
-        dir_info->FileInfo.FileSize = node->isDirectory() ? 0 : node->file_size;
-        dir_info->FileInfo.AllocationSize =
-        node->isDirectory() ? ALLOCATION_UNIT : (dir_info->FileInfo.FileSize + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
-
-        // Set timestamps
-        UINT64 creation_ts = std::bit_cast<UINT64>(node->creation_time);
-        UINT64 access_ts = std::bit_cast<UINT64>(node->last_access_time);
-        UINT64 write_ts = std::bit_cast<UINT64>(node->last_write_time);
-
-        if (creation_ts == 0)
-            creation_ts = creation_time;
-        if (access_ts == 0)
-            access_ts = creation_time;
-        if (write_ts == 0)
-            write_ts = creation_time;
-
-        dir_info->FileInfo.CreationTime = creation_ts;
-        dir_info->FileInfo.LastAccessTime = access_ts;
-        dir_info->FileInfo.LastWriteTime = write_ts;
-        dir_info->FileInfo.ChangeTime = write_ts;
-        dir_info->FileInfo.IndexNumber = StringUtils::stableFileId(node->full_virtual_path);
-        dir_info->FileInfo.HardLinks = 0;
-
-        // Clear padding
-        memset(dir_info->Padding, 0, sizeof(dir_info->Padding));
-
-        // Copy filename with null termination
-        memcpy(dir_info->FileNameBuf, node->name.c_str(), name_bytes);
-        WCHAR *filename_end = (WCHAR *)((char *)dir_info->FileNameBuf + name_bytes);
-        *filename_end = L'\0';
-
-        bytes_used += entry_size;
-        entries_returned++;
-
-        // Removed verbose per-entry logging for performance
+        *PBytesTransferred = static_cast<ULONG>(bytes_used);
+        FspFileSystemAddDirInfo(nullptr, Buffer, Length, PBytesTransferred);
+        return STATUS_SUCCESS;
     }
 
+    std::vector<DirectoryNode *> contents = dir_node->getChildNodes();
+
+    // Continue after the marker, the last name returned by the previous call
+    auto next = contents.begin();
+    bool full = false;
+    if (Marker == nullptr || (has_dot_entries && wcscmp(Marker, L".") == 0))
+    {
+        if (has_dot_entries)
+        {
+            full = (Marker == nullptr && !addDirInfo(Buffer, Length, bytes_used, L".", dir_node)) ||
+                   !addDirInfo(Buffer, Length, bytes_used, L"..", parent_node);
+        }
+    }
+    else if (!(has_dot_entries && wcscmp(Marker, L"..") == 0))
+    {
+        // Ignoring case, a marker given by the caller (SL_INDEX_SPECIFIED) may differ in case from the name
+        next = std::upper_bound(contents.begin(), contents.end(), std::wstring_view(Marker),
+                                [](std::wstring_view marker, const DirectoryNode *node)
+                                {
+                                    return StringUtils::fileNameLessIgnoreCase(marker, node->name);
+                                });
+    }
+
+    for (; !full && next != contents.end(); ++next)
+    {
+        full = !addDirInfo(Buffer, Length, bytes_used, (*next)->name, *next);
+    }
+
+    // The end marker saves WinFsp a call that would only find the listing empty, a full buffer gets continued
     *PBytesTransferred = static_cast<ULONG>(bytes_used);
+    if (!full)
+    {
+        FspFileSystemAddDirInfo(nullptr, Buffer, Length, PBytesTransferred);
+    }
+    return STATUS_SUCCESS;
+}
 
-    Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - returning {} entries, {} bytes total", entries_returned, bytes_used);
+DirectoryNode *HybridFileSystem::findChildByPattern(DirectoryNode *dir_node, PWSTR pattern) const
+{
+    // The driver upper-cases the pattern. Child keys are lowercased with towlower, which is only reliable for ASCII.
+    std::wstring_view name(pattern);
+    bool is_ascii = std::all_of(name.begin(), name.end(), [](wchar_t ch) { return ch < 0x80; });
+    if (is_ascii && !config.global.case_sensitive)
+    {
+        return dir_node->findChild(name);
+    }
 
-    if (entries_returned == 0)
+    for (DirectoryNode *child : dir_node->getChildNodes())
     {
-        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - no entries returned, returning SUCCESS with 0 bytes");
-        return STATUS_SUCCESS; // Real Windows filesystem returns SUCCESS, not NO_MORE_FILES
+        if (CompareStringOrdinal(child->name.c_str(), static_cast<int>(child->name.size()), pattern,
+                                 static_cast<int>(name.size()), TRUE) == CSTR_EQUAL)
+        {
+            return child;
+        }
     }
-    else if (start_index + entries_returned >= contents.size())
+    return nullptr;
+}
+
+bool HybridFileSystem::addDirInfo(PVOID buffer, ULONG length, size_t &bytes_used, std::wstring_view name, const DirectoryNode *node) const
+{
+    size_t name_bytes = name.size() * sizeof(WCHAR);
+    size_t dir_info_size = sizeof(FSP_FSCTL_DIR_INFO) + name_bytes;
+    // Entries are 8-byte aligned in the buffer, the Size field stays unaligned
+    size_t entry_size = (dir_info_size + 7) & ~size_t{ 7 };
+    if (dir_info_size > UINT16_MAX || bytes_used + entry_size > length)
     {
-        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - enumeration complete");
-        return STATUS_SUCCESS; // All entries have been returned
+        return false;
     }
-    else
-    {
-        Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() - more entries available");
-        return STATUS_SUCCESS; // More entries available
-    }
+
+    auto *dir_info = reinterpret_cast<FSP_FSCTL_DIR_INFO *>(static_cast<PUCHAR>(buffer) + bytes_used);
+    memset(dir_info, 0, sizeof(FSP_FSCTL_DIR_INFO));
+    dir_info->Size = static_cast<UINT16>(dir_info_size);
+
+    dir_info->FileInfo.FileAttributes = node->file_attributes;
+    dir_info->FileInfo.FileSize = node->isDirectory() ? 0 : node->file_size;
+    dir_info->FileInfo.AllocationSize =
+    node->isDirectory() ? ALLOCATION_UNIT : (dir_info->FileInfo.FileSize + ALLOCATION_UNIT - 1) / ALLOCATION_UNIT * ALLOCATION_UNIT;
+
+    UINT64 creation_ts = std::bit_cast<UINT64>(node->creation_time);
+    UINT64 access_ts = std::bit_cast<UINT64>(node->last_access_time);
+    UINT64 write_ts = std::bit_cast<UINT64>(node->last_write_time);
+    dir_info->FileInfo.CreationTime = creation_ts != 0 ? creation_ts : creation_time;
+    dir_info->FileInfo.LastAccessTime = access_ts != 0 ? access_ts : creation_time;
+    dir_info->FileInfo.LastWriteTime = write_ts != 0 ? write_ts : creation_time;
+    dir_info->FileInfo.ChangeTime = dir_info->FileInfo.LastWriteTime;
+    dir_info->FileInfo.IndexNumber = StringUtils::stableFileId(node->full_virtual_path);
+
+    memcpy(dir_info->FileNameBuf, name.data(), name_bytes);
+
+    bytes_used += entry_size;
+    return true;
 }
 
 NTSTATUS HybridFileSystem::ReadDirectoryEntry(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID *PContext, DirInfo *DirInfo)

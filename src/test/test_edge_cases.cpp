@@ -237,7 +237,25 @@ int main()
     }
     std::cout << (tuning_ok ? "✓ WinFsp cache tuning config" : "❌ WinFsp cache tuning config wrong") << std::endl;
 
-    if (!empty_file_ok || !memory_cache_ok || !file_id_ok || !tuning_ok)
+    // Test 9: Directory listings are ordered like NTFS (upper-cased ordinal), not by exact case
+    std::cout << "\nTest 9: NTFS file name order" << std::endl;
+    bool order_ok = true;
+    {
+        order_ok &= StringUtils::fileNameLess(L"cliext", L"CodeAnalysis");
+        order_ok &= StringUtils::fileNameLess(L"CodeAnalysis", L"Manifest");
+        order_ok &= StringUtils::fileNameLess(L"Manifest", L"msclr");
+        order_ok &= !StringUtils::fileNameLess(L"msclr", L"Manifest");
+        order_ok &= StringUtils::fileNameLess(L"Bz", L"_a"); // '_' sorts after letters once upper-cased
+        order_ok &= StringUtils::fileNameLess(L"abc", L"ABCD");
+        order_ok &= StringUtils::fileNameLess(L"ABC", L"abc") && !StringUtils::fileNameLess(L"abc", L"ABC");
+        order_ok &= !StringUtils::fileNameLess(L"same", L"same");
+        order_ok &= !StringUtils::fileNameLessIgnoreCase(L"STDIO.H", L"stdio.h");
+        order_ok &= !StringUtils::fileNameLessIgnoreCase(L"stdio.h", L"STDIO.H");
+        order_ok &= StringUtils::fileNameLessIgnoreCase(L"STDIO.H", L"stdlib.h");
+    }
+    std::cout << (order_ok ? "✓ NTFS file name order" : "❌ NTFS file name order wrong") << std::endl;
+
+    if (!empty_file_ok || !memory_cache_ok || !file_id_ok || !tuning_ok || !order_ok)
     {
         return 1;
     }
