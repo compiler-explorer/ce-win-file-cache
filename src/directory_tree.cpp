@@ -50,7 +50,8 @@ DirectoryNode *DirectoryNode::addChild(std::wstring_view child_name, NodeType ch
     }
 
     std::lock_guard<std::mutex> lock(children_mutex);
-    auto child = std::make_unique<DirectoryNode>(name_copy, child_type, this);
+    // name_copy is the lookup key (lowercased when case-insensitive), the node keeps the original case
+    auto child = std::make_unique<DirectoryNode>(std::wstring(child_name), child_type, this);
 
     children[name_copy] = std::move(child);
 
@@ -69,7 +70,8 @@ DirectoryNode *DirectoryNode::addChild(const std::wstring &child_name, NodeType 
     }
 
     std::lock_guard<std::mutex> lock(children_mutex);
-    auto child = std::make_unique<DirectoryNode>(name_copy, child_type, this);
+    // name_copy is the lookup key (lowercased when case-insensitive), the node keeps the original case
+    auto child = std::make_unique<DirectoryNode>(std::wstring(child_name), child_type, this);
 
     children[name_copy] = std::move(child);
 
