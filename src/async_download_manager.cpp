@@ -179,10 +179,11 @@ void AsyncDownloadManager::processDownload(std::shared_ptr<DownloadTask> task)
 
             if (success && task->cache_entry)
             {
-                auto content = memory_cache.getFileContent(task->virtual_path, config);
-                if (!content.empty())
+                // check presence rather than emptiness, 0-byte files are valid cache entries
+                const auto *content = memory_cache.getMemoryCachedFilePtr(task->virtual_path);
+                if (content != nullptr)
                 {
-                    task->cache_entry->file_size = content.size();
+                    task->cache_entry->file_size = content->size();
                     task->cache_entry->state = FileState::CACHED;
                     task->cache_entry->last_used = std::chrono::steady_clock::now();
                     task->cache_entry->access_count++;

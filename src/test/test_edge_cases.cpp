@@ -1,6 +1,8 @@
 #include "../../include/ce-win-file-cache/async_download_manager.hpp"
 #include "../../include/ce-win-file-cache/config_parser.hpp"
+#include <atomic>
 #include <chrono>
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <thread>
@@ -143,6 +145,47 @@ int main()
     catch (const std::exception &e)
     {
         std::cout << "❌ Exception during shutdown: " << e.what() << std::endl;
+    }
+
+    // Test 5: Empty file with a cache entry must end up cached, not failed
+    std::cout << "\nTest 5: Empty file download with cache entry" << std::endl;
+    bool empty_file_ok = false;
+    {
+        Config config;
+        MemoryCacheManager memory_cache;
+        AsyncDownloadManager download_manager(memory_cache, config, 1);
+
+        std::ofstream("empty_file_test.txt").close();
+
+        CacheEntry entry;
+        entry.virtual_path = L"/empty/empty_file_test.txt";
+        entry.network_path = L"empty_file_test.txt";
+        entry.file_size = 123;
+
+        std::atomic<bool> completed(false);
+        std::atomic<NTSTATUS> result(STATUS_PENDING);
+        download_manager.queueDownload(entry.virtual_path, entry.network_path, &entry, CachePolicy::ALWAYS_CACHE,
+                                       [&completed, &result](NTSTATUS s, const std::wstring & /*e*/, CacheEntry * /*entry*/)
+                                       {
+                                           result = s;
+                                           completed = true;
+                                       });
+
+        auto start = std::chrono::steady_clock::now();
+        while (!completed && std::chrono::steady_clock::now() - start < std::chrono::seconds(5))
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+
+        empty_file_ok = completed && result == STATUS_SUCCESS && entry.state == FileState::CACHED &&
+                        entry.file_size == 0 && entry.is_in_memory_cache.load();
+        std::remove("empty_file_test.txt");
+    }
+    std::cout << (empty_file_ok ? "✓ Empty file cached" : "❌ Empty file was not cached") << std::endl;
+
+    if (!empty_file_ok)
+    {
+        return 1;
     }
 
     std::cout << "\n✅ All edge case tests completed!" << std::endl;
