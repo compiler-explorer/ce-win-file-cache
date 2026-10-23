@@ -165,7 +165,7 @@ NTSTATUS HybridFileSystem::Init(PVOID Host)
     Logger::info(LogCategory::FILESYSTEM, "Setting sector size: {}", ALLOCATION_UNIT);
     host->SetSectorSize(ALLOCATION_UNIT);
     host->SetSectorsPerAllocationUnit(1);
-    host->SetFileInfoTimeout(1000);
+    host->SetFileInfoTimeout(config.global.file_info_timeout_ms);
     host->SetCaseSensitiveSearch(FALSE);
     host->SetCasePreservedNames(TRUE);
     host->SetUnicodeOnDisk(TRUE);
@@ -176,9 +176,11 @@ NTSTATUS HybridFileSystem::Init(PVOID Host)
     host->SetPassQueryDirectoryPattern(FALSE);
     host->SetVolumeCreationTime(creation_time);
     host->SetVolumeSerialNumber(0x12345678);
-    host->SetFlushAndPurgeOnCleanup(TRUE);
+    host->SetFlushAndPurgeOnCleanup(config.global.flush_and_purge_on_cleanup ? TRUE : FALSE);
     host->SetFileSystemName(L"NTFS"); // Required for DLL/executable loading
 
+    Logger::info(LogCategory::FILESYSTEM, "FileInfoTimeout: {} ms, FlushAndPurgeOnCleanup: {}", config.global.file_info_timeout_ms,
+                 config.global.flush_and_purge_on_cleanup);
     Logger::debug(LogCategory::FILESYSTEM, "Init() completed successfully");
     return STATUS_SUCCESS;
 }
