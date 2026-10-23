@@ -115,7 +115,8 @@ NTSTATUS DirectoryCache::enumerateNetworkDirectoryWindows(const std::wstring &ne
         if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
         {
             // Add directory to tree
-            directory_tree.addDirectory(child_virtual_path, child_network_path);
+            directory_tree.addDirectory(child_virtual_path, child_network_path, find_data.ftCreationTime,
+                                        find_data.ftLastAccessTime, find_data.ftLastWriteTime);
 
             // Recursively enumerate subdirectory with cycle detection
             static thread_local std::unordered_set<std::wstring> visited_paths;
