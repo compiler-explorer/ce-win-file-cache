@@ -6,6 +6,8 @@
 #include <ce-win-file-cache/string_utils.hpp>
 #include <ce-win-file-cache/windows_compat.hpp>
 #include <chrono>
+#include <cstdio>
+#include <format>
 #include <vector>
 
 #ifndef NO_WINFSP
@@ -28,6 +30,81 @@ HANDLE openSourceFile(const std::wstring &path, UINT64 &size)
     LARGE_INTEGER file_size{};
     size = handle != INVALID_HANDLE_VALUE && GetFileSizeEx(handle, &file_size) ? static_cast<UINT64>(file_size.QuadPart) : 0;
     return handle;
+}
+
+// TEMP: per-callback profiler, prints a summary from the eviction thread every 10 seconds
+enum ProfOp
+{
+    PROF_SECURITY_BY_NAME,
+    PROF_SECURITY_BY_NAME_MISS,
+    PROF_OPEN,
+    PROF_OPEN_TAIL,
+    PROF_CLOSE,
+    PROF_READ,
+    PROF_GET_FILE_INFO,
+    PROF_GET_VOLUME_INFO,
+    PROF_GET_SECURITY,
+    PROF_READ_DIRECTORY,
+    PROF_GET_STREAM_INFO,
+    PROF_COUNT
+};
+
+const char *const prof_names[PROF_COUNT] = { "GetSecurityByName", "GetSecurityByName(miss)", "Open", "Open(metrics+tracker)",
+                                             "Close", "Read", "GetFileInfo", "GetVolumeInfo", "GetSecurity", "ReadDirectory",
+                                             "GetStreamInfo" };
+
+struct ProfStat
+{
+    std::atomic<uint64_t> count{ 0 };
+    std::atomic<uint64_t> total_ns{ 0 };
+    std::atomic<uint64_t> max_ns{ 0 };
+};
+
+ProfStat prof_stats[PROF_COUNT];
+
+struct ProfScope
+{
+    ProfOp op;
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+
+    explicit ProfScope(ProfOp profiled_op) : op(profiled_op)
+    {
+    }
+
+    ~ProfScope()
+    {
+        auto ns = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count());
+        ProfStat &stat = prof_stats[op];
+        stat.count++;
+        stat.total_ns += ns;
+        uint64_t seen = stat.max_ns.load();
+        while (ns > seen && !stat.max_ns.compare_exchange_weak(seen, ns))
+        {
+        }
+    }
+};
+
+void profDump()
+{
+    std::string line;
+    for (int i = 0; i < PROF_COUNT; ++i)
+    {
+        uint64_t count = prof_stats[i].count.exchange(0);
+        uint64_t total_ns = prof_stats[i].total_ns.exchange(0);
+        uint64_t max_ns = prof_stats[i].max_ns.exchange(0);
+        if (count > 0)
+        {
+            line += std::format("  {:<24} n={:<8} avg={:.1f}us max={:.1f}us\n", prof_names[i], count,
+                                static_cast<double>(total_ns) / static_cast<double>(count) / 1000.0,
+                                static_cast<double>(max_ns) / 1000.0);
+        }
+    }
+    if (!line.empty())
+    {
+        std::fprintf(stderr, "[PROF] last 10s:\n%s", line.c_str());
+        std::fflush(stderr);
+    }
 }
 } // namespace
 
@@ -212,6 +289,7 @@ NTSTATUS HybridFileSystem::Init(PVOID Host)
 
 NTSTATUS HybridFileSystem::GetVolumeInfo(VolumeInfo *VolumeInfo)
 {
+    ProfScope prof(PROF_GET_VOLUME_INFO); // TEMP
     Logger::debug(LogCategory::FILESYSTEM, "GetVolumeInfo() called");
 
     // Initialize all fields to prevent buffer overflow errors
@@ -236,6 +314,7 @@ bool HybridFileSystem::getMountPointSecurityDescriptor(PSECURITY_DESCRIPTOR *out
 
 NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttributes, PSECURITY_DESCRIPTOR SecurityDescriptor, SIZE_T *PSecurityDescriptorSize)
 {
+    ProfScope prof(PROF_SECURITY_BY_NAME); // TEMP
     std::wstring virtual_path(FileName);
     Logger::debug(LogCategory::SECURITY, "GetSecurityByName() called for: '{}'", StringUtils::wideToUtf8(virtual_path));
 
@@ -243,6 +322,7 @@ NTSTATUS HybridFileSystem::GetSecurityByName(PWSTR FileName, PUINT32 PFileAttrib
     CacheEntry *entry = getCacheEntry(virtual_path);
     if (!entry)
     {
+        prof.op = PROF_SECURITY_BY_NAME_MISS; // TEMP
         Logger::debug(LogCategory::SECURITY, "GetSecurityByName() - entry NOT FOUND for: '{}'", StringUtils::wideToUtf8(virtual_path));
         return STATUS_OBJECT_NAME_NOT_FOUND;
     }
@@ -393,6 +473,7 @@ NTSTATUS HybridFileSystem::GetFileInfoByName(PWSTR FileName, FileInfo *FileInfo)
 
 NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 GrantedAccess, PVOID *PFileNode, PVOID *PFileDesc, OpenFileInfo *OpenFileInfo)
 {
+    ProfScope prof(PROF_OPEN); // TEMP
     std::wstring virtual_path(FileName);
     Logger::debug(LogCategory::FILESYSTEM, "Open() called for: '{}', CreateOptions: 0x{:x}", StringUtils::wideToUtf8(virtual_path), CreateOptions);
 
@@ -542,6 +623,7 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
 
 
     updateAccessTime(entry);
+    ProfScope prof_tail(PROF_OPEN_TAIL); // TEMP
 
     // Record file open duration
     auto end_time = std::chrono::high_resolution_clock::now();
@@ -584,12 +666,14 @@ NTSTATUS HybridFileSystem::Open(PWSTR FileName, UINT32 CreateOptions, UINT32 Gra
 
 VOID HybridFileSystem::Close(PVOID FileNode, PVOID FileDesc)
 {
+    ProfScope prof(PROF_CLOSE); // TEMP
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
     delete file_desc;
 }
 
 NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UINT64 Offset, ULONG Length, PULONG PBytesTransferred)
 {
+    ProfScope prof(PROF_READ); // TEMP
     auto start_time = std::chrono::high_resolution_clock::now();
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
 
@@ -721,6 +805,7 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
 
 NTSTATUS HybridFileSystem::GetFileInfo(PVOID FileNode, PVOID FileDesc, FileInfo *FileInfo)
 {
+    ProfScope prof(PROF_GET_FILE_INFO); // TEMP
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
 
     // Use cached metadata from DirectoryNode instead of querying handle
@@ -786,6 +871,7 @@ NTSTATUS HybridFileSystem::SetBasicInfo(PVOID FileNode,
 
 NTSTATUS HybridFileSystem::GetSecurity(PVOID FileNode, PVOID FileDesc, PSECURITY_DESCRIPTOR SecurityDescriptor, SIZE_T *PSecurityDescriptorSize)
 {
+    ProfScope prof(PROF_GET_SECURITY); // TEMP
     Logger::debug(LogCategory::SECURITY, "GetSecurity() called for opened file");
 
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
@@ -895,6 +981,7 @@ NTSTATUS HybridFileSystem::SetSecurity(PVOID FileNode, PVOID FileDesc, SECURITY_
 
 NTSTATUS HybridFileSystem::ReadDirectory(PVOID FileNode, PVOID FileDesc, PWSTR Pattern, PWSTR Marker, PVOID Buffer, ULONG Length, PULONG PBytesTransferred)
 {
+    ProfScope prof(PROF_READ_DIRECTORY); // TEMP
     Logger::debug(LogCategory::FILESYSTEM, "ReadDirectory() called - Pattern: '{}', Length: {}, Marker: {}",
                  Pattern ? StringUtils::wideToUtf8(Pattern) : "null",
                  Length,
@@ -1999,6 +2086,8 @@ void HybridFileSystem::memoryEvictionThreadFunc()
             break;
         }
 
+        profDump(); // TEMP
+
         // Only evict if system has been idle for at least 5 seconds
         if (!isSystemIdle(std::chrono::seconds(5)))
         {
@@ -2150,6 +2239,7 @@ NTSTATUS HybridFileSystem::handleFileAsDirectoryEntry(CacheEntry *entry, PWSTR P
 
 NTSTATUS HybridFileSystem::GetStreamInfo(PVOID FileNode, PVOID FileDesc, PVOID Buffer, ULONG Length, PULONG PBytesTransferred)
 {
+    ProfScope prof(PROF_GET_STREAM_INFO); // TEMP
     Logger::debug(LogCategory::FILESYSTEM, "GetStreamInfo() called");
 
     // For a caching filesystem that doesn't support alternate data streams,
