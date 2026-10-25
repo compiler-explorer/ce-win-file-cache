@@ -263,6 +263,13 @@
       "prefetch_patterns": [
         "Include/**/*.h"
       ]
+    },
+    "compilers/asm-parser-v0.9.9": {
+      "network_path": "Y:\\compilers\\asm-parser-v0.9.9",
+      "root_path": "Y:",
+      "cache_always": [
+        "*.exe"
+      ]
     }
   },
   "global": {
