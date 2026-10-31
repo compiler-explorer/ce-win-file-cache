@@ -1,7 +1,7 @@
 {
   "compilers": {
-    "compilers/msvc/14.43.34808": {
-      "network_path": "Y:\\compilers\\msvc\\14.43.34808",
+    "compilers/msvc/14.51.36231-14.51.36246.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.51.36231-14.51.36246.0",
       "root_path": "Y:",
       "cache_always": [
         "bin/**/*.exe",
@@ -15,8 +15,68 @@
         "include/**/*.hpp"
       ]
     },
-    "compilers/msvc/14.42.34433": {
-      "network_path": "Y:\\compilers\\msvc\\14.42.34433",
+    "compilers/msvc/14.50.35717-14.50.35723.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.50.35717-14.50.35723.0",
+      "root_path": "Y:",
+      "cache_always": [
+        "bin/**/*.exe",
+        "bin/**/*.dll",
+        "bin/**/*.config",
+        "include/**",
+        "lib/**/*.lib"
+      ],
+      "prefetch_patterns": [
+        "include/**/*.h",
+        "include/**/*.hpp"
+      ]
+    },
+    "compilers/msvc/14.50.35717-14.50.35717.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.50.35717-14.50.35717.0",
+      "root_path": "Y:",
+      "cache_always": [
+        "bin/**/*.exe",
+        "bin/**/*.dll",
+        "bin/**/*.config",
+        "include/**",
+        "lib/**/*.lib"
+      ],
+      "prefetch_patterns": [
+        "include/**/*.h",
+        "include/**/*.hpp"
+      ]
+    },
+    "compilers/msvc/14.44.35207-14.44.35219.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.44.35207-14.44.35219.0",
+      "root_path": "Y:",
+      "cache_always": [
+        "bin/**/*.exe",
+        "bin/**/*.dll",
+        "bin/**/*.config",
+        "include/**",
+        "lib/**/*.lib"
+      ],
+      "prefetch_patterns": [
+        "include/**/*.h",
+        "include/**/*.hpp"
+      ]
+    },
+    "compilers/msvc/14.43.34808-14.43.34810.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.43.34808-14.43.34810.0",
+      "root_path": "Y:",
+      "cache_always": [
+        "bin/**/*.exe",
+        "bin/**/*.dll",
+        "bin/**/*.config",
+        "include/**",
+        "lib/**/*.lib"
+      ],
+      "prefetch_patterns": [
+        "include/**/*.h",
+        "include/**/*.hpp"
+      ]
+    },
+    "compilers/msvc/14.42.34433-14.42.34444.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.42.34433-14.42.34444.0",
       "root_path": "Y:",
       "cache_always": [
         "bin/**/*.exe",
@@ -29,8 +89,8 @@
         "include/**/*.h"
       ]
     },
-    "compilers/msvc/14.41.34120": {
-      "network_path": "Y:\\compilers\\msvc\\14.41.34120",
+    "compilers/msvc/14.42.34433-14.42.34441.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.42.34433-14.42.34441.0",
       "root_path": "Y:",
       "cache_always": [
         "bin/**/*.exe",
@@ -43,8 +103,8 @@
         "include/**/*.h"
       ]
     },
-    "compilers/msvc/14.40.33807": {
-      "network_path": "Y:\\compilers\\msvc\\14.40.33807",
+    "compilers/msvc/14.41.34120-14.41.34123.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.41.34120-14.41.34123.0",
       "root_path": "Y:",
       "cache_always": [
         "bin/**/*.exe",
@@ -57,8 +117,22 @@
         "include/**/*.h"
       ]
     },
-    "compilers/msvc/14.39.33519": {
-      "network_path": "Y:\\compilers\\msvc\\14.39.33519",
+    "compilers/msvc/14.40.33807-14.40.33811.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.40.33807-14.40.33811.0",
+      "root_path": "Y:",
+      "cache_always": [
+        "bin/**/*.exe",
+        "bin/**/*.dll",
+        "bin/**/*.config",
+        "include/**",
+        "lib/**/*.lib"
+      ],
+      "prefetch_patterns": [
+        "include/**/*.h"
+      ]
+    },
+    "compilers/msvc/14.39.33519-14.39.33523.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.39.33519-14.39.33523.0",
       "root_path": "Y:",
       "cache_always": [
         "bin/**/*.exe",
@@ -69,8 +143,8 @@
       ],
       "prefetch_patterns": []
     },
-    "compilers/msvc/14.38.33130": {
-      "network_path": "Y:\\compilers\\msvc\\14.38.33130",
+    "compilers/msvc/14.38.33130-14.38.33133.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.38.33130-14.38.33133.0",
       "root_path": "Y:",
       "cache_always": [
         "bin/**/*.exe",
@@ -81,8 +155,8 @@
       ],
       "prefetch_patterns": []
     },
-    "compilers/msvc/14.37.32822": {
-      "network_path": "Y:\\compilers\\msvc\\14.37.32822",
+    "compilers/msvc/14.37.32822-14.37.32826.1": {
+      "network_path": "Y:\\compilers\\msvc\\14.37.32822-14.37.32826.1",
       "root_path": "Y:",
       "cache_always": [
         "bin/**/*.exe",
@@ -93,8 +167,8 @@
       ],
       "prefetch_patterns": []
     },
-    "compilers/msvc/14.36.32532": {
-      "network_path": "Y:\\compilers\\msvc\\14.36.32532",
+    "compilers/msvc/14.36.32532-14.36.32544.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.36.32532-14.36.32544.0",
       "root_path": "Y:",
       "cache_always": [
         "bin/**/*.exe",
@@ -105,8 +179,8 @@
       ],
       "prefetch_patterns": []
     },
-    "compilers/msvc/14.35.32215": {
-      "network_path": "Y:\\compilers\\msvc\\14.35.32215",
+    "compilers/msvc/14.35.32215-14.35.32217.1": {
+      "network_path": "Y:\\compilers\\msvc\\14.35.32215-14.35.32217.1",
       "root_path": "Y:",
       "cache_always": [
         "bin/**/*.exe",
@@ -115,8 +189,8 @@
       ],
       "prefetch_patterns": []
     },
-    "compilers/msvc/14.34.31933": {
-      "network_path": "Y:\\compilers\\msvc\\14.34.31933",
+    "compilers/msvc/14.34.31933-14.34.31948.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.34.31933-14.34.31948.0",
       "root_path": "Y:",
       "cache_always": [
         "bin/**/*.exe",
@@ -125,8 +199,8 @@
       ],
       "prefetch_patterns": []
     },
-    "compilers/msvc/14.33.31629": {
-      "network_path": "Y:\\compilers\\msvc\\14.33.31629",
+    "compilers/msvc/14.33.31629-14.33.31630.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.33.31629-14.33.31630.0",
       "root_path": "Y:",
       "cache_always": [
         "bin/**/*.exe",
@@ -135,8 +209,8 @@
       ],
       "prefetch_patterns": []
     },
-    "compilers/msvc/14.32.31326": {
-      "network_path": "Y:\\compilers\\msvc\\14.32.31326",
+    "compilers/msvc/14.32.31326-14.32.31342.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.32.31326-14.32.31342.0",
       "root_path": "Y:",
       "cache_always": [
         "bin/**/*.exe",
@@ -145,8 +219,8 @@
       ],
       "prefetch_patterns": []
     },
-    "compilers/msvc/14.31.31103": {
-      "network_path": "Y:\\compilers\\msvc\\14.31.31103",
+    "compilers/msvc/14.31.31103-14.31.31107.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.31.31103-14.31.31107.0",
       "root_path": "Y:",
       "cache_always": [
         "bin/**/*.exe",
@@ -155,8 +229,8 @@
       ],
       "prefetch_patterns": []
     },
-    "compilers/msvc/14.30.30705": {
-      "network_path": "Y:\\compilers\\msvc\\14.30.30705",
+    "compilers/msvc/14.30.30705-14.30.30715.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.30.30705-14.30.30715.0",
       "root_path": "Y:",
       "cache_always": [
         "bin/**/*.exe",
@@ -165,8 +239,8 @@
       ],
       "prefetch_patterns": []
     },
-    "compilers/msvc/14.29.30133": {
-      "network_path": "Y:\\compilers\\msvc\\14.29.30133",
+    "compilers/msvc/14.29.30133-14.29.30153.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.29.30133-14.29.30153.0",
       "root_path": "Y:",
       "cache_always": [
         "bin/**/*.exe",
@@ -175,8 +249,8 @@
       ],
       "prefetch_patterns": []
     },
-    "compilers/msvc/14.28.29910": {
-      "network_path": "Y:\\compilers\\msvc\\14.28.29910",
+    "compilers/msvc/14.28.29910-14.28.29921.0": {
+      "network_path": "Y:\\compilers\\msvc\\14.28.29910-14.28.29921.0",
       "root_path": "Y:",
       "cache_always": [
         "bin/**/*.exe",
@@ -185,30 +259,47 @@
       ],
       "prefetch_patterns": []
     },
-    "compilers/mingw-w64-15.2.0-18.1.8-12.0.0-ucrt-r1": {
-      "network_path": "Y:\\compilers\\mingw-w64-15.2.0-18.1.8-12.0.0-ucrt-r1",
+    "compilers/mingw-w64-16.2.0posix-14.0.0-ucrt-r1": {
+      "network_path": "Y:\\compilers\\mingw-w64-16.2.0posix-14.0.0-ucrt-r1",
       "root_path": "Y:",
       "cache_always": [
         "bin/*.exe",
-        "bin/*.dll"
+        "bin/*.dll",
+        "libexec/**/*.exe",
+        "libexec/**/*.dll"
       ],
       "prefetch_patterns": []
     },
-    "compilers/mingw-w64-14.3.0-18.1.8-12.0.0-ucrt-r1": {
-      "network_path": "Y:\\compilers\\mingw-w64-14.3.0-18.1.8-12.0.0-ucrt-r1",
+    "compilers/mingw-w64-15.2.0posix-13.0.0-ucrt-r1": {
+      "network_path": "Y:\\compilers\\mingw-w64-15.2.0posix-13.0.0-ucrt-r1",
       "root_path": "Y:",
       "cache_always": [
         "bin/*.exe",
-        "bin/*.dll"
+        "bin/*.dll",
+        "libexec/**/*.exe",
+        "libexec/**/*.dll"
       ],
       "prefetch_patterns": []
     },
-    "compilers/mingw-w64-13.1.0-16.0.0-11.0.0-ucrt-r3": {
-      "network_path": "Y:\\compilers\\mingw-w64-13.1.0-16.0.0-11.0.0-ucrt-r3",
+    "compilers/mingw-w64-14.3.0posix-12.0.0-ucrt-r1": {
+      "network_path": "Y:\\compilers\\mingw-w64-14.3.0posix-12.0.0-ucrt-r1",
       "root_path": "Y:",
       "cache_always": [
         "bin/*.exe",
-        "bin/*.dll"
+        "bin/*.dll",
+        "libexec/**/*.exe",
+        "libexec/**/*.dll"
+      ],
+      "prefetch_patterns": []
+    },
+    "compilers/mingw-w64-13.1.0-16.0.2-11.0.0-ucrt-r1": {
+      "network_path": "Y:\\compilers\\mingw-w64-13.1.0-16.0.2-11.0.0-ucrt-r1",
+      "root_path": "Y:",
+      "cache_always": [
+        "bin/*.exe",
+        "bin/*.dll",
+        "libexec/**/*.exe",
+        "libexec/**/*.dll"
       ],
       "prefetch_patterns": []
     },
@@ -217,27 +308,68 @@
       "root_path": "Y:",
       "cache_always": [
         "bin/*.exe",
-        "bin/*.dll"
+        "bin/*.dll",
+        "libexec/**/*.exe",
+        "libexec/**/*.dll"
       ],
       "prefetch_patterns": []
     },
-    "compilers/mingw-w64-12.1.0-14.0.6-10.0.0-ucrt-r2": {
-      "network_path": "Y:\\compilers\\mingw-w64-12.1.0-14.0.6-10.0.0-ucrt-r2",
+    "compilers/mingw-w64-12.2.0-15.0.7-10.0.0-ucrt-r4": {
+      "network_path": "Y:\\compilers\\mingw-w64-12.2.0-15.0.7-10.0.0-ucrt-r4",
       "root_path": "Y:",
       "cache_always": [
         "bin/*.exe",
-        "bin/*.dll"
+        "bin/*.dll",
+        "libexec/**/*.exe",
+        "libexec/**/*.dll"
       ],
       "prefetch_patterns": []
     },
-    "compilers/mingw-w64-11.3.0-14.0.3-10.0.0-ucrt-r2": {
-      "network_path": "Y:\\compilers\\mingw-w64-11.3.0-14.0.3-10.0.0-ucrt-r2",
+    "compilers/mingw-w64-12.1.0-14.0.6-10.0.0-ucrt-r3": {
+      "network_path": "Y:\\compilers\\mingw-w64-12.1.0-14.0.6-10.0.0-ucrt-r3",
       "root_path": "Y:",
       "cache_always": [
         "bin/*.exe",
-        "bin/*.dll"
+        "bin/*.dll",
+        "libexec/**/*.exe",
+        "libexec/**/*.dll"
       ],
       "prefetch_patterns": []
+    },
+    "compilers/mingw-w64-11.3.0-14.0.3-10.0.0-ucrt-r3": {
+      "network_path": "Y:\\compilers\\mingw-w64-11.3.0-14.0.3-10.0.0-ucrt-r3",
+      "root_path": "Y:",
+      "cache_always": [
+        "bin/*.exe",
+        "bin/*.dll",
+        "libexec/**/*.exe",
+        "libexec/**/*.dll"
+      ],
+      "prefetch_patterns": []
+    },
+    "compilers/clang-cl-23.1.3": {
+      "network_path": "Y:\\compilers\\clang-cl-23.1.3",
+      "root_path": "Y:",
+      "cache_always": [
+        "bin/*.exe",
+        "bin/*.dll",
+        "lib/clang/*/include/**"
+      ],
+      "prefetch_patterns": [
+        "lib/clang/*/include/**/*.h"
+      ]
+    },
+    "compilers/clang-cl-22.1.6": {
+      "network_path": "Y:\\compilers\\clang-cl-22.1.6",
+      "root_path": "Y:",
+      "cache_always": [
+        "bin/*.exe",
+        "bin/*.dll",
+        "lib/clang/*/include/**"
+      ],
+      "prefetch_patterns": [
+        "lib/clang/*/include/**/*.h"
+      ]
     },
     "compilers/clang-cl-18.1.0": {
       "network_path": "Y:\\compilers\\clang-cl-18.1.0",
