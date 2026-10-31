@@ -42,6 +42,8 @@ struct GlobalConfig
     MetricsConfig metrics; // Metrics configuration
     FileTrackingConfig file_tracking; // File access tracking configuration
     bool case_sensitive = false; // Default to case-insensitive
+    uint32_t file_info_timeout_ms = 1000; // WinFsp kernel metadata cache timeout, 4294967295 caches forever
+    bool flush_and_purge_on_cleanup = true; // Drop the kernel's cached file data when the last handle closes
 };
 
 struct Config
