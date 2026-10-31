@@ -31,7 +31,6 @@ struct FileAccessStatistics
     uint64_t total_cache_hits{};
     uint64_t total_cache_misses{};
     double cache_hit_rate{};
-    uint64_t total_bytes_accessed{};
     uint64_t cached_bytes{};
     std::vector<std::pair<std::wstring, uint64_t>> top_accessed_files;
     std::vector<std::pair<std::wstring, uint64_t>> largest_cached_files;

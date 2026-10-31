@@ -371,9 +371,13 @@ Add the `file_tracking` section to your configuration:
 
 ### Report Types
 
-CE Win File Cache generates two types of reports:
+CE Win File Cache generates two types of reports. Both cover everything since startup and are overwritten every
+`report_interval_minutes`, so the report directory only ever holds the latest pair. Timestamped reports written by
+older versions (`file_access_*.csv`, `access_summary_*.txt`) are removed at startup.
 
-#### 1. Detailed CSV Report (`file_access_YYYYMMDD_HHMMSS.csv`)
+Accesses are counted per file open, not per read.
+
+#### 1. Detailed CSV Report (`file_access.csv`)
 
 Contains complete information about every tracked file:
 - Virtual and network paths
@@ -384,7 +388,7 @@ Contains complete information about every tracked file:
 - Average access time
 - First and last access timestamps
 
-#### 2. Summary Report (`access_summary_YYYYMMDD_HHMMSS.txt`)
+#### 2. Summary Report (`access_summary.txt`)
 
 Human-readable summary including:
 - Overall cache statistics

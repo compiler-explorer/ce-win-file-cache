@@ -3,6 +3,7 @@
 #include "../types/file_access_info.hpp"
 #include <atomic>
 #include <chrono>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -16,6 +17,10 @@ namespace CeWinFileCache
 class FileAccessTracker
 {
     public:
+    // Report files in the report directory, overwritten on every report
+    static constexpr const wchar_t *CSV_REPORT_NAME = L"file_access.csv";
+    static constexpr const wchar_t *SUMMARY_REPORT_NAME = L"access_summary.txt";
+
     FileAccessTracker();
     ~FileAccessTracker();
 
@@ -46,8 +51,10 @@ class FileAccessTracker
 
     private:
     void reportingThreadFunc();
-    void writeCSVReport(const std::wstring &filename);
-    void writeSummaryReport(const std::wstring &filename);
+    bool writeCSVReport(const std::wstring &filename);
+    bool writeSummaryReport(const std::wstring &filename);
+    void replaceReport(const std::filesystem::path &tmp_path, const std::filesystem::path &report_path);
+    void removeTimestampedReports();
 
     // Helper to get or create FileAccessInfo (prevents use-after-move)
     FileAccessInfo *getOrCreateAccessInfo(const std::wstring &virtual_path,

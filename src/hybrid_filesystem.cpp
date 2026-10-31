@@ -590,7 +590,6 @@ VOID HybridFileSystem::Close(PVOID FileNode, PVOID FileDesc)
 
 NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UINT64 Offset, ULONG Length, PULONG PBytesTransferred)
 {
-    auto start_time = std::chrono::high_resolution_clock::now();
     auto *file_desc = static_cast<FileDescriptor *>(FileDesc);
 
     std::string path_str = file_desc->entry ? StringUtils::wideToUtf8(file_desc->entry->virtual_path) : "unknown";
@@ -695,25 +694,6 @@ NTSTATUS HybridFileSystem::Read(PVOID FileNode, PVOID FileDesc, PVOID Buffer, UI
     if (file_desc->entry)
     {
         updateAccessTime(file_desc->entry);
-    }
-
-    // Track read operation
-    if (access_tracker && file_desc->entry)
-    {
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration<double>(end_time - start_time).count();
-
-        bool is_cache_hit = (file_desc->entry->state == FileState::CACHED);
-        Logger::debug(LogCategory::FILESYSTEM, "Read() - checking is_in_memory_cache flag (access tracker) for: {}",
-                      StringUtils::wideToUtf8(file_desc->entry->virtual_path));
-        bool is_memory_cached = file_desc->entry->is_in_memory_cache.load();
-
-        access_tracker->recordAccess(file_desc->entry->virtual_path, file_desc->entry->network_path,
-                                     file_desc->entry->file_size, file_desc->entry->state, is_cache_hit, is_memory_cached,
-                                     duration * 1000.0, // Convert to milliseconds
-                                     file_desc->entry->policy == CachePolicy::ALWAYS_CACHE ? L"always_cache" :
-                                     file_desc->entry->policy == CachePolicy::ON_DEMAND    ? L"on_demand" :
-                                                                                             L"never_cache");
     }
 
     return STATUS_SUCCESS;
