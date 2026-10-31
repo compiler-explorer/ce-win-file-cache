@@ -7,12 +7,10 @@
         "bin/**/*.exe",
         "bin/**/*.dll",
         "bin/**/*.config",
-        "include/**",
-        "lib/**/*.lib"
+        "include/**"
       ],
       "prefetch_patterns": [
-        "include/**/*.h",
-        "include/**/*.hpp"
+        "include/**"
       ]
     },
     "compilers/msvc/14.50.35717-14.50.35723.0": {
@@ -22,13 +20,9 @@
         "bin/**/*.exe",
         "bin/**/*.dll",
         "bin/**/*.config",
-        "include/**",
-        "lib/**/*.lib"
+        "include/**"
       ],
-      "prefetch_patterns": [
-        "include/**/*.h",
-        "include/**/*.hpp"
-      ]
+      "prefetch_patterns": []
     },
     "compilers/msvc/14.50.35717-14.50.35717.0": {
       "network_path": "Y:\\compilers\\msvc\\14.50.35717-14.50.35717.0",
@@ -37,13 +31,9 @@
         "bin/**/*.exe",
         "bin/**/*.dll",
         "bin/**/*.config",
-        "include/**",
-        "lib/**/*.lib"
+        "include/**"
       ],
-      "prefetch_patterns": [
-        "include/**/*.h",
-        "include/**/*.hpp"
-      ]
+      "prefetch_patterns": []
     },
     "compilers/msvc/14.44.35207-14.44.35219.0": {
       "network_path": "Y:\\compilers\\msvc\\14.44.35207-14.44.35219.0",
@@ -52,13 +42,9 @@
         "bin/**/*.exe",
         "bin/**/*.dll",
         "bin/**/*.config",
-        "include/**",
-        "lib/**/*.lib"
+        "include/**"
       ],
-      "prefetch_patterns": [
-        "include/**/*.h",
-        "include/**/*.hpp"
-      ]
+      "prefetch_patterns": []
     },
     "compilers/msvc/14.43.34808-14.43.34810.0": {
       "network_path": "Y:\\compilers\\msvc\\14.43.34808-14.43.34810.0",
@@ -67,13 +53,9 @@
         "bin/**/*.exe",
         "bin/**/*.dll",
         "bin/**/*.config",
-        "include/**",
-        "lib/**/*.lib"
+        "include/**"
       ],
-      "prefetch_patterns": [
-        "include/**/*.h",
-        "include/**/*.hpp"
-      ]
+      "prefetch_patterns": []
     },
     "compilers/msvc/14.42.34433-14.42.34444.0": {
       "network_path": "Y:\\compilers\\msvc\\14.42.34433-14.42.34444.0",
@@ -82,12 +64,9 @@
         "bin/**/*.exe",
         "bin/**/*.dll",
         "bin/**/*.config",
-        "include/**",
-        "lib/**/*.lib"
+        "include/**"
       ],
-      "prefetch_patterns": [
-        "include/**/*.h"
-      ]
+      "prefetch_patterns": []
     },
     "compilers/msvc/14.42.34433-14.42.34441.0": {
       "network_path": "Y:\\compilers\\msvc\\14.42.34433-14.42.34441.0",
@@ -96,12 +75,9 @@
         "bin/**/*.exe",
         "bin/**/*.dll",
         "bin/**/*.config",
-        "include/**",
-        "lib/**/*.lib"
+        "include/**"
       ],
-      "prefetch_patterns": [
-        "include/**/*.h"
-      ]
+      "prefetch_patterns": []
     },
     "compilers/msvc/14.41.34120-14.41.34123.0": {
       "network_path": "Y:\\compilers\\msvc\\14.41.34120-14.41.34123.0",
@@ -110,12 +86,9 @@
         "bin/**/*.exe",
         "bin/**/*.dll",
         "bin/**/*.config",
-        "include/**",
-        "lib/**/*.lib"
+        "include/**"
       ],
-      "prefetch_patterns": [
-        "include/**/*.h"
-      ]
+      "prefetch_patterns": []
     },
     "compilers/msvc/14.40.33807-14.40.33811.0": {
       "network_path": "Y:\\compilers\\msvc\\14.40.33807-14.40.33811.0",
@@ -124,12 +97,9 @@
         "bin/**/*.exe",
         "bin/**/*.dll",
         "bin/**/*.config",
-        "include/**",
-        "lib/**/*.lib"
+        "include/**"
       ],
-      "prefetch_patterns": [
-        "include/**/*.h"
-      ]
+      "prefetch_patterns": []
     },
     "compilers/msvc/14.39.33519-14.39.33523.0": {
       "network_path": "Y:\\compilers\\msvc\\14.39.33519-14.39.33523.0",
@@ -138,8 +108,7 @@
         "bin/**/*.exe",
         "bin/**/*.dll",
         "bin/**/*.config",
-        "include/**",
-        "lib/**/*.lib"
+        "include/**"
       ],
       "prefetch_patterns": []
     },
@@ -150,8 +119,7 @@
         "bin/**/*.exe",
         "bin/**/*.dll",
         "bin/**/*.config",
-        "include/**",
-        "lib/**/*.lib"
+        "include/**"
       ],
       "prefetch_patterns": []
     },
@@ -162,8 +130,7 @@
         "bin/**/*.exe",
         "bin/**/*.dll",
         "bin/**/*.config",
-        "include/**",
-        "lib/**/*.lib"
+        "include/**"
       ],
       "prefetch_patterns": []
     },
@@ -174,8 +141,7 @@
         "bin/**/*.exe",
         "bin/**/*.dll",
         "bin/**/*.config",
-        "include/**",
-        "lib/**/*.lib"
+        "include/**"
       ],
       "prefetch_patterns": []
     },
@@ -355,9 +321,7 @@
         "bin/*.dll",
         "lib/clang/*/include/**"
       ],
-      "prefetch_patterns": [
-        "lib/clang/*/include/**/*.h"
-      ]
+      "prefetch_patterns": []
     },
     "compilers/clang-cl-22.1.6": {
       "network_path": "Y:\\compilers\\clang-cl-22.1.6",
@@ -367,9 +331,7 @@
         "bin/*.dll",
         "lib/clang/*/include/**"
       ],
-      "prefetch_patterns": [
-        "lib/clang/*/include/**/*.h"
-      ]
+      "prefetch_patterns": []
     },
     "compilers/clang-cl-18.1.0": {
       "network_path": "Y:\\compilers\\clang-cl-18.1.0",
@@ -379,22 +341,17 @@
         "bin/*.dll",
         "lib/clang/*/include/**"
       ],
-      "prefetch_patterns": [
-        "lib/clang/*/include/**/*.h"
-      ]
+      "prefetch_patterns": []
     },
     "compilers/windows-kits-10": {
       "network_path": "Y:\\compilers\\windows-kits-10",
       "root_path": "Y:",
       "cache_always": [
         "Include/**",
-        "Lib/**/*.lib",
         "bin/*.exe",
         "bin/*.dll"
       ],
-      "prefetch_patterns": [
-        "Include/**/*.h"
-      ]
+      "prefetch_patterns": []
     },
     "compilers/asm-parser-v0.9.9": {
       "network_path": "Y:\\compilers\\asm-parser-v0.9.9",
