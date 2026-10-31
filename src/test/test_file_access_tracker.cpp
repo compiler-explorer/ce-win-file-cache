@@ -49,12 +49,31 @@ int main()
     // Clean up any existing test reports
     cleanupTestReportDirectory();
 
+    // Reports written by older versions, which initialize() should remove, and an unrelated file it should keep
+    createTestReportDirectory();
+    for (const char *name : { "file_access_20261031_113136.csv", "access_summary_20261031_113136.txt", "notes.txt" })
+    {
+        std::ofstream(std::filesystem::path("test_reports") / name) << "old";
+    }
+
     // Test 1: Basic initialization
     std::wcout << L"\n1. Testing basic initialization..." << std::endl;
     std::wcout << L"  Creating FileAccessTracker object..." << std::endl;
     FileAccessTracker tracker;
     std::wcout << L"  Calling initialize..." << std::endl;
     tracker.initialize(L"test_reports", std::chrono::minutes(1), 10);
+    if (std::filesystem::exists("test_reports/file_access_20261031_113136.csv") ||
+        std::filesystem::exists("test_reports/access_summary_20261031_113136.txt"))
+    {
+        std::wcerr << L"Timestamped reports from an earlier version were not removed" << std::endl;
+        return 1;
+    }
+    if (!std::filesystem::exists("test_reports/notes.txt"))
+    {
+        std::wcerr << L"Unrelated file in the report directory was removed" << std::endl;
+        return 1;
+    }
+    std::filesystem::remove("test_reports/notes.txt");
     std::wcout << L"✓ FileAccessTracker initialized" << std::endl;
     std::wcout << L"  Report directory created successfully" << std::endl;
     std::wcout << L"[DEBUG] About to start recording file accesses..." << std::endl;
@@ -122,9 +141,9 @@ int main()
     bool csvFound = false, summaryFound = false;
     for (const auto &file : expectedFiles)
     {
-        if (file.find(L"file_access_") != std::wstring::npos && file.find(L".csv") != std::wstring::npos)
+        if (std::filesystem::path(file).filename() == FileAccessTracker::CSV_REPORT_NAME)
             csvFound = true;
-        if (file.find(L"access_summary_") != std::wstring::npos && file.find(L".txt") != std::wstring::npos)
+        if (std::filesystem::path(file).filename() == FileAccessTracker::SUMMARY_REPORT_NAME)
             summaryFound = true;
     }
 
@@ -149,7 +168,7 @@ int main()
     std::wstring csvFile;
     for (const auto &file : expectedFiles)
     {
-        if (file.find(L"file_access_") != std::wstring::npos && file.find(L".csv") != std::wstring::npos)
+        if (std::filesystem::path(file).filename() == FileAccessTracker::CSV_REPORT_NAME)
         {
             csvFile = file;
             break;
@@ -185,7 +204,7 @@ int main()
     std::wstring summaryFile;
     for (const auto &file : expectedFiles)
     {
-        if (file.find(L"access_summary_") != std::wstring::npos && file.find(L".txt") != std::wstring::npos)
+        if (std::filesystem::path(file).filename() == FileAccessTracker::SUMMARY_REPORT_NAME)
         {
             summaryFile = file;
             break;
@@ -213,6 +232,12 @@ int main()
             return 1;
         }
 
+        if (summaryContent.find(L"Total Bytes Accessed") != std::wstring::npos)
+        {
+            std::wcerr << L"Summary still contains the removed Total Bytes Accessed line" << std::endl;
+            return 1;
+        }
+
         std::wcout << L"✓ Summary content is valid" << std::endl;
     }
 
@@ -237,9 +262,8 @@ int main()
     // Stop reporting
     autoTracker.stopReporting();
 
-    // Check for new reports (should have at least 2 files: CSV and summary)
-    // Note: On Linux, rapid successive report generations may overwrite files with the same timestamp
-    // so we just verify that reports exist rather than counting unique files
+    // Every report replaces the previous one: exactly one CSV and one summary, no temporary files left behind
+    autoTracker.generateReport();
     int reportCount = 0;
     for (const auto &entry : std::filesystem::directory_iterator("test_reports"))
     {
@@ -249,14 +273,22 @@ int main()
         }
     }
 
-    if (reportCount < 2) // Should have at least 2 files (CSV and summary)
+    if (reportCount != 2 || !std::filesystem::exists(std::filesystem::path("test_reports") / FileAccessTracker::CSV_REPORT_NAME) ||
+        !std::filesystem::exists(std::filesystem::path("test_reports") / FileAccessTracker::SUMMARY_REPORT_NAME))
     {
-        std::wcerr << L"❌ Second manual reporting didn't generate additional reports (found " << reportCount
-                   << L" files)" << std::endl;
+        std::wcerr << L"Expected exactly the two latest reports after repeated reporting, found " << reportCount
+                   << L" files" << std::endl;
         return 1;
     }
 
-    std::wcout << L"✓ Second manual reporting didn't generate additional reports (found " << reportCount << L" files)" << std::endl;
+    auto latestCsv = readFileContent((std::filesystem::path("test_reports") / FileAccessTracker::CSV_REPORT_NAME).wstring());
+    if (latestCsv.find(L"/test/file1.txt") == std::wstring::npos || latestCsv.find(L"cl.exe") != std::wstring::npos)
+    {
+        std::wcerr << L"CSV report was not replaced by the latest tracker's report" << std::endl;
+        return 1;
+    }
+
+    std::wcout << L"Repeated reporting keeps only the latest CSV and summary" << std::endl;
 
     // Test 7: List all generated reports
     std::wcout << L"\n7. Generated report files:" << std::endl;

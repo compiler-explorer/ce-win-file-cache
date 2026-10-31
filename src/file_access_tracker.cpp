@@ -75,6 +75,8 @@ void FileAccessTracker::initialize(const std::wstring &report_directory, std::ch
     }
 #endif
     Logger::debug(LogCategory::ACCESS, "Directory creation section completed");
+
+    removeTimestampedReports();
 }
 
 void FileAccessTracker::recordAccess(const std::wstring virtual_path,
@@ -180,21 +182,80 @@ void FileAccessTracker::reportingThreadFunc()
 
 void FileAccessTracker::generateReport()
 {
-    auto timestamp = TimeUtils::getCurrentTimestamp();
+    // Each report covers everything since startup, so only the latest one is kept. It is written to a temporary
+    // file first and then renamed over the previous one, so a reader never sees a partly written report.
+    std::filesystem::path directory(report_directory_);
+    std::filesystem::path csv_path = directory / CSV_REPORT_NAME;
+    std::filesystem::path summary_path = directory / SUMMARY_REPORT_NAME;
 
-    // Generate detailed CSV report
-    std::wstring csv_filename = report_directory_ + L"/file_access_" + timestamp + L".csv";
-    writeCSVReport(csv_filename);
+    std::filesystem::path csv_tmp_path = csv_path;
+    csv_tmp_path += L".tmp";
+    if (writeCSVReport(csv_tmp_path.wstring()))
+    {
+        replaceReport(csv_tmp_path, csv_path);
+    }
 
-    // Generate summary report
-    std::wstring summary_filename = report_directory_ + L"/access_summary_" + timestamp + L".txt";
-    writeSummaryReport(summary_filename);
+    std::filesystem::path summary_tmp_path = summary_path;
+    summary_tmp_path += L".tmp";
+    if (writeSummaryReport(summary_tmp_path.wstring()))
+    {
+        replaceReport(summary_tmp_path, summary_path);
+    }
 
-    Logger::info(LogCategory::ACCESS, "Generated reports: {} and {}", StringUtils::wideToUtf8(csv_filename),
-                 StringUtils::wideToUtf8(summary_filename));
+    Logger::info(LogCategory::ACCESS, "Generated reports: {} and {}", StringUtils::wideToUtf8(csv_path.wstring()),
+                 StringUtils::wideToUtf8(summary_path.wstring()));
 }
 
-void FileAccessTracker::writeCSVReport(const std::wstring &filename)
+void FileAccessTracker::replaceReport(const std::filesystem::path &tmp_path, const std::filesystem::path &report_path)
+{
+    std::error_code error;
+    std::filesystem::rename(tmp_path, report_path, error);
+    if (error)
+    {
+        Logger::error(LogCategory::ACCESS, "Failed to replace report {}: {}", StringUtils::wideToUtf8(report_path.wstring()),
+                      error.message());
+        std::filesystem::remove(tmp_path, error);
+    }
+}
+
+void FileAccessTracker::removeTimestampedReports()
+{
+    // Older versions wrote a new pair of reports every interval and never removed them
+    std::error_code error;
+    std::filesystem::directory_iterator it(std::filesystem::path(report_directory_), error);
+    if (error)
+    {
+        return;
+    }
+
+    size_t removed = 0;
+    for (; it != std::filesystem::directory_iterator(); it.increment(error))
+    {
+        if (error)
+        {
+            break;
+        }
+        if (!it->is_regular_file(error))
+        {
+            continue;
+        }
+
+        std::wstring name = it->path().filename().wstring();
+        bool is_old_csv = name.starts_with(L"file_access_") && name.ends_with(L".csv");
+        bool is_old_summary = name.starts_with(L"access_summary_") && name.ends_with(L".txt");
+        if ((is_old_csv || is_old_summary) && std::filesystem::remove(it->path(), error))
+        {
+            ++removed;
+        }
+    }
+
+    if (removed > 0)
+    {
+        Logger::info(LogCategory::ACCESS, "Removed {} timestamped reports from an earlier version", removed);
+    }
+}
+
+bool FileAccessTracker::writeCSVReport(const std::wstring &filename)
 {
     try
     {
@@ -213,7 +274,7 @@ void FileAccessTracker::writeCSVReport(const std::wstring &filename)
         if (!file.is_open())
         {
             Logger::error(LogCategory::ACCESS, "Failed to create CSV report: {}", StringUtils::wideToUtf8(filename));
-            return;
+            return false;
         }
 
         // Write CSV header
@@ -260,14 +321,16 @@ void FileAccessTracker::writeCSVReport(const std::wstring &filename)
         }
 
         file.close();
+        return !file.fail();
     }
     catch (const std::exception &e)
     {
         Logger::error(LogCategory::ACCESS, "Error writing CSV report: {}", e.what());
+        return false;
     }
 }
 
-void FileAccessTracker::writeSummaryReport(const std::wstring &filename)
+bool FileAccessTracker::writeSummaryReport(const std::wstring &filename)
 {
     try
     {
@@ -286,7 +349,7 @@ void FileAccessTracker::writeSummaryReport(const std::wstring &filename)
         if (!file.is_open())
         {
             Logger::error(LogCategory::ACCESS, "Failed to create summary report: {}", StringUtils::wideToUtf8(filename));
-            return;
+            return false;
         }
 
         auto stats = getStatistics();
@@ -305,7 +368,6 @@ void FileAccessTracker::writeSummaryReport(const std::wstring &filename)
         file << L"Total Cache Hits: " << stats.total_cache_hits << L"\n";
         file << L"Total Cache Misses: " << stats.total_cache_misses << L"\n";
         file << L"Overall Hit Rate: " << std::fixed << std::setprecision(1) << stats.cache_hit_rate << L"%\n";
-        file << L"Total Bytes Accessed: " << formatFileSize(stats.total_bytes_accessed) << L"\n";
         file << L"Cached Bytes: " << formatFileSize(stats.cached_bytes) << L"\n\n";
 
         file << L"Top " << stats.top_accessed_files.size() << L" Most Accessed Files\n";
@@ -333,10 +395,12 @@ void FileAccessTracker::writeSummaryReport(const std::wstring &filename)
         }
 
         file.close();
+        return !file.fail();
     }
     catch (const std::exception &e)
     {
         Logger::error(LogCategory::ACCESS, "Error writing summary report: {}", e.what());
+        return false;
     }
 }
 
@@ -360,7 +424,6 @@ FileAccessStatistics FileAccessTracker::getStatistics() const
     for (const auto &[path, info] : file_access_map_)
     {
         all_files.push_back(info.get());
-        stats.total_bytes_accessed += info->file_size * info->access_count.load();
         if (info->current_state == FileState::CACHED || info->is_memory_cached)
         {
             stats.cached_bytes += info->file_size;
